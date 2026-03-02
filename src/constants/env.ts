@@ -30,3 +30,16 @@ export function generateRandomPort(): number {
 		PORT_RANGE.MIN
 	);
 }
+
+// GitHub release check configuration
+export const GITHUB_REPO_OWNER = 'Helmi';
+export const GITHUB_REPO_NAME = 'cacd';
+export const GITHUB_RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/latest`;
+export const UPDATE_CHECK_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+export interface UpdateCheckCacheEntry {
+	checkedAt: number;
+	latestVersion?: string;
+	latestTag?: string;
+	latestVersionError?: string;
+}

@@ -68,6 +68,7 @@ export interface ApiServerAdapter {
 		port: number,
 		host?: string,
 		devMode?: boolean,
+		allowRandomPortFallback?: boolean,
 	): Promise<{port: number; address: string}>;
 }
 
@@ -140,6 +141,7 @@ export interface CliCommandContext {
 	parsedArgs: ParsedCliArgs;
 	formatter: OutputFormatter;
 	port: number;
+	isPortConfigured: boolean;
 	configDir: string;
 	customConfigDir: boolean;
 	devModeActive: boolean;

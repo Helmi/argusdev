@@ -220,6 +220,13 @@ export interface DevcontainerConfig {
 	execCommand: string; // Command to execute in devcontainer
 }
 
+export interface VersionCheckState {
+	checkedAt: number;
+	latestVersion?: string;
+	latestTag?: string;
+	latestVersionError?: string;
+}
+
 export interface ConfigurationData {
 	shortcuts?: ShortcutConfig;
 	statusHooks?: StatusHookConfig;
@@ -242,6 +249,7 @@ export interface ConfigurationData {
 	passcodeHash?: string; // bcrypt hash of the user's passcode
 	// Legacy field - kept for migration
 	webAuthToken?: string; // Old token format (deprecated, will be migrated)
+	updateCheck?: VersionCheckState;
 }
 
 // Project interfaces

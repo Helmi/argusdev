@@ -1,6 +1,22 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react'
 import { io, Socket } from 'socket.io-client'
-import type { Session, Worktree, Project, ThemeType, FontType, ConnectionStatus, AppConfig, ChangedFile, AgentConfig, AgentsConfig, TdStatus, TdIssue, ProjectConfig, TdPromptTemplate } from './types'
+import type {
+	Session,
+	Worktree,
+	Project,
+	ThemeType,
+	FontType,
+	ConnectionStatus,
+	AppConfig,
+	ChangedFile,
+	AgentConfig,
+	AgentsConfig,
+	TdStatus,
+	TdIssue,
+	ProjectConfig,
+	TdPromptTemplate,
+	UpdateInfo,
+} from './types'
 import { mapBackendToFrontend, mapFrontendToBackend, getDefaultConfig } from './configMapper'
 import { resolveTdIssueWorktreePath } from './tdWorktreeResolver'
 
@@ -89,6 +105,7 @@ interface AppState {
 
   // Server info
   isDevMode: boolean
+  updateInfo: UpdateInfo | null
 
   // Error handling
   error: string | null
@@ -320,6 +337,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Server info
   const [isDevMode, setIsDevMode] = useState(false)
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
 
   // Error state
   const [error, setError] = useState<string | null>(null)
@@ -382,6 +400,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       setCurrentProject(state.selectedProject || null)
       if (state.isDevMode !== undefined) setIsDevMode(state.isDevMode)
+      setUpdateInfo(
+        state.updateInfo && typeof state.updateInfo === 'object'
+          ? (state.updateInfo as UpdateInfo)
+          : null,
+      )
       setSessions(sessionsData)
     } catch (err) {
       console.error('Failed to fetch session data:', err)
@@ -1424,6 +1447,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fontScale,
     connectionStatus,
     isDevMode,
+    updateInfo,
     error,
     socket,
 

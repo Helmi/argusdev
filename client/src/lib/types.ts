@@ -374,6 +374,17 @@ export interface ProjectConfig {
 	[key: string]: unknown;
 }
 
+export interface UpdateInfo {
+	currentVersion: string;
+	latestVersion?: string;
+	latestTag?: string;
+	checkedAt?: number;
+	isUpdateAvailable: boolean;
+	isStale: boolean;
+	source: 'cache' | 'network';
+	error?: string;
+}
+
 // Application configuration
 export interface AppConfig {
 	// Auto approval

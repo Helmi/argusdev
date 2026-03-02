@@ -399,30 +399,29 @@ if (subcommand && !knownCommands.has(subcommand)) {
 }
 
 // Resolve port with precedence: CLI flag > env var > config > generate random
-function resolvePort(): number {
+function resolvePort(): {port: number; isConfigured: boolean} {
 	if (parsedCliArgs.flags.port !== undefined) {
-		return parsedCliArgs.flags.port;
+		return {port: parsedCliArgs.flags.port, isConfigured: true};
 	}
 
 	const envPort = process.env[ENV_VARS.PORT];
 	if (envPort) {
 		const parsed = parseInt(envPort, 10);
 		if (!isNaN(parsed)) {
-			return parsed;
+			return {port: parsed, isConfigured: true};
 		}
 	}
 
 	const configPort = configurationManager.getPort();
 	if (configPort !== undefined) {
-		return configPort;
+		return {port: configPort, isConfigured: true};
 	}
 
 	const randomPort = generateRandomPort();
-	configurationManager.setPort(randomPort);
-	return randomPort;
+	return {port: randomPort, isConfigured: false};
 }
 
-const port = resolvePort();
+const {port, isConfigured: isPortConfigured} = resolvePort();
 
 // Validate port
 if (isNaN(port) || port < 1 || port > 65535) {
@@ -514,6 +513,7 @@ const commandContext: CliCommandContext = {
 	parsedArgs: parsedCliArgs,
 	formatter,
 	port,
+	isPortConfigured,
 	configDir,
 	customConfigDir,
 	devModeActive,
@@ -568,12 +568,13 @@ let webConfig: DaemonWebConfig | undefined;
 
 if (isDaemonMode) {
 	try {
-		const result = await apiServer.start(port, '0.0.0.0', devModeActive);
+		const result = await apiServer.start(
+			port,
+			'0.0.0.0',
+			devModeActive,
+			!isPortConfigured,
+		);
 		const actualPort = result.port;
-
-		if (devModeActive && actualPort !== port) {
-			configurationManager.setPort(actualPort);
-		}
 
 		webConfig = await withNetworkLinks(
 			{

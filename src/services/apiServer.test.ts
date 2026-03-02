@@ -81,6 +81,8 @@ vi.mock('./configurationManager.js', () => ({
 		getAccessToken: vi.fn(() => ''),
 		setTdConfig: vi.fn(),
 		getConfiguration: vi.fn(() => ({accessToken: '', passcodeHash: 'hash'})),
+		getUpdateCheck: vi.fn(() => undefined),
+		setUpdateCheck: vi.fn(),
 		getAgentById: vi.fn(() => ({
 			id: 'codex',
 			name: 'Codex',
@@ -490,6 +492,104 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		} finally {
 			await freshApiServer.stop();
 		}
+	});
+
+	it('throws a clear error when a configured port is already in use and fallback is disabled', async () => {
+		await vi.resetModules();
+		const freshApiModule = await import('./apiServer.js');
+		const freshApiServer = freshApiModule.apiServer as unknown as {
+			start: (
+				port: number,
+				host: string,
+				devMode: boolean,
+				allowRandomPortFallback?: boolean,
+			) => Promise<{address: string; port: number}>;
+			app: {
+				listen: ReturnType<typeof vi.fn>;
+			};
+		};
+
+		const addressInUse = new Error('address in use') as NodeJS.ErrnoException;
+		addressInUse.code = 'EADDRINUSE';
+		const listenSpy = vi
+			.spyOn(freshApiServer.app, 'listen')
+			.mockRejectedValue(addressInUse);
+
+		expect.assertions(2);
+		await expect(
+			freshApiServer.start(3000, '127.0.0.1', false, false),
+		).rejects.toThrow(
+			'Port 3000 is already in use. Start with a different port using --port.',
+		);
+		expect(listenSpy).toHaveBeenCalledTimes(1);
+	});
+
+	it('retries with a random port when fallback is enabled and address is in use', async () => {
+		await vi.resetModules();
+		const freshApiModule = await import('./apiServer.js');
+		const freshApiServer = freshApiModule.apiServer as unknown as {
+			start: (
+				port: number,
+				host: string,
+				devMode: boolean,
+				allowRandomPortFallback?: boolean,
+			) => Promise<{address: string; port: number}>;
+			stop: () => Promise<void>;
+			app: {
+				listen: ReturnType<typeof vi.fn>;
+			};
+		};
+
+		const addressInUse = new Error('address in use') as NodeJS.ErrnoException;
+		addressInUse.code = 'EADDRINUSE';
+		const listenSpy = vi
+			.spyOn(freshApiServer.app, 'listen')
+			.mockRejectedValueOnce(addressInUse)
+			.mockResolvedValueOnce('http://127.0.0.1:41234');
+
+		try {
+			const result = await freshApiServer.start(3000, '127.0.0.1', false, true);
+			expect(listenSpy).toHaveBeenCalledTimes(2);
+			const firstCall = listenSpy.mock.calls[0]?.[0] as {port: number};
+			const secondCall = listenSpy.mock.calls[1]?.[0] as {port: number};
+			expect(firstCall?.port).toBe(3000);
+			expect(secondCall?.port).not.toBe(3000);
+			expect(result.port).toBe(secondCall?.port);
+		} finally {
+			await freshApiServer.stop();
+		}
+	});
+
+	it('throws a clear error for permission denied even when fallback is enabled', async () => {
+		await vi.resetModules();
+		const freshApiModule = await import('./apiServer.js');
+		const freshApiServer = freshApiModule.apiServer as unknown as {
+			start: (
+				port: number,
+				host: string,
+				devMode: boolean,
+				allowRandomPortFallback?: boolean,
+			) => Promise<{address: string; port: number}>;
+			app: {
+				listen: ReturnType<typeof vi.fn>;
+			};
+		};
+
+		const permissionError = new Error(
+			'permission denied',
+		) as NodeJS.ErrnoException;
+		permissionError.code = 'EACCES';
+		const listenSpy = vi
+			.spyOn(freshApiServer.app, 'listen')
+			.mockRejectedValue(permissionError);
+
+		expect.assertions(2);
+		await expect(
+			freshApiServer.start(80, '127.0.0.1', false, true),
+		).rejects.toThrow(
+			'Cannot bind to port 80: permission denied. Try a higher port or allow permission for this operation.',
+		);
+		expect(listenSpy).toHaveBeenCalledTimes(1);
 	});
 
 	it('runs startup launcher cleanup on interval', async () => {
