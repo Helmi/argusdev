@@ -215,6 +215,8 @@ describe('CLI', () => {
 					getConfiguration: vi.fn(() => ({accessToken: 'token'})),
 					getPort: vi.fn(() => 3000),
 					setPort: vi.fn(),
+					getUpdateCheck: vi.fn(() => undefined),
+					setUpdateCheck: vi.fn(),
 				},
 			}));
 
@@ -253,7 +255,12 @@ describe('CLI', () => {
 			try {
 				await import('./cli.js');
 
-				expect(apiStart).toHaveBeenCalledWith(3000, '0.0.0.0', false);
+				expect(apiStart).toHaveBeenCalledWith(
+					3000,
+					'0.0.0.0',
+					false,
+					expect.any(Boolean),
+				);
 				expect(prepareDaemonPidFile).toHaveBeenCalledWith(
 					'/tmp/cacd-test/daemon.pid',
 					process.pid,
@@ -363,6 +370,8 @@ describe('CLI', () => {
 					getConfiguration: vi.fn(() => ({accessToken: 'token'})),
 					getPort: vi.fn(() => 3000),
 					setPort: vi.fn(),
+					getUpdateCheck: vi.fn(() => undefined),
+					setUpdateCheck: vi.fn(),
 				},
 			}));
 			vi.doMock('./services/globalSessionOrchestrator.js', () => ({
@@ -672,7 +681,11 @@ describe('CLI', () => {
 
 			try {
 				await expect(import('./cli.js')).rejects.toThrow('exit:0');
-				expect(consoleLogSpy).toHaveBeenCalledWith('Daemon is running');
+				expect(
+					consoleLogSpy,
+				).toHaveBeenCalledWith(
+					expect.stringMatching(/CA⚡CD v.* — Running/),
+				);
 				expect(consoleLogSpy).toHaveBeenCalledWith('PID:          5151');
 				expect(consoleLogSpy).toHaveBeenCalledWith('Uptime:       00:02:00');
 			} finally {
@@ -713,7 +726,9 @@ describe('CLI', () => {
 
 			try {
 				await expect(import('./cli.js')).rejects.toThrow('exit:0');
-				expect(consoleLogSpy).toHaveBeenCalledWith('Daemon is not running');
+				expect(consoleLogSpy).toHaveBeenCalledWith(
+					expect.stringMatching(/CA⚡CD v.* — Stopped/),
+				);
 			} finally {
 				processExitSpy.mockRestore();
 				consoleLogSpy.mockRestore();

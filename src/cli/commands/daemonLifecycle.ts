@@ -1,11 +1,13 @@
-import {spawnSync} from 'child_process';
 import {mkdir} from 'fs/promises';
-import dgram from 'dgram';
-import dns from 'dns';
-import os from 'os';
 import {createApiClient, ApiClientError} from '../apiClient.js';
 import type {DaemonWebConfig} from '../../utils/daemonControl.js';
 import type {CliCommandContext} from '../types.js';
+import {checkForUpdate} from '../../services/versionCheckService.js';
+import {
+	formatDaemonVersionHeader,
+	getProcessUptime,
+	withNetworkLinks,
+} from './daemonUtils.js';
 
 const DAEMON_READY_TIMEOUT_MS = 15_000;
 const DAEMON_POLL_INTERVAL_MS = 200;
@@ -19,72 +21,6 @@ function sleep(ms: number): Promise<void> {
 	return new Promise(resolve => {
 		setTimeout(resolve, ms);
 	});
-}
-
-function getProcessUptime(pid: number): string | undefined {
-	const result = spawnSync('ps', ['-p', `${pid}`, '-o', 'etime='], {
-		encoding: 'utf-8',
-	});
-
-	if (result.status !== 0) {
-		return undefined;
-	}
-
-	const uptime = result.stdout.trim();
-	return uptime.length > 0 ? uptime : undefined;
-}
-
-function getExternalIP(): Promise<string | undefined> {
-	return new Promise(resolve => {
-		const socket = dgram.createSocket('udp4');
-		socket.connect(80, '8.8.8.8', () => {
-			const addr = socket.address();
-			socket.close();
-			resolve(typeof addr === 'string' ? undefined : addr.address);
-		});
-		socket.on('error', () => {
-			socket.close();
-			resolve(undefined);
-		});
-	});
-}
-
-function getLocalHostname(
-	externalIP: string | undefined,
-): Promise<string | undefined> {
-	if (!externalIP) {
-		return Promise.resolve(undefined);
-	}
-
-	return new Promise(resolve => {
-		const hostname = os.hostname();
-		dns.lookup(hostname, {family: 4}, (err, addr) => {
-			if (!err && addr === externalIP) {
-				resolve(hostname);
-			} else {
-				resolve(undefined);
-			}
-		});
-	});
-}
-
-async function withNetworkLinks(
-	baseConfig: DaemonWebConfig,
-	token: string | undefined,
-): Promise<DaemonWebConfig> {
-	const externalIP = await getExternalIP();
-	const hostname = await getLocalHostname(externalIP);
-	const tokenPath = token ? `/${token}` : '';
-
-	return {
-		...baseConfig,
-		externalUrl: externalIP
-			? `http://${externalIP}:${baseConfig.port}${tokenPath}`
-			: undefined,
-		hostname: hostname
-			? `http://${hostname}:${baseConfig.port}${tokenPath}`
-			: undefined,
-	};
 }
 
 function normalizeApiError(error: unknown): Error {
@@ -279,20 +215,17 @@ export async function runDaemonLifecycleCommand(
 			return 1;
 		}
 
-		const lines: string[] = [];
-		if (result.started) {
-			lines.push('CA⚡CD daemon started in background');
-		} else {
-			lines.push(`Daemon already running (PID ${result.pid})`);
-		}
+		const lines = formatDaemonVersionHeader(
+			result.started ? 'Started' : 'Already running',
+		);
+		lines.push(`PID:          ${result.pid}`);
 		lines.push(`Local URL:    ${result.webConfig.url}`);
 		lines.push(
 			`External URL: ${result.webConfig.externalUrl || '(unavailable)'}`,
 		);
-		lines.push(`PID:          ${result.pid}`);
-		lines.push(`Config Dir:   ${context.configDir}`);
-		lines.push(`PID File:     ${context.daemonPidFilePath}`);
-		lines.push(`Log File:     ${context.daemonLogPath}`);
+		if (!context.isPortConfigured) {
+			lines.push(`Using auto-assigned port: ${result.webConfig.port}`);
+		}
 
 		context.formatter.write({
 			text: lines,
@@ -307,6 +240,7 @@ export async function runDaemonLifecycleCommand(
 				logFile: context.daemonLogPath,
 			},
 		});
+		void checkForUpdate();
 		return 0;
 	}
 
@@ -445,11 +379,7 @@ export async function runDaemonLifecycleCommand(
 
 		if (!statusOutput.running) {
 			context.formatter.write({
-				text: [
-					'Daemon is not running',
-					`Config Dir: ${context.configDir}`,
-					`PID File:   ${context.daemonPidFilePath}`,
-				],
+				text: [...formatDaemonVersionHeader('Stopped'), 'Active sessions: 0'],
 				data: {
 					ok: true,
 					command: 'status',
@@ -462,13 +392,10 @@ export async function runDaemonLifecycleCommand(
 		}
 
 		const lines = [
-			'Daemon is running',
+			...formatDaemonVersionHeader('Running'),
 			`PID:          ${statusOutput.pid}`,
 			`Local URL:    ${statusOutput.webConfig?.url}`,
 			`External URL: ${statusOutput.webConfig?.externalUrl || '(unavailable)'}`,
-			`Config Dir:   ${context.configDir}`,
-			`PID File:     ${context.daemonPidFilePath}`,
-			`Log File:     ${context.daemonLogPath}`,
 		];
 		if (statusOutput.uptime) {
 			lines.push(`Uptime:       ${statusOutput.uptime}`);
@@ -537,27 +464,21 @@ export async function runDaemonLifecycleCommand(
 		}
 
 		context.formatter.write({
-			text: context.parsedArgs.flags.force
-				? [
-						`Daemon restarted (PID ${result.pid})`,
-						`Local URL:    ${result.webConfig.url}`,
-						`External URL: ${result.webConfig.externalUrl || '(unavailable)'}`,
-						`Config Dir:   ${context.configDir}`,
-						`PID File:     ${context.daemonPidFilePath}`,
-						`Log File:     ${context.daemonLogPath}`,
-						`Force mode: terminated ${forceRestartSummary?.terminated || 0} active session(s) before restart.`,
-						`Sessions terminated: ${formatActiveSessionList(forceRestartSummary?.activeSessionIds || [])}`,
-					]
-				: [
-						`Daemon restarted (PID ${result.pid})`,
-						`Local URL:    ${result.webConfig.url}`,
-						`External URL: ${result.webConfig.externalUrl || '(unavailable)'}`,
-						`Config Dir:   ${context.configDir}`,
-						`PID File:     ${context.daemonPidFilePath}`,
-						`Log File:     ${context.daemonLogPath}`,
-						'Session recovery mode: active sessions were preserved and will be rehydrated.',
-						'Use `cacd restart --force` for destructive restart.',
-					],
+			text: [
+				...formatDaemonVersionHeader('Restarted'),
+				`PID:          ${result.pid}`,
+				`Local URL:    ${result.webConfig.url}`,
+				`External URL: ${result.webConfig.externalUrl || '(unavailable)'}`,
+				...(!context.isPortConfigured
+					? [`Using auto-assigned port: ${result.webConfig.port}`]
+					: []),
+				context.parsedArgs.flags.force
+					? `Force mode: terminated ${forceRestartSummary?.terminated || 0} active session(s) before restart.`
+					: 'Session recovery mode: active sessions were preserved and will be rehydrated.',
+				context.parsedArgs.flags.force
+					? `Sessions terminated: ${formatActiveSessionList(forceRestartSummary?.activeSessionIds || [])}`
+					: 'Use `cacd restart --force` for destructive restart.',
+			],
 			data: {
 				ok: true,
 				command: 'restart',
@@ -572,46 +493,19 @@ export async function runDaemonLifecycleCommand(
 				activeSessions: forceRestartSummary?.activeSessionIds || [],
 			},
 		});
+		void checkForUpdate();
 		return 0;
 	}
 
-	let result: {pid: number; started: boolean; webConfig: DaemonWebConfig};
-	try {
-		await stopDaemon(context);
-		result = await startDaemonInBackground(context);
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		context.formatter.writeError({
-			text: [`Failed to restart daemon: ${message}`],
-			data: {
-				ok: false,
-				command: 'restart',
-				error: {
-					message,
-				},
-			},
-		});
-		return 1;
-	}
-
-	context.formatter.write({
-		text: [
-			`Daemon restarted (PID ${result.pid})`,
-			`Local URL:    ${result.webConfig.url}`,
-			`External URL: ${result.webConfig.externalUrl || '(unavailable)'}`,
-			`Config Dir:   ${context.configDir}`,
-			`PID File:     ${context.daemonPidFilePath}`,
-			`Log File:     ${context.daemonLogPath}`,
-		],
+	context.formatter.writeError({
+		text: [`Unknown daemon command: ${context.subcommand}`],
 		data: {
-			ok: true,
-			command: 'restart',
-			pid: result.pid,
-			webConfig: result.webConfig,
-			configDir: context.configDir,
-			pidFile: context.daemonPidFilePath,
-			logFile: context.daemonLogPath,
+			ok: false,
+			command: context.subcommand,
+			error: {
+				message: `Unsupported daemon command: ${context.subcommand}`,
+			},
 		},
 	});
-	return 0;
+	return 1;
 }

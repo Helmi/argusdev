@@ -6,7 +6,8 @@ import { FontScaleControl } from '@/components/FontScaleControl'
 import { PanelLeft, Settings, Zap } from 'lucide-react'
 
 export function Header() {
-  const { toggleSidebar, isDevMode, openSettings } = useAppStore()
+  const { toggleSidebar, isDevMode, openSettings, updateInfo } = useAppStore()
+  const hasUpdate = updateInfo?.isUpdateAvailable === true
 
   return (
     <header className="flex h-9 items-center justify-between border-b border-border bg-sidebar px-3 text-sm">
@@ -28,8 +29,14 @@ export function Header() {
 
         {/* DEV indicator */}
         {isDevMode && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
             DEV
+          </span>
+        )}
+
+        {hasUpdate && (
+          <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300">
+            Update available: v{updateInfo?.latestVersion || 'new'} → cacd update
           </span>
         )}
       </div>

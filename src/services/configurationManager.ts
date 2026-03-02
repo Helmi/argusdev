@@ -1256,6 +1256,21 @@ export class ConfigurationManager {
 	}
 
 	/**
+	 * Read cached release-check metadata.
+	 */
+	getUpdateCheck(): ConfigurationData['updateCheck'] | undefined {
+		return this.config.updateCheck;
+	}
+
+	/**
+	 * Persist release-check metadata in config for cross-process reuse.
+	 */
+	setUpdateCheck(updateCheck: ConfigurationData['updateCheck']): void {
+		this.config.updateCheck = updateCheck;
+		this.saveConfig();
+	}
+
+	/**
 	 * Update authentication credentials (access token and/or passcode hash).
 	 * Used by CLI auth commands.
 	 */

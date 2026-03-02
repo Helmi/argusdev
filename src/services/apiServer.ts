@@ -62,6 +62,10 @@ import {
 	toApiSessionPayload,
 	toSessionUpdatePayload,
 } from './sessionStateMetadata.js';
+import {
+	checkForUpdate,
+	getCachedUpdateCheck,
+} from './versionCheckService.js';
 
 // --- Clipboard Image Paste Constants ---
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -1109,6 +1113,7 @@ export class APIServer {
 			return {
 				...coreService.getState(),
 				isDevMode: isDevMode(),
+				updateInfo: getCachedUpdateCheck(),
 			};
 		});
 
@@ -3796,19 +3801,25 @@ export class APIServer {
 	 * Start the API server.
 	 * @param port - Port to listen on
 	 * @param host - Host to bind to
-	 * @param devMode - If true, retry with random ports on EADDRINUSE
+	 * @param devMode - If true, enables dev-mode startup behavior (like dev passcode output)
+	 * @param allowRandomPortFallback - If true, retry with random ports on EADDRINUSE
 	 * @returns Object containing the address and actual port used
 	 */
 	public async start(
 		port: number = 3000,
 		host: string = '127.0.0.1', // Bind to localhost only for security
 		devMode: boolean = false,
+		allowRandomPortFallback = false,
 	): Promise<{address: string; port: number}> {
 		// Wait for setup to complete before starting
 		await this.setupPromise;
 
-		const maxRetries = devMode ? 10 : 1;
+		const maxRetries = allowRandomPortFallback ? 10 : 1;
 		let currentPort = port;
+
+		void checkForUpdate().catch(error => {
+			logger.debug(`Update check failed: ${String(error)}`);
+		});
 
 		for (let attempt = 0; attempt < maxRetries; attempt++) {
 			try {
@@ -3840,19 +3851,30 @@ export class APIServer {
 				}
 				return {address, port: currentPort};
 			} catch (err: unknown) {
-				const isAddressInUse =
-					err instanceof Error &&
-					'code' in err &&
-					(err as NodeJS.ErrnoException).code === 'EADDRINUSE';
+				const errorCode = err instanceof Error && 'code' in err ? (err as NodeJS.ErrnoException).code : undefined;
+				const isAddressInUse = errorCode === 'EADDRINUSE';
+				const isPermissionError = errorCode === 'EACCES';
 
-				if (isAddressInUse && devMode && attempt < maxRetries - 1) {
-					// In dev mode, try a new random port
+				if (isPermissionError) {
+					throw new Error(
+						`Cannot bind to port ${currentPort}: permission denied. Try a higher port or allow permission for this operation.`,
+					);
+				}
+
+				if (isAddressInUse && allowRandomPortFallback && attempt < maxRetries - 1) {
+					// Try a new random port when no port is configured.
 					const newPort = generateRandomPort();
 					logger.info(
 						`Port ${currentPort} in use, retrying with port ${newPort} (attempt ${attempt + 2}/${maxRetries})`,
 					);
 					currentPort = newPort;
 					continue;
+				}
+
+				if (isAddressInUse && !allowRandomPortFallback) {
+					throw new Error(
+						`Port ${currentPort} is already in use. Start with a different port using --port.`,
+					);
 				}
 
 				logger.error('Failed to start API server', err);
