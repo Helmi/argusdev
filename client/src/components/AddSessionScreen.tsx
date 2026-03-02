@@ -482,12 +482,19 @@ export function AddSessionScreen() {
 		}
 	}, [quickStartIntent]);
 
-	// Auto-select first available worktree when in 'existing' mode with nothing selected
+	// Auto-select first available worktree when in 'existing' mode with nothing selected.
+	// Skip for fix/review sessions — those must use the task's own worktree, not a fallback.
 	useEffect(() => {
-		if (mode === 'existing' && !selectedWorktreePath && projectWorktrees.length > 0) {
+		if (
+			mode === 'existing' &&
+			!selectedWorktreePath &&
+			projectWorktrees.length > 0 &&
+			quickStartIntent !== 'fix' &&
+			quickStartIntent !== 'review'
+		) {
 			setSelectedWorktreePath(projectWorktrees[0].path);
 		}
-	}, [mode, selectedWorktreePath, projectWorktrees]);
+	}, [mode, selectedWorktreePath, projectWorktrees, quickStartIntent]);
 
 	// Handle pre-selected project
 	useEffect(() => {
