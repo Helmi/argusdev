@@ -244,9 +244,10 @@ function renderTaskPromptTemplate(
 		'task.status': taskDetail.status,
 		'task.priority': taskDetail.priority,
 		'task.acceptance': taskDetail.acceptance || '',
+		'task.rejection_reason': taskDetail.rejectionReason || '',
 	};
 	return templateContent.replace(
-		/\{\{(task\.(?:id|title|description|status|priority|acceptance))\}\}/g,
+		/\{\{(task\.(?:id|title|description|status|priority|acceptance|rejection_reason))\}\}/g,
 		(_match, key: string) => vars[key] ?? '',
 	);
 }
@@ -2458,6 +2459,30 @@ export class APIServer {
 							matchedProject?.path || '',
 							matchedProject ? 'effective' : 'global',
 						);
+
+						// Fetch task detail first to check for rejection context
+						const tdState = tdService.resolveProjectState(worktreePath);
+						if (!tdState.initialized || !tdState.dbPath) {
+							return reply.code(400).send({
+								error:
+									'TD project state is not initialized. Initialize td before linking sessions to tasks.',
+							});
+						}
+
+						const reader = new TdReader(tdState.dbPath);
+						let taskDetail: TdIssueWithChildren | null;
+						try {
+							taskDetail = reader.getIssueWithDetails(normalizedTdTaskId);
+						} finally {
+							reader.close();
+						}
+
+						if (!taskDetail) {
+							return reply.code(404).send({
+								error: `TD task ${normalizedTdTaskId} not found`,
+							});
+						}
+
 						const explicitPromptTemplate = promptTemplate?.trim();
 						let selectedTemplate: PromptTemplate | null = null;
 
@@ -2472,21 +2497,44 @@ export class APIServer {
 								});
 							}
 						} else {
-							const projectDefaultPrompt =
-								projConfig?.td?.defaultPrompt?.trim();
-							const globalDefaultPrompt = globalTdConfig.defaultPrompt?.trim();
-							selectedTemplate =
-								(projectDefaultPrompt &&
-									findPromptTemplateByName(
-										promptTemplates,
-										projectDefaultPrompt,
-									)) ||
-								(globalDefaultPrompt &&
-									findPromptTemplateByName(
-										promptTemplates,
-										globalDefaultPrompt,
-									)) ||
-								null;
+							// Auto-select "Fix Rejected Work" for rejected tasks in progress
+							const isRejectedInProgress =
+								taskDetail.status === 'in_progress' &&
+								taskDetail.rejectionReason !== null;
+
+							if (isRejectedInProgress) {
+								const fixRejectedTemplate = findPromptTemplateByName(
+									promptTemplates,
+									'Fix Rejected Work',
+								);
+								if (fixRejectedTemplate) {
+									selectedTemplate = fixRejectedTemplate;
+									logger.info(
+										`API: Auto-selected "Fix Rejected Work" prompt for rejected task ${normalizedTdTaskId}`,
+									);
+								}
+							}
+
+							// Fall back to configured default if no auto-selection
+							if (!selectedTemplate) {
+								const projectDefaultPrompt =
+									projConfig?.td?.defaultPrompt?.trim();
+								const globalDefaultPrompt =
+									globalTdConfig.defaultPrompt?.trim();
+								selectedTemplate =
+									(projectDefaultPrompt &&
+										findPromptTemplateByName(
+											promptTemplates,
+											projectDefaultPrompt,
+										)) ||
+									(globalDefaultPrompt &&
+										findPromptTemplateByName(
+											promptTemplates,
+											globalDefaultPrompt,
+										)) ||
+									null;
+							}
+
 							if (!selectedTemplate) {
 								if (promptTemplates.length > 0) {
 									selectedTemplate = promptTemplates[0]!;
@@ -2505,30 +2553,10 @@ export class APIServer {
 							});
 						}
 
-						const tdState = tdService.resolveProjectState(worktreePath);
-						if (!tdState.initialized || !tdState.dbPath) {
-							return reply.code(400).send({
-								error:
-									'TD project state is not initialized. Initialize td before linking sessions to tasks.',
-							});
-						}
-
-						const reader = new TdReader(tdState.dbPath);
-						try {
-							const taskDetail = reader.getIssueWithDetails(normalizedTdTaskId);
-							if (!taskDetail) {
-								return reply.code(404).send({
-									error: `TD task ${normalizedTdTaskId} not found`,
-								});
-							}
-
-							renderedPromptTemplate = renderTaskPromptTemplate(
-								selectedTemplate.content,
-								taskDetail,
-							);
-						} finally {
-							reader.close();
-						}
+						renderedPromptTemplate = renderTaskPromptTemplate(
+							selectedTemplate.content,
+							taskDetail,
+						);
 					} catch (err) {
 						logger.warn(`API: Failed to prepare TD startup prompt: ${err}`);
 						return reply
