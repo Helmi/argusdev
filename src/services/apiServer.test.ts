@@ -215,6 +215,12 @@ vi.mock('./sessionStore.js', () => ({
 	},
 }));
 
+type PendingTdPromptInjection = {
+	prompt: string;
+	taskId?: string;
+	timeout: ReturnType<typeof setTimeout>;
+};
+
 describe('APIServer td create-with-agent validation ordering', () => {
 	interface InjectRequest {
 		method: string;
@@ -234,6 +240,36 @@ describe('APIServer td create-with-agent validation ordering', () => {
 	}
 
 	let apiServer: {setupPromise: Promise<void>; app: TestApp};
+	let sessionProcessWriteMock: ReturnType<typeof vi.fn>;
+
+	const getPendingTdPromptInjections = (): Map<string, PendingTdPromptInjection> => {
+		const serverWithQueue = apiServer as unknown as {
+			pendingTdPromptInjections?: Map<string, PendingTdPromptInjection>;
+		};
+		return serverWithQueue.pendingTdPromptInjections || new Map();
+	};
+
+	const clearPendingTdPromptInjections = () => {
+		for (const value of getPendingTdPromptInjections().values()) {
+			clearTimeout(value.timeout);
+		}
+		getPendingTdPromptInjections().clear();
+	};
+
+	const mockAgentConfig = async (agent: {
+		id: string;
+		name: string;
+		kind: 'agent';
+		command: string;
+		options: [];
+		promptArg?: string;
+		enabled: boolean;
+	}) => {
+		const {
+			configurationManager,
+		} = await import('./configurationManager.js');
+		vi.mocked(configurationManager.getAgentById).mockReturnValue(agent);
+	};
 
 	beforeAll(async () => {
 		mockLoadPromptTemplatesByScope.mockReturnValue([
@@ -257,6 +293,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 	});
 
 	beforeEach(() => {
+		clearPendingTdPromptInjections();
 		const mockedSessionManager = (
 			coreService as unknown as {
 				sessionManager: {
@@ -289,6 +326,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		mockSessionStoreCountSessions.mockReturnValue(0);
 		mockSessionStoreGetOriginalWorkTdSessionId.mockReturnValue(null);
 		mockedSessionManager.createSessionWithAgentEffect.mockReset();
+		sessionProcessWriteMock = vi.fn();
 		mockedSessionManager.createSessionWithAgentEffect.mockReturnValue(
 			Effect.succeed({
 				id: 'session-restored',
@@ -298,7 +336,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 					getSnapshot: () => ({state: 'idle'}),
 				},
 				process: {
-					write: vi.fn(),
+					write: sessionProcessWriteMock,
 				},
 			}) as never,
 		);
@@ -1477,6 +1515,239 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		expect(options?.initialPrompt).toContain('Done items:');
 		expect(options?.initialPrompt).not.toContain('undefined');
 	});
+
+	
+	it('uses CLI arg startup prompt delivery and skips PTY queue for Codex', async () => {
+		const mockedSessionManager = (
+			coreService as unknown as {
+				sessionManager: {
+					createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+				};
+			}
+		).sessionManager;
+
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Normal Task',
+			description: 'Test description',
+			status: 'in_progress',
+			priority: 'P1',
+			acceptance: 'Acceptance criteria',
+			labels: '',
+			parent_id: '',
+			type: 'task',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: null,
+		});
+		await mockAgentConfig({
+			id: 'codex',
+			name: 'Codex',
+			kind: 'agent',
+			command: 'codex',
+			options: [],
+			enabled: true,
+		});
+
+		const response = await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/feat',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'work',
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
+		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		const options = call?.[8] as {
+			initialPrompt?: string;
+			promptArg?: string;
+		};
+		expect(options?.initialPrompt).toBeDefined();
+		expect(options?.initialPrompt).toContain('td-abc123');
+		expect(options?.promptArg).toBeUndefined();
+		expect(sessionProcessWriteMock).not.toHaveBeenCalled();
+		expect(getPendingTdPromptInjections().has('session-restored')).toBe(false);
+	});
+
+	it('queues startup prompt via PTY when startup prompt cannot be passed via CLI arg', async () => {
+		const mockedSessionManager = (
+			coreService as unknown as {
+				sessionManager: {
+					createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+				};
+			}
+		).sessionManager;
+
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Normal Task',
+			description: 'Test description',
+			status: 'in_progress',
+			priority: 'P1',
+			acceptance: 'Acceptance criteria',
+			labels: '',
+			parent_id: '',
+			type: 'task',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: null,
+		});
+
+		await mockAgentConfig({
+			id: 'codex',
+			name: 'Codex',
+			kind: 'agent',
+			command: 'codex',
+			options: [],
+			promptArg: 'none',
+			enabled: true,
+		});
+
+		const response = await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/feat',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'work',
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
+		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		const options = call?.[8] as {
+			initialPrompt?: string;
+			promptArg?: string;
+		};
+		expect(options?.initialPrompt).toBeUndefined();
+		expect(options?.promptArg).toBe('none');
+		expect(sessionProcessWriteMock).toHaveBeenCalledWith(
+			expect.stringContaining('td-abc123'),
+		);
+		const pending = getPendingTdPromptInjections();
+		expect(pending.has('session-restored')).toBe(false);
+	});
+
+	it.each(['claude', 'pi', 'gemini'] as const)(
+		'uses CLI-based startup delivery for %s without PTY queued prompt',
+		async agentId => {
+			const mockedSessionManager = (
+				coreService as unknown as {
+					sessionManager: {
+						createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+					};
+				}
+			).sessionManager;
+
+			mockTdReaderGetIssueWithDetails.mockReturnValue({
+				id: 'td-abc123',
+				title: 'Agent Prompt Task',
+				description: 'Test description',
+				status: 'in_progress',
+				priority: 'P1',
+				acceptance: 'Acceptance criteria',
+				labels: '',
+				parent_id: '',
+				type: 'task',
+				points: 0,
+				implementer_session: '',
+				reviewer_session: '',
+				created_at: '2024-01-01',
+				updated_at: '2024-01-01',
+				closed_at: null,
+				deleted_at: null,
+				minor: 0,
+				created_branch: '',
+				creator_session: '',
+				sprint: '',
+				defer_until: null,
+				due_date: null,
+				defer_count: 0,
+				children: [],
+				handoffs: [],
+				files: [],
+				comments: [],
+				rejectionReason: null,
+			});
+			await mockAgentConfig({
+				id: agentId,
+				name: agentId,
+				kind: 'agent',
+				command: agentId,
+				options: [],
+				enabled: true,
+			});
+
+			const response = await apiServer.app.inject({
+				method: 'POST',
+				url: '/api/session/create-with-agent',
+				headers: {cookie: 'cacd_session=test'},
+				payload: {
+					path: '/repo/.worktrees/feat',
+					agentId,
+					options: {},
+					tdTaskId: 'td-abc123',
+					intent: 'work',
+				},
+			});
+
+			expect(response.statusCode).toBe(200);
+			expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
+			const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+			const options = call?.[8] as {
+				initialPrompt?: string;
+				promptArg?: string;
+			};
+			expect(options?.initialPrompt).toBeDefined();
+			expect(options?.initialPrompt).toContain('td-abc123');
+			expect(options?.promptArg).toBeUndefined();
+			expect(sessionProcessWriteMock).not.toHaveBeenCalled();
+			expect(getPendingTdPromptInjections().has('session-restored')).toBe(false);
+		},
+	);
 
 	it('preserves worktree hook warnings at top-level and nested response fields', async () => {
 		mockCreateWorktreeEffect.mockReturnValue(

@@ -2715,6 +2715,14 @@ export class APIServer {
 				}
 			}
 
+			// Use CLI arg delivery by default, fall back to PTY write only when startup
+			// prompt cannot be passed through the command line.
+			const startupPromptDeliveredViaCli =
+				!!(
+					startupPromptToInject &&
+					normalizedPromptArg?.toLowerCase() !== 'none'
+				);
+
 			// Create session with resolved command and args
 			const effect = coreService.sessionManager.createSessionWithAgentEffect(
 				worktreePath,
@@ -2726,13 +2734,11 @@ export class APIServer {
 				Object.keys(extraEnv).length > 0 ? extraEnv : undefined,
 				agent.kind,
 				{
-					initialPrompt:
-						startupPromptToInject &&
-						normalizedPromptArg?.toLowerCase() !== 'none'
-							? startupPromptToInject
-							: undefined,
-					prependCwd: agent.prependCwd,
+					initialPrompt: startupPromptDeliveredViaCli
+						? startupPromptToInject
+						: undefined,
 					promptArg: normalizedPromptArg,
+					prependCwd: agent.prependCwd,
 				},
 			);
 			const result = await Effect.runPromise(Effect.either(effect));
@@ -2803,13 +2809,10 @@ export class APIServer {
 			// If initialPrompt was passed to createSessionWithAgentEffect (CLI path), the
 			// agent already received the prompt at process start — PTY injection would
 			// double-post it (e.g. Codex starts working but prompt also appears in input field).
-			const promptWasInjectedViaCli = !!(
-				startupPromptToInject && normalizedPromptArg?.toLowerCase() !== 'none'
-			);
 			if (
 				startupPromptToInject &&
 				agent.kind !== 'terminal' &&
-				!promptWasInjectedViaCli
+				!startupPromptDeliveredViaCli
 			) {
 				this.queueTdPromptInjection(
 					session.id,
