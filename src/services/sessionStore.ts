@@ -466,6 +466,33 @@ export class SessionStore {
 		});
 	}
 
+	getOriginalWorkTdSessionId(params: {
+		tdTaskId: string;
+		projectPath?: string;
+	}): string | null {
+		return this.withRecovery(() => {
+			const clauses = [
+				'td_task_id = ?',
+				'intent = ?',
+				'td_session_id IS NOT NULL',
+			];
+			const values: SqlPrimitive[] = [params.tdTaskId, 'work'];
+
+			if (params.projectPath) {
+				clauses.push('project_path = ?');
+				values.push(params.projectPath);
+			}
+
+			const row = this.db
+				.prepare(
+					`SELECT td_session_id FROM sessions WHERE ${clauses.join(' AND ')} ORDER BY created_at ASC LIMIT 1`,
+				)
+				.get(...values) as {td_session_id: string | null} | undefined;
+
+			return row?.td_session_id || null;
+		});
+	}
+
 	scheduleAgentSessionDiscovery(params: {
 		sessionId: string;
 		agentType: string;

@@ -2421,6 +2421,9 @@ export class APIServer {
 					worktreePath.startsWith(p.path) ||
 					worktreePath.includes(`/.worktrees/${p.path.split('/').pop()}/`),
 			);
+			const linkedProjectPath =
+				matchedProject?.path ||
+				resolveGitField(worktreePath, ['rev-parse', '--show-toplevel']);
 			const projConfig = matchedProject
 				? loadProjectConfig(matchedProject.path)
 				: null;
@@ -2442,7 +2445,16 @@ export class APIServer {
 				let shouldAutoStartTdTask = false;
 				let renderedPromptTemplate: string | null = null;
 				if (tdService.isAvailable()) {
-					const tdSessionId = `ses_${randomUUID().slice(0, 6)}`;
+					let tdSessionId: string | null = null;
+					if (resolvedIntent === 'work') {
+						tdSessionId = sessionStore.getOriginalWorkTdSessionId({
+							tdTaskId: normalizedTdTaskId,
+							projectPath: linkedProjectPath,
+						});
+					}
+					if (!tdSessionId) {
+						tdSessionId = `ses_${randomUUID().slice(0, 6)}`;
+					}
 					linkedTdSessionId = tdSessionId;
 					extraEnv['TD_SESSION_ID'] = tdSessionId;
 					extraEnv['TD_TASK_ID'] = normalizedTdTaskId;
@@ -2630,9 +2642,7 @@ export class APIServer {
 				'branch',
 				'--show-current',
 			]);
-			const projectPath =
-				matchedProject?.path ||
-				resolveGitField(worktreePath, ['rev-parse', '--show-toplevel']);
+			const projectPath = linkedProjectPath;
 			const adapterForAgent =
 				adapterRegistry.getById(agent.id) ||
 				adapterRegistry.getByAgentType(inferAgentType(agent));

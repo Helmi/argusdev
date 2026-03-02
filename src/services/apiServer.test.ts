@@ -26,6 +26,7 @@ const mockSessionStoreMarkSessionResumed = vi.fn();
 const mockSessionStoreHydratePreview = vi.fn(async () => {});
 const mockSessionStoreGetLatestByTdSessionId = vi.fn(() => null);
 const mockSessionStoreCountSessions = vi.fn(() => 0);
+const mockSessionStoreGetOriginalWorkTdSessionId = vi.fn(() => null);
 
 vi.mock('child_process', async importOriginal => {
 	const actual = await importOriginal<typeof import('child_process')>();
@@ -183,6 +184,7 @@ vi.mock('./sessionStore.js', () => ({
 		hydrateSessionContentPreview: mockSessionStoreHydratePreview,
 		getLatestByTdSessionId: mockSessionStoreGetLatestByTdSessionId,
 		countSessions: mockSessionStoreCountSessions,
+		getOriginalWorkTdSessionId: mockSessionStoreGetOriginalWorkTdSessionId,
 	},
 }));
 
@@ -253,12 +255,24 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		mockSessionStoreHydratePreview.mockReset();
 		mockSessionStoreGetLatestByTdSessionId.mockReset();
 		mockSessionStoreCountSessions.mockReset();
+		mockSessionStoreGetOriginalWorkTdSessionId.mockReset();
 		mockSessionStoreQuerySessions.mockReturnValue([]);
 		mockSessionStoreGetSessionById.mockReturnValue(null);
 		mockSessionStoreCountSessions.mockReturnValue(0);
+		mockSessionStoreGetOriginalWorkTdSessionId.mockReturnValue(null);
 		mockedSessionManager.createSessionWithAgentEffect.mockReset();
 		mockedSessionManager.createSessionWithAgentEffect.mockReturnValue(
-			Effect.succeed({id: 'session-restored'}) as never,
+			Effect.succeed({
+				id: 'session-restored',
+				name: 'Session Restored',
+				agentId: 'codex',
+				stateMutex: {
+					getSnapshot: () => ({state: 'idle'}),
+				},
+				process: {
+					write: vi.fn(),
+				},
+			}) as never,
 		);
 		mockedSessionManager.setSessionActive.mockReset();
 		mockedSessionManager.getSession.mockReset();
@@ -432,6 +446,149 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			'td',
 			expect.arrayContaining(['start']),
 			expect.anything(),
+		);
+	});
+
+	it('reuses original implementer td session id for task-linked work sessions', async () => {
+		mockSessionStoreGetOriginalWorkTdSessionId.mockReturnValue('ses_impl001');
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Fix cache invalidation',
+			description: 'Ensure stale reads are removed',
+			status: 'in_progress',
+			type: 'task',
+			priority: 'P1',
+			points: 0,
+			labels: '',
+			parent_id: '',
+			acceptance: 'No stale reads',
+			implementer_session: 'ses_impl001',
+			reviewer_session: '',
+			created_at: '',
+			updated_at: '',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+		});
+
+		const response = await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/fix-cache',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'work',
+				promptTemplate: 'Begin Work on Task',
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(mockSessionStoreGetOriginalWorkTdSessionId).toHaveBeenCalledWith({
+			tdTaskId: 'td-abc123',
+			projectPath: '/repo',
+		});
+
+		const tdStartCall = mockExecFileSync.mock.calls.find(call => {
+			return (
+				call[0] === 'td' &&
+				Array.isArray(call[1]) &&
+				(call[1] as string[]).includes('start')
+			);
+		});
+		expect(tdStartCall?.[1]).toEqual(
+			expect.arrayContaining(['start', 'td-abc123', '--session', 'ses_impl001']),
+		);
+		expect(mockSessionStoreCreateSessionRecord).toHaveBeenCalledWith(
+			expect.objectContaining({
+				tdTaskId: 'td-abc123',
+				tdSessionId: 'ses_impl001',
+				intent: 'work',
+			}),
+		);
+	});
+
+	it('keeps review sessions on a distinct td session id', async () => {
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Fix cache invalidation',
+			description: 'Ensure stale reads are removed',
+			status: 'in_review',
+			type: 'task',
+			priority: 'P1',
+			points: 0,
+			labels: '',
+			parent_id: '',
+			acceptance: 'No stale reads',
+			implementer_session: 'ses_impl001',
+			reviewer_session: 'ses_reviewer_a',
+			created_at: '',
+			updated_at: '',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+		});
+
+		const response = await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/review-cache',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'review',
+				promptTemplate: 'Begin Work on Task',
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(mockSessionStoreGetOriginalWorkTdSessionId).not.toHaveBeenCalled();
+
+		const tdStartCall = mockExecFileSync.mock.calls.find(call => {
+			return (
+				call[0] === 'td' &&
+				Array.isArray(call[1]) &&
+				(call[1] as string[]).includes('start')
+			);
+		});
+		const tdArgs = (tdStartCall?.[1] || []) as string[];
+		const sessionFlagIndex = tdArgs.indexOf('--session');
+		const reviewSessionId =
+			sessionFlagIndex >= 0 ? tdArgs[sessionFlagIndex + 1] : undefined;
+
+		expect(reviewSessionId).toBeDefined();
+		expect(reviewSessionId).toMatch(/^ses_/);
+		expect(reviewSessionId).not.toBe('ses_impl001');
+		expect(mockSessionStoreCreateSessionRecord).toHaveBeenCalledWith(
+			expect.objectContaining({
+				tdTaskId: 'td-abc123',
+				tdSessionId: reviewSessionId,
+				intent: 'review',
+			}),
 		);
 	});
 

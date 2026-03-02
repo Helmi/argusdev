@@ -202,4 +202,90 @@ describe('SessionStore', () => {
 			store.getLatestByTdSessionId({tdSessionId: 'ses_missing'}),
 		).toBeNull();
 	});
+
+	it('resolves original work td session id for a task across fix rounds', () => {
+		store.createSessionRecord({
+			id: 'session-work-original',
+			agentProfileId: 'codex',
+			agentProfileName: 'Codex',
+			agentType: 'codex',
+			agentOptions: {},
+			worktreePath: '/tmp/worktree-orig',
+			projectPath: '/tmp/project-a',
+			tdTaskId: 'td-42',
+			tdSessionId: 'ses_impl',
+			intent: 'work',
+			createdAt: 1_720_000_100,
+		});
+		store.createSessionRecord({
+			id: 'session-review',
+			agentProfileId: 'codex',
+			agentProfileName: 'Codex',
+			agentType: 'codex',
+			agentOptions: {},
+			worktreePath: '/tmp/worktree-review',
+			projectPath: '/tmp/project-a',
+			tdTaskId: 'td-42',
+			tdSessionId: 'ses_reviewer',
+			intent: 'review',
+			createdAt: 1_720_000_200,
+		});
+		store.createSessionRecord({
+			id: 'session-fix-round-1',
+			agentProfileId: 'codex',
+			agentProfileName: 'Codex',
+			agentType: 'codex',
+			agentOptions: {},
+			worktreePath: '/tmp/worktree-fix-1',
+			projectPath: '/tmp/project-a',
+			tdTaskId: 'td-42',
+			tdSessionId: 'ses_fix_round_1',
+			intent: 'work',
+			createdAt: 1_720_000_300,
+		});
+		store.createSessionRecord({
+			id: 'session-fix-round-2',
+			agentProfileId: 'codex',
+			agentProfileName: 'Codex',
+			agentType: 'codex',
+			agentOptions: {},
+			worktreePath: '/tmp/worktree-fix-2',
+			projectPath: '/tmp/project-a',
+			tdTaskId: 'td-42',
+			tdSessionId: 'ses_fix_round_2',
+			intent: 'work',
+			createdAt: 1_720_000_400,
+		});
+		store.createSessionRecord({
+			id: 'session-other-project',
+			agentProfileId: 'codex',
+			agentProfileName: 'Codex',
+			agentType: 'codex',
+			agentOptions: {},
+			worktreePath: '/tmp/worktree-other',
+			projectPath: '/tmp/project-b',
+			tdTaskId: 'td-42',
+			tdSessionId: 'ses_other_project',
+			intent: 'work',
+			createdAt: 1_720_000_050,
+		});
+
+		expect(
+			store.getOriginalWorkTdSessionId({
+				tdTaskId: 'td-42',
+				projectPath: '/tmp/project-a',
+			}),
+		).toBe('ses_impl');
+		expect(
+			store.getOriginalWorkTdSessionId({
+				tdTaskId: 'td-42',
+			}),
+		).toBe('ses_other_project');
+		expect(
+			store.getOriginalWorkTdSessionId({
+				tdTaskId: 'td-missing',
+				projectPath: '/tmp/project-a',
+			}),
+		).toBeNull();
+	});
 });
