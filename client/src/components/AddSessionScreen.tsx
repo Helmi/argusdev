@@ -460,27 +460,34 @@ export function AddSessionScreen() {
 		});
 	}, [worktrees, selectedProjectPath]);
 
-	// Handle pre-selected worktree
+	// Handle pre-selected worktree — always populate dropdown, but only force
+	// mode='existing' for fix/review sessions; work sessions default to 'new'
 	useEffect(() => {
 		if (addSessionWorktreePath) {
 			setSelectedWorktreePath(addSessionWorktreePath);
-			setMode('existing');
+			if (quickStartIntent === 'fix' || quickStartIntent === 'review') {
+				setMode('existing');
+			}
 			const project = getProjectForWorktree(addSessionWorktreePath);
 			if (project) {
 				setSelectedProjectPath(project.path);
 			}
 		}
-	}, [addSessionWorktreePath, getProjectForWorktree]);
+	}, [addSessionWorktreePath, quickStartIntent, getProjectForWorktree]);
 
+	// Work sessions always default to creating a new worktree
 	useEffect(() => {
-		if (
-			(quickStartIntent === 'work' || quickStartIntent === 'fix') &&
-			!addSessionWorktreePath
-		) {
+		if (quickStartIntent === 'work') {
 			setMode('new');
-			setSelectedWorktreePath('');
 		}
-	}, [quickStartIntent, addSessionWorktreePath]);
+	}, [quickStartIntent]);
+
+	// Auto-select first available worktree when in 'existing' mode with nothing selected
+	useEffect(() => {
+		if (mode === 'existing' && !selectedWorktreePath && projectWorktrees.length > 0) {
+			setSelectedWorktreePath(projectWorktrees[0].path);
+		}
+	}, [mode, selectedWorktreePath, projectWorktrees]);
 
 	// Handle pre-selected project
 	useEffect(() => {
