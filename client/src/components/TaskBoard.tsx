@@ -187,6 +187,7 @@ export function TaskBoard() {
     openAddSession,
     closeTaskBoard,
     currentProject,
+    taskBoardOpen,
   } = useAppStore()
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [searchQuery, setSearchQuery] = useState('')
@@ -202,13 +203,15 @@ export function TaskBoard() {
     return counts
   }, [tdIssues])
 
-  // Fetch board data on mount and when project changes
+  // Fetch board data whenever the board opens or the project changes.
+  // Not gated on tdStatus — tdStatus may not be loaded yet on first open,
+  // which caused the board to render empty until a second refresh.
   useEffect(() => {
-    if (tdStatus?.projectState?.enabled) {
+    if (taskBoardOpen) {
       fetchTdBoard()
       fetchTdIssues()
     }
-  }, [tdStatus?.projectState?.enabled, currentProject?.path, fetchTdBoard, fetchTdIssues])
+  }, [taskBoardOpen, currentProject?.path, fetchTdBoard, fetchTdIssues])
 
   // Escape key handler to close task board
   useEffect(() => {
