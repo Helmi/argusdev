@@ -92,6 +92,7 @@ export interface TdIssueWithChildren extends TdIssue {
 	handoffs: TdHandoffParsed[];
 	files: TdIssueFile[];
 	comments: TdComment[];
+	rejectionReason: string | null;
 }
 
 /**
@@ -224,7 +225,7 @@ export class TdReader {
 	}
 
 	/**
-	 * Get an issue with its children, handoffs, and files.
+	 * Get an issue with its children, handoffs, files, and rejection reason.
 	 */
 	getIssueWithDetails(issueId: string): TdIssueWithChildren | null {
 		const issue = this.getIssue(issueId);
@@ -236,6 +237,7 @@ export class TdReader {
 			handoffs: this.getHandoffs(issueId),
 			files: this.getIssueFiles(issueId),
 			comments: this.getComments(issueId),
+			rejectionReason: this.getLatestRejectionReason(issueId),
 		};
 	}
 
@@ -382,6 +384,44 @@ export class TdReader {
 				error,
 			);
 			return [];
+		}
+	}
+
+	// --- Rejection queries ---
+
+	/**
+	 * Get the most recent rejection reason for an issue.
+	 * Returns null if the issue has never been rejected.
+	 *
+	 * Rejection reasons are stored in the logs table with messages
+	 * starting with "Rejected:" (written by `td reject -c "reason"`).
+	 */
+	getLatestRejectionReason(issueId: string): string | null {
+		try {
+			const db = this.open();
+			const row = db
+				.prepare(
+					`SELECT message FROM logs
+					 WHERE issue_id = ?
+					   AND message LIKE 'Rejected:%'
+					 ORDER BY timestamp DESC
+					 LIMIT 1`,
+				)
+				.get(issueId) as {message: string} | undefined;
+
+			if (!row) return null;
+
+			// Strip the "Rejected: " prefix
+			const prefix = 'Rejected: ';
+			return row.message.startsWith(prefix)
+				? row.message.slice(prefix.length)
+				: row.message;
+		} catch (error) {
+			logger.error(
+				`[TdReader] Failed to get rejection reason for ${issueId}`,
+				error,
+			);
+			return null;
 		}
 	}
 

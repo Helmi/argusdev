@@ -404,6 +404,37 @@ describe('APIServer td create-with-agent validation ordering', () => {
 	});
 
 	it('does not auto-start td task when prompt validation fails with 400', async () => {
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Test Task',
+			description: 'Test description',
+			status: 'open',
+			priority: 'P2',
+			acceptance: '',
+			labels: '',
+			parent_id: '',
+			type: 'task',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: null,
+		});
+
 		const response = await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
@@ -479,6 +510,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			handoffs: [],
 			files: [],
 			comments: [],
+			rejectionReason: null,
 		});
 
 		const response = await apiServer.app.inject({
@@ -549,6 +581,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			handoffs: [],
 			files: [],
 			comments: [],
+			rejectionReason: null,
 		});
 
 		const response = await apiServer.app.inject({
@@ -590,6 +623,288 @@ describe('APIServer td create-with-agent validation ordering', () => {
 				intent: 'review',
 			}),
 		);
+	});
+
+	it('auto-selects Fix Rejected Work prompt for work intent on rejected in_progress tasks', async () => {
+		const mockedSessionManager = (
+			coreService as unknown as {
+				sessionManager: {
+					createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+				};
+			}
+		).sessionManager;
+
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Rejected Task',
+			description: 'Test description',
+			status: 'in_progress',
+			priority: 'P1',
+			acceptance: 'Acceptance criteria',
+			labels: '',
+			parent_id: '',
+			type: 'task',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: 'Missing test coverage for edge cases.',
+		});
+		mockLoadPromptTemplatesByScope.mockReturnValue([
+			{
+				name: 'Begin Work on Task',
+				path: '/tmp/Begin Work on Task.md',
+				content: 'Work on {{task.id}}: {{task.title}}',
+				source: 'global',
+			},
+			{
+				name: 'Fix Rejected Work',
+				path: '/tmp/Fix Rejected Work.md',
+				content:
+					'Task {{task.id}} was rejected: {{task.rejection_reason}}\n\nFix the issues.',
+				source: 'global',
+			},
+		]);
+
+		await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/feat',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'work',
+			},
+		});
+
+		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
+		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		const options = call?.[8] as {initialPrompt?: string} | undefined;
+		expect(options?.initialPrompt).toBeDefined();
+		expect(options?.initialPrompt).toContain('was rejected');
+		expect(options?.initialPrompt).toContain('Missing test coverage');
+	});
+
+	it('does NOT auto-select Fix prompt for review intent on rejected task', async () => {
+		const mockedSessionManager = (
+			coreService as unknown as {
+				sessionManager: {
+					createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+				};
+			}
+		).sessionManager;
+
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Rejected Task',
+			description: 'Test description',
+			status: 'in_progress',
+			priority: 'P1',
+			acceptance: 'Acceptance criteria',
+			labels: '',
+			parent_id: '',
+			type: 'task',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: 'Missing test coverage for edge cases.',
+		});
+		mockLoadPromptTemplatesByScope.mockReturnValue([
+			{
+				name: 'Begin Work on Task',
+				path: '/tmp/Begin Work on Task.md',
+				content: 'Work on {{task.id}}: {{task.title}}',
+				source: 'global',
+			},
+			{
+				name: 'Fix Rejected Work',
+				path: '/tmp/Fix Rejected Work.md',
+				content:
+					'Task {{task.id}} was rejected: {{task.rejection_reason}}\n\nFix the issues.',
+				source: 'global',
+			},
+		]);
+
+		await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/feat',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'review',
+			},
+		});
+
+		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
+		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		const options = call?.[8] as {initialPrompt?: string} | undefined;
+		expect(options?.initialPrompt).toBeDefined();
+		expect(options?.initialPrompt).not.toContain('was rejected');
+		expect(options?.initialPrompt).toContain('td-abc123');
+	});
+
+	it('falls back to Begin Work on Task when Fix Rejected Work template missing', async () => {
+		const mockedSessionManager = (
+			coreService as unknown as {
+				sessionManager: {
+					createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+				};
+			}
+		).sessionManager;
+
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Rejected Task',
+			description: 'Test description',
+			status: 'in_progress',
+			priority: 'P1',
+			acceptance: 'Acceptance criteria',
+			labels: '',
+			parent_id: '',
+			type: 'task',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: 'Missing test coverage.',
+		});
+		mockLoadPromptTemplatesByScope.mockReturnValue([
+			{
+				name: 'Begin Work on Task',
+				path: '/tmp/Begin Work on Task.md',
+				content: 'Work on {{task.id}}: {{task.title}}',
+				source: 'global',
+			},
+		]);
+
+		await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/feat',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'work',
+			},
+		});
+
+		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
+		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		const options = call?.[8] as {initialPrompt?: string} | undefined;
+		expect(options?.initialPrompt).toBeDefined();
+		expect(options?.initialPrompt).toContain('td-abc123');
+		expect(options?.initialPrompt).not.toContain('was rejected');
+	});
+
+	it('uses Begin Work on Task for normal in_progress tasks without rejection', async () => {
+		const mockedSessionManager = (
+			coreService as unknown as {
+				sessionManager: {
+					createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+				};
+			}
+		).sessionManager;
+
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Normal Task',
+			description: 'Test description',
+			status: 'in_progress',
+			priority: 'P1',
+			acceptance: 'Acceptance criteria',
+			labels: '',
+			parent_id: '',
+			type: 'task',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: null,
+		});
+
+		await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/feat',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'work',
+			},
+		});
+
+		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
+		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		const options = call?.[8] as {initialPrompt?: string} | undefined;
+		expect(options?.initialPrompt).toBeDefined();
+		expect(options?.initialPrompt).toContain('td-abc123');
+		expect(options?.initialPrompt).not.toContain('was rejected');
 	});
 
 	it('preserves worktree hook warnings at top-level and nested response fields', async () => {

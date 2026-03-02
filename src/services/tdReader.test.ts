@@ -103,6 +103,16 @@ function createTestDb(): void {
 			text TEXT NOT NULL,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		);
+
+		CREATE TABLE logs (
+			id TEXT PRIMARY KEY,
+			issue_id TEXT DEFAULT '',
+			session_id TEXT NOT NULL,
+			work_session_id TEXT DEFAULT '',
+			message TEXT NOT NULL,
+			type TEXT NOT NULL DEFAULT 'progress',
+			timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
 	`);
 
 	// Seed test data
@@ -148,6 +158,46 @@ function createTestDb(): void {
 		'2026-02-20 08:45:10 +0000 UTC',
 	);
 
+	// Add a rejected task for testing rejection detection
+	db.prepare(
+		`INSERT INTO issues (id, title, status, type, priority, parent_id) VALUES (?, ?, ?, ?, ?, ?)`,
+	).run('td-005', 'Rejected feature', 'in_progress', 'task', 'P1', '');
+
+	// Add rejection logs for td-005
+	db.prepare(
+		`INSERT INTO logs (id, issue_id, session_id, message, type, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
+	).run(
+		'lg-001',
+		'td-005',
+		'ses_reviewer',
+		'Rejected: Missing test coverage for edge cases.',
+		'progress',
+		'2026-02-20 10:00:00',
+	);
+
+	db.prepare(
+		`INSERT INTO logs (id, issue_id, session_id, message, type, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
+	).run(
+		'lg-002',
+		'td-005',
+		'ses_reviewer2',
+		'Rejected: Still missing error handling.',
+		'progress',
+		'2026-02-20 12:00:00',
+	);
+
+	// Add a regular progress log (not a rejection)
+	db.prepare(
+		`INSERT INTO logs (id, issue_id, session_id, message, type, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
+	).run(
+		'lg-003',
+		'td-005',
+		'ses_dev',
+		'Fixed the edge cases',
+		'progress',
+		'2026-02-20 11:00:00',
+	);
+
 	db.close();
 }
 
@@ -180,7 +230,8 @@ describe('TdReader', () => {
 			const issues = reader.listIssues();
 			reader.close();
 
-			expect(issues).toHaveLength(3);
+			// td-001, td-002, td-003, td-005 (td-004 is deleted)
+			expect(issues).toHaveLength(4);
 			expect(issues.find(i => i.id === 'td-004')).toBeUndefined();
 		});
 
@@ -338,7 +389,8 @@ describe('TdReader', () => {
 			const board = reader.getBoard();
 			reader.close();
 
-			expect(board['in_progress']).toHaveLength(1);
+			// td-001 and td-005 are in_progress, td-002 is open, td-003 is done
+			expect(board['in_progress']).toHaveLength(2);
 			expect(board['open']).toHaveLength(1);
 			expect(board['done']).toHaveLength(1);
 		});
@@ -416,6 +468,53 @@ describe('TdReader', () => {
 		it('should return false for non-existent database', () => {
 			const reader = new TdReader('/nonexistent/path/db');
 			expect(reader.isAccessible()).toBe(false);
+		});
+	});
+
+	describe('getLatestRejectionReason', () => {
+		it('should return the most recent rejection reason', () => {
+			const reader = new TdReader(TEST_DB_PATH);
+			const reason = reader.getLatestRejectionReason('td-005');
+			reader.close();
+
+			// The most recent rejection is from lg-002
+			expect(reason).toBe('Still missing error handling.');
+		});
+
+		it('should return null for issues without rejections', () => {
+			const reader = new TdReader(TEST_DB_PATH);
+			const reason = reader.getLatestRejectionReason('td-002');
+			reader.close();
+
+			expect(reason).toBeNull();
+		});
+
+		it('should return null for non-existent issues', () => {
+			const reader = new TdReader(TEST_DB_PATH);
+			const reason = reader.getLatestRejectionReason('td-999');
+			reader.close();
+
+			expect(reason).toBeNull();
+		});
+	});
+
+	describe('getIssueWithDetails rejectionReason', () => {
+		it('should include rejection reason for rejected tasks', () => {
+			const reader = new TdReader(TEST_DB_PATH);
+			const issue = reader.getIssueWithDetails('td-005');
+			reader.close();
+
+			expect(issue).not.toBeNull();
+			expect(issue!.rejectionReason).toBe('Still missing error handling.');
+		});
+
+		it('should have null rejectionReason for non-rejected tasks', () => {
+			const reader = new TdReader(TEST_DB_PATH);
+			const issue = reader.getIssueWithDetails('td-002');
+			reader.close();
+
+			expect(issue).not.toBeNull();
+			expect(issue!.rejectionReason).toBeNull();
 		});
 	});
 });
