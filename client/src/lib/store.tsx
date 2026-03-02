@@ -1187,7 +1187,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAddWorktreeProjectPath(null)
   }
   const openAddSession = (worktreePath?: string, projectPath?: string, tdTaskId?: string, context?: AddSessionContext) => {
-    const taskCreatedBranch = context?.createdBranch || tdIssues.find(issue => issue.id === tdTaskId)?.created_branch
+    const intent = context?.intent
+    const shouldInferWorktree = intent === 'fix' || intent === 'review'
+    const taskCreatedBranch = shouldInferWorktree
+      ? (context?.createdBranch || tdIssues.find(issue => issue.id === tdTaskId)?.created_branch)
+      : undefined
     const inferredWorktreePath =
       worktreePath ||
       resolveTdIssueWorktreePath(worktrees, taskCreatedBranch, projectPath || currentProject?.path || undefined)
