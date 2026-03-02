@@ -7,7 +7,7 @@ import {exec, execFile} from 'child_process';
 import {getDefaultShell} from '../utils/platform.js';
 import {join} from 'path';
 import {tmpdir} from 'os';
-import {mkdtemp, rm} from 'fs/promises';
+import {mkdtemp, rm, readFile} from 'fs/promises';
 import * as startupScript from '../utils/startupScript.js';
 
 // Mock node-pty
@@ -587,6 +587,27 @@ describe('SessionManager', () => {
 			expect(bootstrapCommand).not.toContain("'--resume'");
 		});
 
+		it('should prepend cwd when bootstrap option is enabled', async () => {
+			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+			await Effect.runPromise(
+				sessionManager.createSessionWithAgentEffect(
+					'/test/worktree',
+					'opencode',
+					['-m', 'openai/gpt-5'],
+					'claude',
+					'Agent Session',
+					'opencode',
+					undefined,
+					'agent',
+					{prependCwd: true},
+				),
+			);
+
+			const bootstrapCommand = mockPty.write.mock.calls[0]?.[0] as string;
+			expect(bootstrapCommand).toContain('opencode . -m openai/gpt-5');
+		});
+
 		it('should keep terminal sessions as plain shells without bootstrap command', async () => {
 			vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
@@ -647,6 +668,45 @@ describe('SessionManager', () => {
 				const bootstrapCommand = mockPty.write.mock.calls[0]?.[0] as string;
 				expect(bootstrapCommand).toContain('bash');
 				expect(bootstrapCommand).toContain('/tmp/.cacd-startup-test.sh');
+			},
+		);
+
+		it.skipIf(process.platform === 'win32')(
+			'should add project cwd to launcher command for agents that prependCwd',
+			async () => {
+				const worktreePath = await mkdtemp(
+					join(tmpdir(), 'cacd-startup-worktree-'),
+				);
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						worktreePath,
+						'opencode',
+						['-m', 'openai/gpt-5'],
+						'claude',
+						'Agent Session',
+						'opencode',
+						undefined,
+						'agent',
+						{
+							initialPrompt: 'Line 1\nLine 2',
+							promptArg: '--prompt',
+							prependCwd: true,
+						},
+					),
+				);
+
+				const bootstrapCommand = mockPty.write.mock.calls[0]?.[0] as string;
+				const scriptPath = bootstrapCommand
+					.replace(/\r?\n?$/, '')
+					.replace(/^bash\s+/, '');
+				const scriptContent = await readFile(scriptPath, 'utf-8');
+				expect(scriptContent).toContain(
+					'opencode . -m openai/gpt-5 --prompt "$CACD_PROMPT"',
+				);
+
+				await rm(worktreePath, {recursive: true, force: true});
 			},
 		);
 

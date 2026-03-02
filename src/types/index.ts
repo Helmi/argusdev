@@ -178,6 +178,7 @@ export interface AgentConfig {
 	options: AgentOption[];
 	enabled?: boolean; // Whether this agent is available for new session selection (defaults to true)
 	promptArg?: string; // Startup prompt passing mode: positional (empty), flag (e.g. '--prompt'), or 'none'
+	prependCwd?: boolean; // Inject the worktree path as the first positional argument
 	detectionStrategy?: StateDetectionStrategy; // For state detection (agents only)
 	icon?: string; // Brand icon ID or generic Lucide icon name
 	iconColor?: string; // Hex color (only for generic icons)

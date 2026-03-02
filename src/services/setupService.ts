@@ -78,6 +78,9 @@ function createAgentConfigFromAdapter(adapterId: string): AgentConfig | null {
 		icon: canonical?.icon || adapter.icon,
 		iconColor: canonical?.iconColor || adapter.iconColor,
 		enabled: true,
+		...(canonical?.prependCwd === undefined
+			? {}
+			: {prependCwd: canonical.prependCwd}),
 		promptArg: adapter.promptArg,
 	};
 }
