@@ -698,6 +698,13 @@ if (isDaemonMode) {
 		console.log(`\nReceived ${signal}, shutting down...`);
 
 		try {
+			// Stop API server and cleanup resources (TD watcher, sockets, etc.)
+			await apiServer.stop();
+		} catch (_error) {
+			// ignore stop errors during shutdown
+		}
+
+		try {
 			// Intentionally avoid force-destroying sessions here.
 			// Startup rehydration recovers active sessions after daemon restarts.
 			await cleanupDaemonPidFile(daemonPidFilePath, daemonPid);

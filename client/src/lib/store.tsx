@@ -798,6 +798,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return newOnes.length > 0 ? [...prev, ...newOnes] : prev
       })
     })
+    // Auto-refresh TD board when issues.db changes externally (td CLI commands)
+    socket.on('td_board_changed', () => {
+      fetchTdBoard()
+      fetchTdIssues()
+    })
 
     // Connect socket now that auth is complete (AppProvider only mounts after auth)
     socket.connect()
@@ -812,9 +817,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       socket.off('connect_error')
       socket.off('session_update')
       socket.off('td_review_ready')
+      socket.off('td_board_changed')
       debouncedFetchSessionData.cancel()
     }
-  }, [fetchData, fetchAgents, fetchSessionData, debouncedFetchSessionData])
+  }, [fetchData, fetchAgents, fetchSessionData, debouncedFetchSessionData, fetchTdBoard, fetchTdIssues])
 
   // Keep project-specific td/config state in sync with selected project
   // Always fetch td status (availability is system-wide), only clear project-specific state

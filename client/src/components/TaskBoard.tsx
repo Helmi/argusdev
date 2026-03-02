@@ -187,7 +187,7 @@ export function TaskBoard() {
     openAddSession,
     closeTaskBoard,
     currentProject,
-    worktrees,
+    worktrees: _worktrees,
   } = useAppStore()
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [searchQuery, setSearchQuery] = useState('')

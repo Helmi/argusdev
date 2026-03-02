@@ -20,7 +20,7 @@ import {
 } from '../utils/gitStatus.js';
 import {randomUUID, randomBytes} from 'crypto';
 import {execFileSync} from 'child_process';
-import {existsSync} from 'fs';
+import {existsSync, watch, type FSWatcher} from 'fs';
 import {writeFile, mkdir, readdir, unlink, stat} from 'fs/promises';
 import {tmpdir} from 'os';
 import {generateRandomPort, isDevMode} from '../constants/env.js';
@@ -370,6 +370,11 @@ export class APIServer {
 	>();
 	private pendingFallbackSessionEndTimes = new Map<string, number>();
 	private hasRehydratedSessions = false;
+
+	// TD issues.db file watcher for auto-refresh
+	private tdDbWatcher: FSWatcher | null = null;
+	private tdDbWatchDebounceTimer: NodeJS.Timeout | null = null;
+	private static readonly TD_DB_WATCH_DEBOUNCE_MS = 500;
 
 	constructor() {
 		this.app = Fastify({logger: false});
@@ -3572,6 +3577,94 @@ export class APIServer {
 		// Poll every 30 seconds, start after 5s
 		setTimeout(pollTdReviews, 5000);
 		setInterval(pollTdReviews, 30000);
+
+		// Setup TD issues.db watcher for auto-refresh
+		this.setupTdDbWatcher();
+
+		// Re-setup watcher when project changes
+		coreService.on('projectSelected', () => {
+			this.setupTdDbWatcher();
+		});
+	}
+
+	/**
+	 * Setup file watcher on issues.db to auto-refresh TD board on external changes.
+	 * Watches the selected project's issues.db and emits 'td_board_changed' on change.
+	 */
+	private setupTdDbWatcher(): void {
+		// Clean up existing watcher
+		this.teardownTdDbWatcher();
+
+		const project = coreService.getSelectedProject();
+		if (!project) {
+			return;
+		}
+
+		const state = tdService.resolveProjectState(project.path);
+		if (!state.dbPath) {
+			return;
+		}
+
+		const dbPath = state.dbPath;
+
+		try {
+			this.tdDbWatcher = watch(dbPath, (eventType) => {
+				if (eventType === 'change') {
+					// Debounce to prevent fetch storms on rapid writes
+					if (this.tdDbWatchDebounceTimer) {
+						clearTimeout(this.tdDbWatchDebounceTimer);
+					}
+					this.tdDbWatchDebounceTimer = setTimeout(() => {
+						logger.info(`API: TD issues.db changed, emitting td_board_changed`);
+						this.io?.emit('td_board_changed');
+					}, APIServer.TD_DB_WATCH_DEBOUNCE_MS);
+				}
+			});
+
+			this.tdDbWatcher.on('error', (err) => {
+				logger.warn(`API: TD issues.db watcher error: ${err}`);
+			});
+
+			logger.info(`API: Watching TD issues.db at ${dbPath}`);
+		} catch (err) {
+			logger.warn(`API: Failed to setup TD issues.db watcher: ${err}`);
+		}
+	}
+
+	/**
+	 * Teardown TD issues.db watcher and clear pending timers.
+	 * Called on project change, server shutdown, or daemon stop.
+	 */
+	private teardownTdDbWatcher(): void {
+		if (this.tdDbWatchDebounceTimer) {
+			clearTimeout(this.tdDbWatchDebounceTimer);
+			this.tdDbWatchDebounceTimer = null;
+		}
+		if (this.tdDbWatcher) {
+			this.tdDbWatcher.close();
+			this.tdDbWatcher = null;
+			logger.info('API: Closed TD issues.db watcher');
+		}
+	}
+
+	/**
+	 * Stop the API server and cleanup all resources.
+	 * Called during daemon shutdown.
+	 */
+	public async stop(): Promise<void> {
+		// Cleanup TD watcher
+		this.teardownTdDbWatcher();
+
+		// Close Socket.IO
+		if (this.io) {
+			this.io.disconnectSockets(true);
+			this.io.close();
+			this.io = undefined;
+		}
+
+		// Close Fastify
+		await this.app.close();
+		logger.info('API Server stopped');
 	}
 
 	/**
