@@ -6,6 +6,42 @@ export interface TaskDetailTabCounts {
 	details: number
 }
 
+export type ChildTaskGroup = 'needs-fix' | 'in_review' | 'open' | 'closed'
+
+export interface GroupedChildren {
+	'needs-fix': TdIssue[]
+	in_review: TdIssue[]
+	open: TdIssue[]
+	closed: TdIssue[]
+}
+
+export function getChildGroup(child: TdIssue): ChildTaskGroup {
+	if (child.status === 'closed') return 'closed'
+	if (child.status === 'in_review') return 'in_review'
+	if (child.status === 'in_progress') {
+		// Check if this task was rejected (has reviewer_session set = was in review, now back in progress)
+		if (child.reviewer_session) return 'needs-fix'
+		// Also check for comments with rejection - but children don't have comments loaded
+		// Fall back to treating in_progress without reviewer_session as "open" for starting
+		return 'open'
+	}
+	return 'open'
+}
+
+export function groupChildrenByStatus(children: TdIssue[]): GroupedChildren {
+	const grouped: GroupedChildren = {
+		'needs-fix': [],
+		in_review: [],
+		open: [],
+		closed: [],
+	}
+	for (const child of children) {
+		const group = getChildGroup(child)
+		grouped[group].push(child)
+	}
+	return grouped
+}
+
 export function parseAcceptanceCriteria(acceptance: string): string[] {
 	return acceptance
 		.split('\n')

@@ -25,7 +25,7 @@ const DISCOVERY_RETRY_DELAY_MS = 1500;
 
 type SqlPrimitive = string | number | null;
 
-export type SessionIntent = 'work' | 'review' | 'manual';
+export type SessionIntent = 'work' | 'review' | 'fix' | 'manual';
 
 export interface SessionRecord {
 	id: string;
@@ -896,7 +896,9 @@ export class SessionStore {
 
 	private mapRow(row: SessionRow): SessionRecord {
 		const intent =
-			row.intent === 'work' || row.intent === 'review' ? row.intent : 'manual';
+			row.intent === 'work' || row.intent === 'review' || row.intent === 'fix'
+				? row.intent
+				: 'manual';
 
 		return {
 			id: row.id,

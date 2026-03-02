@@ -26,7 +26,7 @@ const socket: Socket = io({
   autoConnect: false, // Don't connect until AppProvider mounts (after auth)
 })
 
-type AddSessionIntent = 'work' | 'review'
+type AddSessionIntent = 'work' | 'review' | 'fix'
 
 interface AddSessionContext {
   intent?: AddSessionIntent
@@ -154,7 +154,7 @@ interface AppActions {
     taskListName?: string,
     tdTaskId?: string,
     promptTemplate?: string,
-    intent?: 'work' | 'review' | 'manual'
+    intent?: 'work' | 'review' | 'fix' | 'manual'
   ) => Promise<boolean>
   renameSession: (sessionId: string, name: string) => Promise<boolean>
   stopSession: (sessionId: string) => Promise<void>
@@ -1061,7 +1061,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     taskListName?: string,
     tdTaskId?: string,
     promptTemplate?: string,
-    intent?: 'work' | 'review' | 'manual'
+    intent?: 'work' | 'review' | 'fix' | 'manual'
   ): Promise<boolean> => {
     try {
       const res = await fetch('/api/session/create-with-agent', {

@@ -563,6 +563,78 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		);
 	});
 
+	it('uses fix intent for task-linked fix sessions and reuses the original implementer td session', async () => {
+		mockSessionStoreGetOriginalWorkTdSessionId.mockReturnValue('ses_impl001');
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Fix cache invalidation',
+			description: 'Ensure stale reads are removed',
+			status: 'in_progress',
+			type: 'task',
+			priority: 'P1',
+			points: 0,
+			labels: '',
+			parent_id: '',
+			acceptance: 'No stale reads',
+			implementer_session: 'ses_impl001',
+			reviewer_session: '',
+			created_at: '',
+			updated_at: '',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: null,
+		});
+
+		const response = await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/fix-cache',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'fix',
+				promptTemplate: 'Begin Work on Task',
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(mockSessionStoreGetOriginalWorkTdSessionId).toHaveBeenCalledWith({
+			tdTaskId: 'td-abc123',
+			projectPath: '/repo',
+		});
+
+		const tdStartCall = mockExecFileSync.mock.calls.find(call => {
+			return (
+				call[0] === 'td' &&
+				Array.isArray(call[1]) &&
+				(call[1] as string[]).includes('start')
+			);
+		});
+		expect(tdStartCall?.[1]).toEqual(
+			expect.arrayContaining(['start', 'td-abc123', '--session', 'ses_impl001']),
+		);
+		expect(mockSessionStoreCreateSessionRecord).toHaveBeenCalledWith(
+			expect.objectContaining({
+				tdTaskId: 'td-abc123',
+				tdSessionId: 'ses_impl001',
+				intent: 'fix',
+			}),
+		);
+	});
+
 	it('keeps review sessions on a distinct td session id', async () => {
 		mockTdReaderGetIssueWithDetails.mockReturnValue({
 			id: 'td-abc123',

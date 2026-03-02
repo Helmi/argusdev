@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { TdIssueWithChildren } from '../lib/types'
+import type { TdIssueWithChildren, TdIssue } from '../lib/types'
 import {
   getLinkedSessions,
   getTaskDetailLayoutCounts,
   hasSchedulingDetails,
   parseAcceptanceCriteria,
+  getChildGroup,
+  groupChildrenByStatus,
 } from '../lib/taskDetailLayout'
 
 function makeIssue(overrides: Partial<TdIssueWithChildren> = {}): TdIssueWithChildren {
@@ -190,5 +192,87 @@ describe('TaskDetailModal layout helpers', () => {
       activity: 0,
       details: 1,
     })
+  })
+})
+
+function makeChild(overrides: Partial<TdIssue> = {}): TdIssue {
+  return {
+    id: 'td-child',
+    title: 'Child task',
+    description: '',
+    status: 'open',
+    type: 'task',
+    priority: 'P1',
+    points: 0,
+    labels: '',
+    parent_id: 'td-1',
+    acceptance: '',
+    implementer_session: '',
+    reviewer_session: '',
+    created_at: '2026-02-20 08:30:10 +0000 UTC',
+    updated_at: '2026-02-20 08:30:10 +0000 UTC',
+    closed_at: null,
+    deleted_at: null,
+    minor: 0,
+    created_branch: '',
+    creator_session: '',
+    sprint: '',
+    defer_until: null,
+    due_date: null,
+    defer_count: 0,
+    ...overrides,
+  }
+}
+
+describe('getChildGroup', () => {
+  it('groups closed tasks as closed', () => {
+    expect(getChildGroup(makeChild({ status: 'closed' }))).toBe('closed')
+  })
+
+  it('groups in_review tasks as in_review', () => {
+    expect(getChildGroup(makeChild({ status: 'in_review' }))).toBe('in_review')
+  })
+
+  it('groups in_progress tasks with reviewer_session as needs-fix', () => {
+    const child = makeChild({
+      status: 'in_progress',
+      reviewer_session: 'ses_reviewer',
+    })
+    expect(getChildGroup(child)).toBe('needs-fix')
+  })
+
+  it('groups in_progress tasks without reviewer_session as open', () => {
+    expect(getChildGroup(makeChild({ status: 'in_progress' }))).toBe('open')
+  })
+
+  it('groups open tasks as open', () => {
+    expect(getChildGroup(makeChild({ status: 'open' }))).toBe('open')
+  })
+})
+
+describe('groupChildrenByStatus', () => {
+  it('groups children in correct order: needs-fix, in_review, open, closed', () => {
+    const children = [
+      makeChild({ id: 'td-open', status: 'open' }),
+      makeChild({ id: 'td-closed', status: 'closed' }),
+      makeChild({ id: 'td-needsfix', status: 'in_progress', reviewer_session: 'ses_rev' }),
+      makeChild({ id: 'td-review', status: 'in_review' }),
+    ]
+
+    const grouped = groupChildrenByStatus(children)
+
+    expect(grouped['needs-fix'].map(c => c.id)).toEqual(['td-needsfix'])
+    expect(grouped['in_review'].map(c => c.id)).toEqual(['td-review'])
+    expect(grouped['open'].map(c => c.id)).toEqual(['td-open'])
+    expect(grouped['closed'].map(c => c.id)).toEqual(['td-closed'])
+  })
+
+  it('returns empty arrays for groups with no children', () => {
+    const grouped = groupChildrenByStatus([])
+
+    expect(grouped['needs-fix']).toEqual([])
+    expect(grouped['in_review']).toEqual([])
+    expect(grouped['open']).toEqual([])
+    expect(grouped['closed']).toEqual([])
   })
 })

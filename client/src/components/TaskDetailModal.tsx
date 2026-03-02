@@ -10,12 +10,13 @@ import {
   formatTdRelative,
   parseTdTimestamp,
 } from '@/lib/tdTimestamp'
-import type { TdIssueWithChildren, TdHandoffParsed, TdIssue } from '@/lib/types'
+import type { TdIssueWithChildren, TdHandoffParsed } from '@/lib/types'
 import {
   getLinkedSessions,
   getTaskDetailLayoutCounts,
   hasSchedulingDetails,
   parseAcceptanceCriteria,
+  groupChildrenByStatus,
 } from '@/lib/taskDetailLayout'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -35,6 +36,7 @@ import {
   Send,
   RotateCcw,
   MessageSquare,
+  Wrench,
 } from 'lucide-react'
 
 type TaskDetailTab = 'overview' | 'activity' | 'details'
@@ -174,7 +176,7 @@ interface TaskDetailModalProps {
   issueId: string
   onClose: () => void
   onNavigate?: (issueId: string) => void
-  onStartWorking?: (issueId: string) => void
+  onStartWorking?: (issueId: string, intent?: 'work' | 'review' | 'fix') => void
   onStartReview?: (issueId: string, createdBranch?: string) => void
   onRefresh?: () => void
 }
@@ -530,23 +532,73 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
 
                   {children.length > 0 && (
                     <CollapsibleSection title="Subtasks" icon={Layers} count={children.length} defaultOpen>
-                      <div className="space-y-1">
-                        {children.map((child: TdIssue) => {
-                          const childStatus = statusConfig[child.status]
-                          const ChildIcon = childStatus?.icon || Circle
-                          return (
-                            <button
-                              key={child.id}
-                              onClick={() => onNavigate?.(child.id)}
-                              className="flex items-center gap-2 w-full text-left rounded px-2 py-1.5 hover:bg-accent/50 transition-colors"
-                            >
-                              <ChildIcon className={cn('h-3 w-3 shrink-0', childStatus?.color)} />
-                              <span className="text-[10px] font-mono text-muted-foreground shrink-0">{child.id}</span>
-                              <span className="text-xs truncate flex-1">{child.title}</span>
-                              <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                            </button>
-                          )
-                        })}
+                      <div className="space-y-3">
+                        {(() => {
+                          const grouped = groupChildrenByStatus(children)
+                          const allChildren = [
+                            ...grouped['needs-fix'].map(c => ({ child: c, group: 'needs-fix' as const })),
+                            ...grouped['in_review'].map(c => ({ child: c, group: 'in_review' as const })),
+                            ...grouped['open'].map(c => ({ child: c, group: 'open' as const })),
+                            ...grouped['closed'].map(c => ({ child: c, group: 'closed' as const })),
+                          ]
+                          return allChildren.map(({ child, group }) => {
+                            const childStatus = statusConfig[child.status]
+                            const ChildIcon = childStatus?.icon || Circle
+                            const isNeedsFix = group === 'needs-fix'
+                            const isOpen = group === 'open'
+                            const showFixButton = isNeedsFix && onStartWorking
+                            const showStartButton = isOpen && onStartWorking && !child.implementer_session
+
+                            return (
+                              <div
+                                key={child.id}
+                                className={cn(
+                                  'flex items-center gap-2 rounded px-2 py-1.5',
+                                  isNeedsFix && 'bg-orange-500/10 border border-orange-500/30',
+                                  !isNeedsFix && 'hover:bg-accent/50'
+                                )}
+                              >
+                                <button
+                                  onClick={() => onNavigate?.(child.id)}
+                                  className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                                >
+                                  <ChildIcon className={cn('h-3 w-3 shrink-0', childStatus?.color)} />
+                                  {isNeedsFix && (
+                                    <Wrench className="h-3 w-3 shrink-0 text-orange-400 ml-1" />
+                                  )}
+                                  <span className="text-[10px] font-mono text-muted-foreground shrink-0">{child.id}</span>
+                                  <span className="text-xs truncate flex-1">{child.title}</span>
+                                </button>
+                                {showFixButton && (
+                                  <Button
+                                    size="sm"
+                                    className="h-5 text-[10px] px-2 bg-orange-500 hover:bg-orange-600"
+                                    onClick={() => {
+                                      onStartWorking(child.id, 'fix')
+                                      handleClose()
+                                    }}
+                                  >
+                                    <Wrench className="h-2.5 w-2.5 mr-1" />
+                                    Fix
+                                  </Button>
+                                )}
+                                {showStartButton && (
+                                  <Button
+                                    size="sm"
+                                    className="h-5 text-[10px] px-2"
+                                    onClick={() => {
+                                      onStartWorking(child.id, 'work')
+                                      handleClose()
+                                    }}
+                                  >
+                                    <Play className="h-2.5 w-2.5 mr-1" />
+                                    Start
+                                  </Button>
+                                )}
+                              </div>
+                            )
+                          })
+                        })()}
                       </div>
                     </CollapsibleSection>
                   )}
