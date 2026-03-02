@@ -389,10 +389,20 @@ describe('TdReader', () => {
 			const board = reader.getBoard();
 			reader.close();
 
-			// td-001 and td-005 are in_progress, td-002 is open, td-003 is done
+			// td-002 and td-003 are children of an open epic, so they stay off board
 			expect(board['in_progress']).toHaveLength(2);
-			expect(board['open']).toHaveLength(1);
-			expect(board['done']).toHaveLength(1);
+			expect(board['open']).toBeUndefined();
+			expect(board['done']).toBeUndefined();
+		});
+
+		it('should hide child tasks with open epic parents', () => {
+			const reader = new TdReader(TEST_DB_PATH);
+			const board = reader.getBoard();
+			reader.close();
+
+			const inProgressIds = board['in_progress']?.map(i => i.id) ?? [];
+			expect(inProgressIds).toContain('td-001');
+			expect(inProgressIds).not.toContain('td-002');
 		});
 
 		it('should hide deferred issues', () => {
@@ -415,6 +425,38 @@ describe('TdReader', () => {
 
 			const openIds = (board['open'] || []).map(i => i.id);
 			expect(openIds).not.toContain('td-deferred-board');
+		});
+
+		it('should show child tasks when epic parent is closed', () => {
+			const db = new Database(TEST_DB_PATH);
+			db.prepare(
+				`INSERT INTO issues (id, title, status, type, priority, parent_id) VALUES (?, ?, ?, ?, ?, ?)`,
+			).run(
+				'td-closed-parent',
+				'Closed Parent Epic',
+				'closed',
+				'epic',
+				'P1',
+				'',
+			);
+			db.prepare(
+				`INSERT INTO issues (id, title, status, type, priority, parent_id) VALUES (?, ?, ?, ?, ?, ?)`,
+			).run(
+				'td-closed-child',
+				'Child of Closed Epic',
+				'open',
+				'task',
+				'P2',
+				'td-closed-parent',
+			);
+			db.close();
+
+			const reader = new TdReader(TEST_DB_PATH);
+			const board = reader.getBoard();
+			reader.close();
+
+			const openIds = (board['open'] || []).map(i => i.id);
+			expect(openIds).toContain('td-closed-child');
 		});
 
 		it('should sort issues by priority within each status column', () => {
