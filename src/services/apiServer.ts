@@ -2497,8 +2497,9 @@ export class APIServer {
 								});
 							}
 						} else {
-							// Auto-select "Fix Rejected Work" for rejected tasks in progress
+							// Auto-select "Fix Rejected Work" only for work intent on rejected tasks
 							const isRejectedInProgress =
+								resolvedIntent === 'work' &&
 								taskDetail.status === 'in_progress' &&
 								taskDetail.rejectionReason !== null;
 
@@ -2512,6 +2513,18 @@ export class APIServer {
 									logger.info(
 										`API: Auto-selected "Fix Rejected Work" prompt for rejected task ${normalizedTdTaskId}`,
 									);
+								} else {
+									// Fallback to 'Begin Work on Task' when Fix template missing
+									const beginTemplate = findPromptTemplateByName(
+										promptTemplates,
+										'Begin Work on Task',
+									);
+									if (beginTemplate) {
+										selectedTemplate = beginTemplate;
+										logger.info(
+											`API: Fix Rejected Work template not found, using Begin Work on Task for ${normalizedTdTaskId}`,
+										);
+									}
 								}
 							}
 
