@@ -31,20 +31,23 @@ function detectClaudeState(
 	const content = getTerminalContent(terminal);
 	const lowerContent = content.toLowerCase();
 
-	if (lowerContent.includes('ctrl+r to toggle')) {
-		return currentState;
-	}
-
+	// Confirmation prompts (yes/no or selection dialogs)
 	if (
 		/(?:do you want|would you like).+\n+[\s\S]*?(?:yes|❯)/.test(lowerContent)
 	) {
 		return 'waiting_input';
 	}
 
-	if (lowerContent.includes('esc to cancel')) {
+	// "esc to cancel" without an accompanying interrupt hint = waiting for input
+	if (
+		lowerContent.includes('esc to cancel') &&
+		!lowerContent.includes('ctrl+c to interrupt') &&
+		!lowerContent.includes('esc to interrupt')
+	) {
 		return 'waiting_input';
 	}
 
+	// Active processing
 	if (
 		lowerContent.includes('ctrl+c to interrupt') ||
 		lowerContent.includes('esc to interrupt')
@@ -52,11 +55,18 @@ function detectClaudeState(
 		return 'busy';
 	}
 
-	if (lowerContent.includes('↵ send')) {
+	// Idle: input prompt visible
+	// "↵ send" — standard Claude Code idle hint
+	// "type a message" — fallback idle hint in some versions
+	if (
+		lowerContent.includes('↵ send') ||
+		lowerContent.includes('enter to send') ||
+		lowerContent.includes('type a message')
+	) {
 		return 'idle';
 	}
 
-	return 'idle';
+	return currentState;
 }
 
 function detectCodexState(terminal: Terminal): SessionState {
