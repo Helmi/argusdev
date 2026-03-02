@@ -260,9 +260,22 @@ export class TdReader {
 	 */
 	getBoard(): Record<string, TdIssue[]> {
 		const issues = this.listIssues({hideDeferred: true});
+		const issueById = new Map(issues.map(issue => [issue.id, issue] as const));
 		const board: Record<string, TdIssue[]> = {};
 
 		for (const issue of issues) {
+			const parent = issue.parent_id
+				? issueById.get(issue.parent_id)
+				: undefined;
+			if (
+				issue.parent_id &&
+				parent &&
+				parent.type === 'epic' &&
+				parent.status !== 'closed'
+			) {
+				continue;
+			}
+
 			const status = issue.status;
 			if (!board[status]) {
 				board[status] = [];
