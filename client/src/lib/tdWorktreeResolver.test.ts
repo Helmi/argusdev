@@ -70,4 +70,16 @@ describe('tdWorktreeResolver', () => {
 			resolveTdIssueWorktreePath(worktrees, 'feature/td-5'),
 		).toBeUndefined();
 	});
+
+	it('never resolves to the project root even if its branch matches', () => {
+		// created_branch = 'main' is bad data but should not resolve to the project root
+		const worktrees = [
+			makeWorktree('/projects/app', 'main'),
+			makeWorktree('/projects/.worktrees/app/task-td-99-foo', 'task/td-99-foo'),
+		];
+
+		expect(
+			resolveTdIssueWorktreePath(worktrees, 'main', '/projects/app'),
+		).toBeUndefined();
+	});
 });

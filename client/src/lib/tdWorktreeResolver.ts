@@ -34,6 +34,11 @@ export function resolveTdIssueWorktreePath(
 		if (projectPath && !worktreeBelongsToProject(worktree.path, projectPath)) {
 			return false;
 		}
+		// Never resolve to the project root itself — task worktrees are always
+		// subdirectories or siblings, not the main checkout
+		if (projectPath && worktree.path === projectPath) {
+			return false;
+		}
 		const branch = normalizeTdBranchName(worktree.branch);
 		return branch === issueBranch || worktree.path.endsWith(`/${issueBranch}`);
 	});
