@@ -28,8 +28,22 @@ const mockSessionStoreMarkSessionResumed = vi.fn();
 const mockSessionStoreHydratePreview = vi.fn(async () => {});
 const mockSessionStoreGetLatestByTdSessionId = vi.fn(() => null);
 const mockSessionStoreCountSessions = vi.fn(() => 0);
-const mockSessionStoreGetOriginalWorkTdSessionId = vi.fn(() => null as string | null);
+const mockSessionStoreGetOriginalWorkTdSessionId = vi.fn(
+	() => null as string | null,
+);
 const mockWatch = vi.fn<(...args: unknown[]) => unknown>();
+const mockCleanupStartupScriptsInWorktree = vi.fn<
+	(worktreePath: string, maxAgeMs: number, now?: number) => Promise<number>
+>(() => Promise.resolve(0));
+
+vi.mock('../utils/startupScript.js', async importOriginal => {
+	const actual =
+		await importOriginal<typeof import('../utils/startupScript.js')>();
+	return {
+		...actual,
+		cleanupStartupScriptsInWorktree: mockCleanupStartupScriptsInWorktree,
+	};
+});
 
 vi.mock('child_process', async importOriginal => {
 	const actual = await importOriginal<typeof import('child_process')>();
@@ -267,6 +281,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		mockSessionStoreGetLatestByTdSessionId.mockReset();
 		mockSessionStoreCountSessions.mockReset();
 		mockSessionStoreGetOriginalWorkTdSessionId.mockReset();
+		mockCleanupStartupScriptsInWorktree.mockReset();
 		mockSessionStoreQuerySessions.mockReturnValue([]);
 		mockSessionStoreGetSessionById.mockReturnValue(null);
 		mockSessionStoreCountSessions.mockReturnValue(0);
@@ -347,6 +362,187 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			'session-recover-1',
 			true,
 		);
+	});
+
+	it('cleans up startup launcher scripts on first startup', async () => {
+		vi.mocked(coreService.getState).mockReturnValue({
+			selectedProject: null,
+			activeSession: null,
+			worktrees: [
+				{
+					path: '/repo/.worktrees/live-from-state',
+					isMainWorktree: false,
+					hasSession: false,
+				},
+			],
+		});
+
+		mockSessionStoreQuerySessions.mockReturnValue([
+			{worktreePath: '/repo/.worktrees/live-from-store'},
+		]);
+
+		const startedApiServer = apiServer as unknown as {
+			start: (
+				port: number,
+				host: string,
+				devMode: boolean,
+			) => Promise<{
+				address: string;
+				port: number;
+			}>;
+		};
+		const result = await startedApiServer.start(0, '127.0.0.1', true);
+		expect(result.address).toContain('127.0.0.1');
+
+		expect(mockCleanupStartupScriptsInWorktree).toHaveBeenCalledTimes(2);
+		expect(mockCleanupStartupScriptsInWorktree).toHaveBeenCalledWith(
+			'/repo/.worktrees/live-from-state',
+			expect.any(Number),
+		);
+		expect(mockCleanupStartupScriptsInWorktree).toHaveBeenCalledWith(
+			'/repo/.worktrees/live-from-store',
+			expect.any(Number),
+		);
+	});
+
+	it('deduplicates worktree paths before startup cleanup', async () => {
+		const loaded = '/repo/.worktrees/shared';
+		vi.mocked(coreService.getState).mockReturnValue({
+			selectedProject: null,
+			activeSession: null,
+			worktrees: [
+				{
+					path: loaded,
+					isMainWorktree: false,
+					hasSession: false,
+				},
+			],
+		});
+
+		mockSessionStoreQuerySessions.mockReturnValue([
+			{worktreePath: loaded},
+			{worktreePath: loaded},
+		]);
+
+		await vi.resetModules();
+		const freshApiModule = await import('./apiServer.js');
+		const freshApiServer = freshApiModule.apiServer as {
+			start: (
+				port: number,
+				host: string,
+				devMode: boolean,
+			) => Promise<{address: string; port: number}>;
+			stop: () => Promise<void>;
+		};
+
+		try {
+			await freshApiServer.start(0, '127.0.0.1', true);
+			expect(mockCleanupStartupScriptsInWorktree).toHaveBeenCalledTimes(2);
+			expect(mockCleanupStartupScriptsInWorktree).toHaveBeenCalledWith(
+				loaded,
+				expect.any(Number),
+			);
+			expect(mockCleanupStartupScriptsInWorktree).toHaveBeenCalledWith(
+				loaded,
+				expect.any(Number),
+			);
+		} finally {
+			await freshApiServer.stop();
+		}
+	});
+
+	it('continues startup cleanup when sessionStore lookup fails', async () => {
+		const loaded = '/repo/.worktrees/failing-store';
+		vi.mocked(coreService.getState).mockReturnValue({
+			selectedProject: null,
+			activeSession: null,
+			worktrees: [
+				{
+					path: loaded,
+					isMainWorktree: false,
+					hasSession: false,
+				},
+			],
+		});
+
+		mockSessionStoreQuerySessions.mockImplementation(() => {
+			throw new Error('temp db locked');
+		});
+
+		await vi.resetModules();
+		const freshApiModule = await import('./apiServer.js');
+		const freshApiServer = freshApiModule.apiServer as {
+			start: (
+				port: number,
+				host: string,
+				devMode: boolean,
+			) => Promise<{address: string; port: number}>;
+			stop: () => Promise<void>;
+		};
+
+		try {
+			await freshApiServer.start(0, '127.0.0.1', true);
+			expect(mockCleanupStartupScriptsInWorktree).toHaveBeenCalled();
+			expect(mockCleanupStartupScriptsInWorktree).toHaveBeenCalledWith(
+				loaded,
+				expect.any(Number),
+			);
+		} finally {
+			await freshApiServer.stop();
+		}
+	});
+
+	it('runs startup launcher cleanup on interval', async () => {
+		const setIntervalCalls: Array<{
+			callback: (...args: unknown[]) => unknown;
+			delay: number;
+		}> = [];
+
+		const setIntervalSpy = vi
+			.spyOn(global, 'setInterval')
+			.mockImplementation((callback, delay) => {
+				setIntervalCalls.push({
+					callback: callback as (...args: unknown[]) => unknown,
+					delay: typeof delay === 'number' ? delay : 0,
+				});
+				return 1 as unknown as ReturnType<typeof setInterval>;
+			});
+
+		try {
+			vi.mocked(coreService.getState).mockReturnValue({
+				selectedProject: null,
+				activeSession: null,
+				worktrees: [
+					{
+						path: '/repo/.worktrees/live-from-state',
+						isMainWorktree: false,
+						hasSession: false,
+					},
+				],
+			});
+
+			mockSessionStoreQuerySessions.mockReturnValue([
+				{worktreePath: '/repo/.worktrees/live-from-store'},
+			]);
+
+			await vi.resetModules();
+			await import('./apiServer.js');
+
+			const intervalCallback = setIntervalCalls.find(item => {
+				if (item.delay !== 60 * 60 * 1000) {
+					return false;
+				}
+
+				return item.callback.toString().includes('cleanupStartupScripts');
+			})?.callback;
+			expect(typeof intervalCallback).toBe('function');
+
+			intervalCallback?.();
+			await Promise.resolve();
+			expect(mockCleanupStartupScriptsInWorktree).toHaveBeenCalled();
+		} finally {
+			setIntervalSpy.mockRestore();
+		}
 	});
 
 	it('restarts only the requested session via /api/session/restart', async () => {
@@ -552,7 +748,12 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			);
 		});
 		expect(tdStartCall?.[1]).toEqual(
-			expect.arrayContaining(['start', 'td-abc123', '--session', 'ses_impl001']),
+			expect.arrayContaining([
+				'start',
+				'td-abc123',
+				'--session',
+				'ses_impl001',
+			]),
 		);
 		expect(mockSessionStoreCreateSessionRecord).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -624,7 +825,12 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			);
 		});
 		expect(tdStartCall?.[1]).toEqual(
-			expect.arrayContaining(['start', 'td-abc123', '--session', 'ses_impl001']),
+			expect.arrayContaining([
+				'start',
+				'td-abc123',
+				'--session',
+				'ses_impl001',
+			]),
 		);
 		expect(mockSessionStoreCreateSessionRecord).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -776,8 +982,11 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			},
 		});
 
-		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
-		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		expect(
+			mockedSessionManager.createSessionWithAgentEffect,
+		).toHaveBeenCalled();
+		const call =
+			mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
 		const options = call?.[8] as {initialPrompt?: string} | undefined;
 		expect(options?.initialPrompt).toBeDefined();
 		expect(options?.initialPrompt).toContain('was rejected');
@@ -852,8 +1061,11 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			},
 		});
 
-		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
-		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		expect(
+			mockedSessionManager.createSessionWithAgentEffect,
+		).toHaveBeenCalled();
+		const call =
+			mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
 		const options = call?.[8] as {initialPrompt?: string} | undefined;
 		expect(options?.initialPrompt).toBeDefined();
 		expect(options?.initialPrompt).not.toContain('was rejected');
@@ -921,8 +1133,11 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			},
 		});
 
-		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
-		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		expect(
+			mockedSessionManager.createSessionWithAgentEffect,
+		).toHaveBeenCalled();
+		const call =
+			mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
 		const options = call?.[8] as {initialPrompt?: string} | undefined;
 		expect(options?.initialPrompt).toBeDefined();
 		expect(options?.initialPrompt).toContain('td-abc123');
@@ -982,8 +1197,11 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			},
 		});
 
-		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
-		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		expect(
+			mockedSessionManager.createSessionWithAgentEffect,
+		).toHaveBeenCalled();
+		const call =
+			mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
 		const options = call?.[8] as {initialPrompt?: string} | undefined;
 		expect(options?.initialPrompt).toBeDefined();
 		expect(options?.initialPrompt).toContain('td-abc123');
@@ -1182,7 +1400,9 @@ describe('APIServer TD issues.db watcher', () => {
 		const apiServerModule = await import('./apiServer.js');
 		apiServer = apiServerModule.apiServer;
 
-		const apiServerInternal = apiServer as unknown as {setupPromise: Promise<void>};
+		const apiServerInternal = apiServer as unknown as {
+			setupPromise: Promise<void>;
+		};
 		await apiServerInternal.setupPromise;
 	});
 
@@ -1234,18 +1454,18 @@ describe('APIServer TD issues.db watcher', () => {
 		};
 		internal['io'] = {emit: mockEmit};
 
-		const watchCallback =
-			mockWatch.mock.calls[mockWatch.mock.calls.length - 1]?.[1] as
-				(eventType: string) => void;
+		const watchCallback = mockWatch.mock.calls[
+			mockWatch.mock.calls.length - 1
+		]?.[1] as (eventType: string) => void;
 		expect(watchCallback).toBeDefined();
 
 		const timeoutCallbacks: Array<() => void> = [];
-		const setTimeoutSpy = vi
-			.spyOn(global, 'setTimeout')
-			.mockImplementation(((callback: () => void) => {
-				timeoutCallbacks.push(callback);
-				return 0 as unknown as ReturnType<typeof setTimeout>;
-			}) as typeof setTimeout);
+		const setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation(((
+			callback: () => void,
+		) => {
+			timeoutCallbacks.push(callback);
+			return 0 as unknown as ReturnType<typeof setTimeout>;
+		}) as typeof setTimeout);
 
 		watchCallback('change');
 		expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
@@ -1264,7 +1484,9 @@ describe('APIServer TD issues.db watcher', () => {
 		};
 		internal['io'] = {emit: mockEmit};
 
-		const watchCallback = mockWatch.mock.calls[mockWatch.mock.calls.length - 1]?.[1] as (eventType: string) => void;
+		const watchCallback = mockWatch.mock.calls[
+			mockWatch.mock.calls.length - 1
+		]?.[1] as (eventType: string) => void;
 		expect(watchCallback).toBeDefined();
 
 		vi.useFakeTimers();
@@ -1293,9 +1515,11 @@ describe('APIServer TD issues.db watcher', () => {
 		};
 		internal['io'] = {emit: mockEmit};
 
-		const onCalls = (mockedCoreService.on as ReturnType<typeof vi.fn>).mock.calls;
-		const projectSelectedHandler = onCalls.find(([event]) => event === 'projectSelected')?.[1] as
-			(() => void) | undefined;
+		const onCalls = (mockedCoreService.on as ReturnType<typeof vi.fn>).mock
+			.calls;
+		const projectSelectedHandler = onCalls.find(
+			([event]) => event === 'projectSelected',
+		)?.[1] as (() => void) | undefined;
 		expect(projectSelectedHandler).toBeDefined();
 		projectSelectedHandler?.();
 
@@ -1312,7 +1536,9 @@ describe('APIServer TD issues.db watcher', () => {
 		internal['io'] = {emit: mockEmit};
 		internal.setupTdDbWatcher();
 
-		const watchCallback = mockWatch.mock.calls[mockWatch.mock.calls.length - 1]?.[1] as (eventType: string) => void;
+		const watchCallback = mockWatch.mock.calls[
+			mockWatch.mock.calls.length - 1
+		]?.[1] as (eventType: string) => void;
 		vi.useFakeTimers();
 		watchCallback('change');
 		vi.advanceTimersByTime(200);
@@ -1331,7 +1557,13 @@ describe('APIServer TD issues.db watcher', () => {
 		const mockIoClose = vi.fn();
 		const mockAppClose = vi.fn().mockResolvedValue(undefined);
 		const internal = apiServer as unknown as {
-			io: {emit: ReturnType<typeof vi.fn>; disconnectSockets: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>} | undefined;
+			io:
+				| {
+						emit: ReturnType<typeof vi.fn>;
+						disconnectSockets: ReturnType<typeof vi.fn>;
+						close: ReturnType<typeof vi.fn>;
+				  }
+				| undefined;
 			setupTdDbWatcher: () => void;
 			stop: () => Promise<void>;
 			app: {close: typeof mockAppClose};
@@ -1344,7 +1576,9 @@ describe('APIServer TD issues.db watcher', () => {
 		internal.app = {close: mockAppClose};
 
 		internal.setupTdDbWatcher();
-		const watchCallback = mockWatch.mock.calls[mockWatch.mock.calls.length - 1]?.[1] as (eventType: string) => void;
+		const watchCallback = mockWatch.mock.calls[
+			mockWatch.mock.calls.length - 1
+		]?.[1] as (eventType: string) => void;
 
 		vi.useFakeTimers();
 		watchCallback('change');

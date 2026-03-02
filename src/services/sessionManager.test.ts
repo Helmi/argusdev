@@ -5,6 +5,10 @@ import {EventEmitter} from 'events';
 import {Session, DevcontainerConfig} from '../types/index.js';
 import {exec, execFile} from 'child_process';
 import {getDefaultShell} from '../utils/platform.js';
+import {join} from 'path';
+import {tmpdir} from 'os';
+import {mkdtemp, rm} from 'fs/promises';
+import * as startupScript from '../utils/startupScript.js';
 
 // Mock node-pty
 vi.mock('node-pty', () => ({
@@ -643,6 +647,82 @@ describe('SessionManager', () => {
 				const bootstrapCommand = mockPty.write.mock.calls[0]?.[0] as string;
 				expect(bootstrapCommand).toContain('bash');
 				expect(bootstrapCommand).toContain('/tmp/.cacd-startup-test.sh');
+			},
+		);
+
+		it.skipIf(process.platform === 'win32')(
+			'should add startup script to git exclude when using launcher',
+			async () => {
+				const worktreePath = await mkdtemp(
+					join(tmpdir(), 'cacd-startup-worktree-'),
+				);
+				const ensureSpy = vi
+					.spyOn(startupScript, 'ensureStartupScriptInGitExclude')
+					.mockResolvedValue(true);
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						worktreePath,
+						'claude',
+						[],
+						'claude',
+						'Agent Session',
+						'claude',
+						undefined,
+						'agent',
+						{
+							initialPrompt: 'Line 1\nLine 2',
+						},
+					),
+				);
+
+				const bootstrapCommand = mockPty.write.mock.calls[0]?.[0] as string;
+				expect(bootstrapCommand).toContain('bash');
+				expect(bootstrapCommand).toContain('.cacd-startup-');
+				expect(ensureSpy).toHaveBeenCalledTimes(1);
+				const [registeredWorktreePath, launcherName] = ensureSpy.mock
+					.calls[0] as [string, string];
+				expect(registeredWorktreePath).toBe(worktreePath);
+				expect(launcherName).toMatch(/\.cacd-startup-.*\.sh/);
+
+				await rm(worktreePath, {recursive: true, force: true});
+			},
+		);
+
+		it.skipIf(process.platform === 'win32')(
+			'should continue with session bootstrap when git exclude update fails',
+			async () => {
+				const worktreePath = await mkdtemp(
+					join(tmpdir(), 'cacd-startup-worktree-'),
+				);
+				const ensureSpy = vi
+					.spyOn(startupScript, 'ensureStartupScriptInGitExclude')
+					.mockResolvedValue(false);
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						worktreePath,
+						'claude',
+						[],
+						'claude',
+						'Agent Session',
+						'agent',
+						undefined,
+						'agent',
+						{
+							initialPrompt: 'Line 1\nLine 2',
+						},
+					),
+				);
+
+				const bootstrapCommand = mockPty.write.mock.calls[0]?.[0] as string;
+				expect(bootstrapCommand).toContain('bash');
+				expect(bootstrapCommand).toContain('.cacd-startup-');
+				expect(ensureSpy).toHaveBeenCalledTimes(1);
+
+				await rm(worktreePath, {recursive: true, force: true});
 			},
 		);
 

@@ -11,7 +11,7 @@ import pkg from '@xterm/headless';
 import {exec, execFile} from 'child_process';
 import {promisify} from 'util';
 import {writeFile} from 'fs/promises';
-import {join} from 'path';
+import {join, basename} from 'path';
 import {configurationManager} from './configurationManager.js';
 import {executeStatusHook} from '../utils/hookExecutor.js';
 import {
@@ -25,6 +25,7 @@ import {logger} from '../utils/logger.js';
 import {Mutex, createInitialSessionStateData} from '../utils/mutex.js';
 import {getDefaultShell, getPtyEnv} from '../utils/platform.js';
 import {adapterRegistry} from '../adapters/index.js';
+import {ensureStartupScriptInGitExclude} from '../utils/startupScript.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -257,6 +258,17 @@ ${commandTokens.join(' ')}
 			encoding: 'utf-8',
 			mode: 0o700,
 		});
+
+		const scriptFileName = basename(scriptPath);
+		const isExcluded = await ensureStartupScriptInGitExclude(
+			worktreePath,
+			scriptFileName,
+		);
+		if (!isExcluded) {
+			logger.warn(
+				`[SessionManager] Could not add startup launcher script to git exclude file for ${scriptFileName}`,
+			);
+		}
 
 		return scriptPath;
 	}

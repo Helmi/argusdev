@@ -51,6 +51,7 @@ import {adapterRegistry} from '../adapters/index.js';
 import {globalSessionOrchestrator} from './globalSessionOrchestrator.js';
 import {fileWatcherService} from './fileWatcherService.js';
 import type {SessionManager} from './sessionManager.js';
+import {cleanupStartupScriptsInWorktree} from '../utils/startupScript.js';
 import type {
 	AgentConfig,
 	Session,
@@ -71,6 +72,8 @@ const ALLOWED_MIME_TYPES = [
 	'image/gif',
 ];
 const TEMP_IMAGE_DIR = path.join(tmpdir(), 'cacd-images');
+const STARTUP_SCRIPT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+const STARTUP_SCRIPT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Create temp directory on module load (async, fire-and-forget)
 mkdir(TEMP_IMAGE_DIR, {recursive: true, mode: 0o700}).catch(() => {});
@@ -101,6 +104,61 @@ async function cleanupTempImages() {
 // Run cleanup on startup and every hour
 cleanupTempImages();
 setInterval(cleanupTempImages, 60 * 60 * 1000);
+
+async function cleanupStartupScripts(): Promise<void> {
+	try {
+		const worktreePaths = new Set<string>();
+		for (const worktree of coreService.getState().worktrees) {
+			if (worktree.path) {
+				worktreePaths.add(worktree.path);
+			}
+		}
+
+		let persistedSessions: Array<{worktreePath?: string}> = [];
+		try {
+			persistedSessions = sessionStore.querySessions({
+				limit: 5000,
+				offset: 0,
+			}) as Array<{worktreePath?: string}>;
+		} catch {
+			logger.debug(
+				'API: Skipping startup script cleanup due to session store read error',
+			);
+		}
+
+		for (const session of persistedSessions) {
+			if (session?.worktreePath) {
+				worktreePaths.add(session.worktreePath);
+			}
+		}
+
+		const paths = Array.from(worktreePaths);
+		if (paths.length === 0) {
+			return;
+		}
+
+		let removedTotal = 0;
+		for (const worktreePath of paths) {
+			removedTotal += await cleanupStartupScriptsInWorktree(
+				worktreePath,
+				STARTUP_SCRIPT_MAX_AGE_MS,
+			);
+		}
+
+		if (removedTotal > 0) {
+			logger.info(
+				`API: Startup script cleanup removed ${removedTotal} stale launcher script(s)`,
+			);
+		}
+	} catch (error) {
+		logger.debug(`API: Startup script cleanup failed: ${String(error)}`);
+	}
+}
+
+void cleanupStartupScripts();
+setInterval(() => {
+	void cleanupStartupScripts();
+}, STARTUP_SCRIPT_CLEANUP_INTERVAL_MS);
 
 // Check if hostname is allowed (localhost, private network IP, or local hostname)
 function isAllowedHost(hostname: string): boolean {
@@ -3618,7 +3676,7 @@ export class APIServer {
 		const dbPath = state.dbPath;
 
 		try {
-			this.tdDbWatcher = watch(dbPath, (eventType) => {
+			this.tdDbWatcher = watch(dbPath, eventType => {
 				if (eventType === 'change') {
 					// Debounce to prevent fetch storms on rapid writes
 					if (this.tdDbWatchDebounceTimer) {
@@ -3631,7 +3689,7 @@ export class APIServer {
 				}
 			});
 
-			this.tdDbWatcher.on('error', (err) => {
+			this.tdDbWatcher.on('error', err => {
 				logger.warn(`API: TD issues.db watcher error: ${err}`);
 			});
 
@@ -3672,15 +3730,12 @@ export class APIServer {
 		}
 
 		// Forward worktrees_changed events to clients
-		fileWatcherService.on(
-			'worktrees_changed',
-			(projectPath: string) => {
-				logger.info(
-					`API: File watcher detected worktrees change for ${projectPath}`,
-				);
-				this.io?.emit('worktrees_changed', {projectPath});
-			},
-		);
+		fileWatcherService.on('worktrees_changed', (projectPath: string) => {
+			logger.info(
+				`API: File watcher detected worktrees change for ${projectPath}`,
+			);
+			this.io?.emit('worktrees_changed', {projectPath});
+		});
 
 		// Forward projects_changed events to clients
 		fileWatcherService.on('projects_changed', () => {
@@ -3693,7 +3748,7 @@ export class APIServer {
 		});
 
 		// Update watchers on project switch
-		coreService.on('projectSelected', (project) => {
+		coreService.on('projectSelected', project => {
 			fileWatcherService.updateWatchedProjects(project ? [project.path] : []);
 		});
 	}
@@ -3774,6 +3829,7 @@ export class APIServer {
 
 				if (!this.hasRehydratedSessions) {
 					try {
+						await cleanupStartupScripts();
 						await this.rehydratePersistedSessions();
 						this.hasRehydratedSessions = true;
 					} catch (error) {
