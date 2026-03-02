@@ -294,7 +294,9 @@ function isValidTdTaskId(taskId: string): boolean {
 }
 
 function resolveSessionIntent(intent?: string): SessionIntent {
-	return intent === 'work' || intent === 'review' ? intent : 'manual';
+	return intent === 'work' || intent === 'review' || intent === 'fix'
+		? intent
+		: 'manual';
 }
 
 function inferAgentType(agent: AgentConfig): string {
@@ -2351,7 +2353,7 @@ export class APIServer {
 				taskListName?: string;
 				tdTaskId?: string;
 				promptTemplate?: string;
-				intent?: 'work' | 'review' | 'manual';
+				intent?: 'work' | 'review' | 'fix' | 'manual';
 			};
 		}>('/api/session/create-with-agent', async (request, reply) => {
 			const {
@@ -2446,7 +2448,7 @@ export class APIServer {
 				let renderedPromptTemplate: string | null = null;
 				if (tdService.isAvailable()) {
 					let tdSessionId: string | null = null;
-					if (resolvedIntent === 'work') {
+					if (resolvedIntent === 'work' || resolvedIntent === 'fix') {
 						tdSessionId = sessionStore.getOriginalWorkTdSessionId({
 							tdTaskId: normalizedTdTaskId,
 							projectPath: linkedProjectPath,
@@ -2681,10 +2683,14 @@ export class APIServer {
 			// If initialPrompt was passed to createSessionWithAgentEffect (CLI path), the
 			// agent already received the prompt at process start — PTY injection would
 			// double-post it (e.g. Codex starts working but prompt also appears in input field).
-			const promptWasInjectedViaCli =
-				!!(startupPromptToInject &&
-				normalizedPromptArg?.toLowerCase() !== 'none');
-			if (startupPromptToInject && agent.kind !== 'terminal' && !promptWasInjectedViaCli) {
+			const promptWasInjectedViaCli = !!(
+				startupPromptToInject && normalizedPromptArg?.toLowerCase() !== 'none'
+			);
+			if (
+				startupPromptToInject &&
+				agent.kind !== 'terminal' &&
+				!promptWasInjectedViaCli
+			) {
 				this.queueTdPromptInjection(
 					session.id,
 					startupPromptToInject,

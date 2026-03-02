@@ -43,7 +43,7 @@ interface ApiCreateSessionRequest {
 	taskListName?: string;
 	tdTaskId?: string;
 	promptTemplate?: string;
-	intent?: 'work' | 'review' | 'manual';
+	intent?: 'work' | 'review' | 'fix' | 'manual';
 }
 
 interface ApiCreateSessionResponse {
@@ -637,19 +637,24 @@ function parseSessionOptions(rawOptionFlag: string | string[] | undefined): {
 }
 
 function parseSessionIntent(intent: string | undefined): {
-	intent?: 'work' | 'review' | 'manual';
+	intent?: 'work' | 'review' | 'fix' | 'manual';
 	error?: string;
 } {
 	if (!intent) {
 		return {};
 	}
 
-	if (intent === 'work' || intent === 'review' || intent === 'manual') {
+	if (
+		intent === 'work' ||
+		intent === 'review' ||
+		intent === 'fix' ||
+		intent === 'manual'
+	) {
 		return {intent};
 	}
 
 	return {
-		error: `Invalid --intent value: ${intent}. Expected one of: work, review, manual.`,
+		error: `Invalid --intent value: ${intent}. Expected one of: work, review, fix, manual.`,
 	};
 }
 
