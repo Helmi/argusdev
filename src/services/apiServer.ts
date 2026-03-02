@@ -2513,7 +2513,7 @@ export class APIServer {
 				projConfig,
 				globalTdConfig,
 			);
-			let startupPromptToInject: string | null = null;
+			let startupPromptToInject: string | undefined = undefined;
 			let linkedTdSessionId: string | undefined;
 
 			if (taskListName && isClaudeAgent) {
