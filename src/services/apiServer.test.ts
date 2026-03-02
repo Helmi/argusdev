@@ -1,5 +1,6 @@
 import {
 	afterAll,
+	afterEach,
 	beforeAll,
 	beforeEach,
 	describe,
@@ -9,6 +10,7 @@ import {
 } from 'vitest';
 import {Effect} from 'effect';
 import {coreService} from './coreService.js';
+import type {FSWatcher} from 'node:fs';
 
 const mockGetAllActiveSessions = vi.fn<() => unknown[]>(() => []);
 
@@ -26,13 +28,22 @@ const mockSessionStoreMarkSessionResumed = vi.fn();
 const mockSessionStoreHydratePreview = vi.fn(async () => {});
 const mockSessionStoreGetLatestByTdSessionId = vi.fn(() => null);
 const mockSessionStoreCountSessions = vi.fn(() => 0);
-const mockSessionStoreGetOriginalWorkTdSessionId = vi.fn(() => null);
+const mockSessionStoreGetOriginalWorkTdSessionId = vi.fn(() => null as string | null);
+const mockWatch = vi.fn<(...args: unknown[]) => unknown>();
 
 vi.mock('child_process', async importOriginal => {
 	const actual = await importOriginal<typeof import('child_process')>();
 	return {
 		...actual,
 		execFileSync: mockExecFileSync,
+	};
+});
+
+vi.mock('fs', async importOriginal => {
+	const actual = await importOriginal<typeof import('fs')>();
+	return {
+		...actual,
+		watch: mockWatch,
 	};
 });
 
@@ -742,5 +753,224 @@ describe('APIServer td create-with-agent validation ordering', () => {
 
 		expect(mainWt?.hasSession).toBe(false);
 		expect(featWt?.hasSession).toBe(true);
+	});
+});
+
+describe('APIServer TD issues.db watcher', () => {
+	let apiServer: import('./apiServer.js').APIServer;
+	let mockWatcher: {
+		close: ReturnType<typeof vi.fn>;
+		on: ReturnType<typeof vi.fn>;
+	};
+
+	beforeEach(async () => {
+		vi.clearAllMocks();
+		vi.resetModules();
+
+		const {coreService: mockedCoreService} = await import('./coreService.js');
+		const {tdService: mockedTdService} = await import('./tdService.js');
+		mockedCoreService.getSelectedProject = vi.fn(() => ({
+			path: '/repo',
+			name: 'repo',
+			relativePath: '/repo',
+			isValid: true,
+		}));
+		mockedTdService.resolveProjectState = vi.fn(() => ({
+			enabled: true,
+			initialized: true,
+			binaryAvailable: true,
+			todosDir: '/repo/.todos',
+			dbPath: '/repo/.todos/issues.db',
+			tdRoot: '/repo',
+		}));
+
+		mockWatcher = {
+			close: vi.fn(),
+			on: vi.fn(() => mockWatcher),
+		};
+
+		mockWatch.mockReset();
+		mockWatch.mockReturnValue(mockWatcher as unknown as FSWatcher);
+
+		const apiServerModule = await import('./apiServer.js');
+		apiServer = apiServerModule.apiServer;
+
+		const apiServerInternal = apiServer as unknown as {setupPromise: Promise<void>};
+		await apiServerInternal.setupPromise;
+	});
+
+	afterEach(() => {
+		mockWatch.mockReset();
+	});
+
+	it('does nothing when no project is selected', async () => {
+		const {coreService: mockedCoreService} = await import('./coreService.js');
+		const internal = apiServer as unknown as {
+			setupTdDbWatcher: () => void;
+		};
+		mockedCoreService.getSelectedProject = vi.fn(() => null);
+		const callsBefore = mockWatch.mock.calls.length;
+		internal.setupTdDbWatcher();
+		expect(mockWatch).toHaveBeenCalledTimes(callsBefore);
+	});
+
+	it('does nothing when selected project has no issues.db path', async () => {
+		const {coreService: mockedCoreService} = await import('./coreService.js');
+		const {tdService: mockedTdService} = await import('./tdService.js');
+		const internal = apiServer as unknown as {
+			setupTdDbWatcher: () => void;
+		};
+		mockedCoreService.getSelectedProject = vi.fn(() => ({
+			path: '/repo',
+			name: 'repo',
+			relativePath: '/repo',
+			isValid: true,
+		}));
+		mockedTdService.resolveProjectState = vi.fn(() => ({
+			enabled: true,
+			initialized: true,
+			binaryAvailable: true,
+			todosDir: '/repo/.todos',
+			dbPath: null,
+			tdRoot: '/repo',
+		}));
+		const callsBefore = mockWatch.mock.calls.length;
+		internal.setupTdDbWatcher();
+		expect(mockWatch).toHaveBeenCalledTimes(callsBefore);
+	});
+
+	it('emits td_board_changed when db file changes', async () => {
+		const mockEmit = vi.fn();
+		const internal = apiServer as unknown as {
+			io: {emit: ReturnType<typeof vi.fn>} | undefined;
+			setupTdDbWatcher: () => void;
+		};
+		internal['io'] = {emit: mockEmit};
+
+		const watchCallback =
+			mockWatch.mock.calls[mockWatch.mock.calls.length - 1]?.[1] as
+				(eventType: string) => void;
+		expect(watchCallback).toBeDefined();
+
+		const timeoutCallbacks: Array<() => void> = [];
+		const setTimeoutSpy = vi
+			.spyOn(global, 'setTimeout')
+			.mockImplementation(((callback: () => void) => {
+				timeoutCallbacks.push(callback);
+				return 0 as unknown as ReturnType<typeof setTimeout>;
+			}) as typeof setTimeout);
+
+		watchCallback('change');
+		expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+		expect(timeoutCallbacks).toHaveLength(1);
+		timeoutCallbacks[0]?.();
+		expect(mockEmit).toHaveBeenCalledWith('td_board_changed');
+
+		setTimeoutSpy.mockRestore();
+	});
+
+	it('debounces rapid db change events to one emit', () => {
+		const mockEmit = vi.fn();
+		const internal = apiServer as unknown as {
+			io: {emit: ReturnType<typeof vi.fn>} | undefined;
+			setupTdDbWatcher: () => void;
+		};
+		internal['io'] = {emit: mockEmit};
+
+		const watchCallback = mockWatch.mock.calls[mockWatch.mock.calls.length - 1]?.[1] as (eventType: string) => void;
+		expect(watchCallback).toBeDefined();
+
+		vi.useFakeTimers();
+		watchCallback('change');
+		vi.advanceTimersByTime(100);
+		watchCallback('change');
+		vi.advanceTimersByTime(100);
+		watchCallback('change');
+		vi.advanceTimersByTime(500);
+		expect(mockEmit).toHaveBeenCalledTimes(1);
+		vi.useRealTimers();
+	});
+
+	it('closes previous watcher on project switch', async () => {
+		const mockEmit = vi.fn();
+		const {coreService: mockedCoreService} = await import('./coreService.js');
+		const secondWatcher = {
+			close: vi.fn(),
+			on: vi.fn(() => secondWatcher),
+		};
+		mockWatch.mockReturnValueOnce(secondWatcher as unknown as FSWatcher);
+
+		const internal = apiServer as unknown as {
+			io: {emit: ReturnType<typeof vi.fn>} | undefined;
+			setupTdDbWatcher: () => void;
+		};
+		internal['io'] = {emit: mockEmit};
+
+		const onCalls = (mockedCoreService.on as ReturnType<typeof vi.fn>).mock.calls;
+		const projectSelectedHandler = onCalls.find(([event]) => event === 'projectSelected')?.[1] as
+			(() => void) | undefined;
+		expect(projectSelectedHandler).toBeDefined();
+		projectSelectedHandler?.();
+
+		expect(mockWatcher.close).toHaveBeenCalledTimes(1);
+	});
+
+	it('teardownTdDbWatcher clears pending debounce timer and closes watcher', async () => {
+		const mockEmit = vi.fn();
+		const internal = apiServer as unknown as {
+			io: {emit: ReturnType<typeof vi.fn>} | undefined;
+			setupTdDbWatcher: () => void;
+			teardownTdDbWatcher: () => void;
+		};
+		internal['io'] = {emit: mockEmit};
+		internal.setupTdDbWatcher();
+
+		const watchCallback = mockWatch.mock.calls[mockWatch.mock.calls.length - 1]?.[1] as (eventType: string) => void;
+		vi.useFakeTimers();
+		watchCallback('change');
+		vi.advanceTimersByTime(200);
+
+		internal.teardownTdDbWatcher();
+		vi.advanceTimersByTime(500);
+
+		expect(mockEmit).not.toHaveBeenCalled();
+		expect(mockWatcher.close).toHaveBeenCalled();
+		vi.useRealTimers();
+	});
+
+	it('stop() closes watcher and clears pending timer', async () => {
+		const mockEmit = vi.fn();
+		const mockIoDisconnect = vi.fn();
+		const mockIoClose = vi.fn();
+		const mockAppClose = vi.fn().mockResolvedValue(undefined);
+		const internal = apiServer as unknown as {
+			io: {emit: ReturnType<typeof vi.fn>; disconnectSockets: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>} | undefined;
+			setupTdDbWatcher: () => void;
+			stop: () => Promise<void>;
+			app: {close: typeof mockAppClose};
+		};
+		internal['io'] = {
+			emit: mockEmit,
+			disconnectSockets: mockIoDisconnect,
+			close: mockIoClose,
+		};
+		internal.app = {close: mockAppClose};
+
+		internal.setupTdDbWatcher();
+		const watchCallback = mockWatch.mock.calls[mockWatch.mock.calls.length - 1]?.[1] as (eventType: string) => void;
+
+		vi.useFakeTimers();
+		watchCallback('change');
+		vi.advanceTimersByTime(200);
+
+		await internal.stop();
+		vi.advanceTimersByTime(500);
+
+		expect(mockIoDisconnect).toHaveBeenCalledWith(true);
+		expect(mockIoClose).toHaveBeenCalled();
+		expect(mockAppClose).toHaveBeenCalled();
+		expect(mockEmit).not.toHaveBeenCalled();
+		expect(mockWatcher.close).toHaveBeenCalled();
+		vi.useRealTimers();
 	});
 });
