@@ -61,11 +61,9 @@ import type {
 import {
 	toApiSessionPayload,
 	toSessionUpdatePayload,
+	resolveSessionCreatedAtFromSource,
 } from './sessionStateMetadata.js';
-import {
-	checkForUpdate,
-	getCachedUpdateCheck,
-} from './versionCheckService.js';
+import {checkForUpdate, getCachedUpdateCheck} from './versionCheckService.js';
 
 // --- Clipboard Image Paste Constants ---
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -408,27 +406,6 @@ function resolveGitField(
 	}
 }
 
-function resolveSessionCreatedAt(session: Session): number {
-	const idMatch = /^session-(\d+)-/.exec(session.id);
-	if (idMatch) {
-		const parsedMs = Number.parseInt(idMatch[1] || '', 10);
-		if (Number.isFinite(parsedMs) && parsedMs > 0) {
-			return Math.floor(parsedMs / 1000);
-		}
-	}
-
-	const activityMs = session.lastActivity?.getTime();
-	if (
-		typeof activityMs === 'number' &&
-		Number.isFinite(activityMs) &&
-		activityMs > 0
-	) {
-		return Math.floor(activityMs / 1000);
-	}
-
-	return Math.floor(Date.now() / 1000);
-}
-
 export class APIServer {
 	private app: FastifyInstance;
 	private io: Server | undefined;
@@ -670,7 +647,7 @@ export class APIServer {
 					adapterRegistry.getByAgentType(inferAgentType(configuredAgent))?.id ||
 					inferAgentType(configuredAgent)
 				: session.detectionStrategy || session.agentId || 'terminal';
-			const createdAt = resolveSessionCreatedAt(session);
+			const createdAt = resolveSessionCreatedAtFromSource(session);
 
 			sessionStore.createSessionRecord({
 				id: session.id,
@@ -2717,11 +2694,9 @@ export class APIServer {
 
 			// Use CLI arg delivery by default, fall back to PTY write only when startup
 			// prompt cannot be passed through the command line.
-			const startupPromptDeliveredViaCli =
-				!!(
-					startupPromptToInject &&
-					normalizedPromptArg?.toLowerCase() !== 'none'
-				);
+			const startupPromptDeliveredViaCli = !!(
+				startupPromptToInject && normalizedPromptArg?.toLowerCase() !== 'none'
+			);
 
 			// Create session with resolved command and args
 			const effect = coreService.sessionManager.createSessionWithAgentEffect(
@@ -3864,7 +3839,10 @@ export class APIServer {
 				}
 				return {address, port: currentPort};
 			} catch (err: unknown) {
-				const errorCode = err instanceof Error && 'code' in err ? (err as NodeJS.ErrnoException).code : undefined;
+				const errorCode =
+					err instanceof Error && 'code' in err
+						? (err as NodeJS.ErrnoException).code
+						: undefined;
 				const isAddressInUse = errorCode === 'EADDRINUSE';
 				const isPermissionError = errorCode === 'EACCES';
 
@@ -3874,7 +3852,11 @@ export class APIServer {
 					);
 				}
 
-				if (isAddressInUse && allowRandomPortFallback && attempt < maxRetries - 1) {
+				if (
+					isAddressInUse &&
+					allowRandomPortFallback &&
+					attempt < maxRetries - 1
+				) {
 					// Try a new random port when no port is configured.
 					const newPort = generateRandomPort();
 					logger.info(

@@ -52,6 +52,8 @@ export interface Session {
 	name?: string;
 	path: string;
 	state: string;
+	createdAt?: number;
+	endedAt?: number | null;
 	isActive: boolean;
 	agentId?: string;
 }

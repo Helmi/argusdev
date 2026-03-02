@@ -2,6 +2,9 @@ import type {Session, SessionState} from '../types/index.js';
 
 type SessionStateMetadataSource = Pick<Session, 'stateMutex'>;
 type SessionUpdatePayloadSource = Pick<Session, 'id' | 'stateMutex'>;
+type ApiSessionCreatedAtSource = Pick<Session, 'id'> & {
+	lastActivity?: Date;
+};
 type ApiSessionPayloadSource = Pick<
 	Session,
 	| 'id'
@@ -11,12 +14,36 @@ type ApiSessionPayloadSource = Pick<
 	| 'agentId'
 	| 'stateMutex'
 	| 'process'
->;
+> &
+	ApiSessionCreatedAtSource;
 
 export interface SessionStateMetadata {
 	state: SessionState;
 	autoApprovalFailed: boolean;
 	autoApprovalReason: string | undefined;
+}
+
+export function resolveSessionCreatedAtFromSource(
+	session: ApiSessionCreatedAtSource,
+): number {
+	const idMatch = /^session-(\d+)-/.exec(session.id);
+	if (idMatch) {
+		const parsedMs = Number.parseInt(idMatch[1] || '', 10);
+		if (Number.isFinite(parsedMs) && parsedMs > 0) {
+			return Math.floor(parsedMs / 1000);
+		}
+	}
+
+	const activityMs = session.lastActivity?.getTime();
+	if (
+		typeof activityMs === 'number' &&
+		Number.isFinite(activityMs) &&
+		activityMs > 0
+	) {
+		return Math.floor(activityMs / 1000);
+	}
+
+	return Math.floor(Date.now() / 1000);
 }
 
 export function resolveSessionStateMetadata(
@@ -47,6 +74,7 @@ export function toApiSessionPayload(session: ApiSessionPayloadSource): {
 	name: string | undefined;
 	path: string;
 	state: SessionState;
+	createdAt: number;
 	autoApprovalFailed: boolean;
 	autoApprovalReason: string | undefined;
 	isActive: boolean;
@@ -58,6 +86,7 @@ export function toApiSessionPayload(session: ApiSessionPayloadSource): {
 		name: session.name,
 		path: session.worktreePath,
 		...resolveSessionStateMetadata(session),
+		createdAt: resolveSessionCreatedAtFromSource(session),
 		isActive: session.isActive,
 		agentId: session.agentId,
 		pid: session.process.pid,

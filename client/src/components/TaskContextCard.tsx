@@ -1,15 +1,9 @@
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useCallback} from 'react';
 import {useAppStore} from '@/lib/store';
-import type {TdIssue, TdHandoffParsed} from '@/lib/types';
+import type {TdIssue} from '@/lib/types';
 import {cn} from '@/lib/utils';
-import {Button} from '@/components/ui/button';
+import {TaskDetailModal} from '@/components/TaskDetailModal';
 import {
-	getTaskPrimaryAction,
-	type TaskLaunchIntent,
-} from '@/lib/taskContextActions';
-import {
-	ChevronDown,
-	ChevronRight,
 	ListTodo,
 	Circle,
 	CircleDot,
@@ -38,32 +32,26 @@ const priorityColors: Record<string, string> = {
 	P0: 'text-red-500 font-bold',
 	P1: 'text-orange-500',
 	P2: 'text-muted-foreground',
-	P3: 'text-muted-foreground',
+	P3: 'text-muted-foreground/50',
 };
 
 interface TaskContextCardProps {
 	worktreePath?: string;
-	sessionId?: string;
 }
 
-export function TaskContextCard({
-	worktreePath,
-	sessionId,
-}: TaskContextCardProps) {
-	const {tdStatus, openAddSession, currentProject, openTaskBoard} =
-		useAppStore();
-	const [expanded, setExpanded] = useState(false);
+export function TaskContextCard({worktreePath}: TaskContextCardProps) {
+	const {tdStatus} = useAppStore();
 	const [task, setTask] = useState<TdIssue | null>(null);
-	const [handoff, setHandoff] = useState<TdHandoffParsed | null>(null);
 	const [loading, setLoading] = useState(false);
-	const [launchingIntent, setLaunchingIntent] =
-		useState<TaskLaunchIntent | null>(null);
-	const [actionError, setActionError] = useState<string | null>(null);
-	const tdEnabled = tdStatus?.projectState?.enabled === true;
+	const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+
+	const closeModal = useCallback(() => {
+		setSelectedIssueId(null);
+	}, []);
 
 	// Fetch linked task for this worktree (by matching branch to created_branch)
 	useEffect(() => {
-		if (!worktreePath || !tdEnabled) {
+		if (!worktreePath || !tdStatus?.projectState?.enabled) {
 			setTask(null);
 			return;
 		}
@@ -71,11 +59,10 @@ export function TaskContextCard({
 		const fetchLinkedTask = async () => {
 			setLoading(true);
 			try {
-				// Fetch active TD tasks and match by linked session first, then worktree hints.
-				const res = await fetch(
-					'/api/td/issues?status=open,in_progress,in_review,blocked',
-					{credentials: 'include'},
-				);
+				// Get all in-progress tasks and find one linked to this worktree
+				const res = await fetch('/api/td/issues?status=in_progress', {
+					credentials: 'include',
+				});
 				if (!res.ok) return;
 
 				const data = await res.json();
@@ -83,14 +70,7 @@ export function TaskContextCard({
 
 				// Try to match by created_branch or by worktree path containing the task's branch
 				const folderName = worktreePath.split('/').pop() || '';
-				const matchedBySession = sessionId
-					? issues.find(
-							issue =>
-								issue.implementer_session === sessionId ||
-								issue.reviewer_session === sessionId,
-						)
-					: undefined;
-				const matchedByWorktree = issues.find(issue => {
+				const matched = issues.find(issue => {
 					if (
 						issue.created_branch &&
 						worktreePath.includes(issue.created_branch)
@@ -100,57 +80,26 @@ export function TaskContextCard({
 					if (folderName.includes(issue.id)) return true;
 					return false;
 				});
-				const matched = matchedBySession || matchedByWorktree;
 
 				if (matched) {
 					setTask(matched);
-
-					// Fetch handoff data for matched task
-					const detailRes = await fetch(`/api/td/issues/${matched.id}`, {
-						credentials: 'include',
-					});
-					if (detailRes.ok) {
-						const detail = await detailRes.json();
-						if (detail.issue?.handoffs?.length > 0) {
-							setHandoff(detail.issue.handoffs[0]);
-						}
-					}
 				} else {
 					setTask(null);
-					setHandoff(null);
 				}
 			} catch {
 				// Silent fail — td is optional
+				setTask(null);
 			} finally {
 				setLoading(false);
 			}
 		};
 
 		fetchLinkedTask();
-	}, [worktreePath, sessionId, tdEnabled]);
+	}, [worktreePath, tdStatus?.projectState?.enabled]);
 
-	if (!tdEnabled) {
+	if (!tdStatus?.projectState?.enabled) {
 		return null;
 	}
-
-	const primaryAction = task ? getTaskPrimaryAction(task) : null;
-
-	const handleLaunch = async (intent: TaskLaunchIntent) => {
-		if (!task || launchingIntent) return;
-		setActionError(null);
-		setLaunchingIntent(intent);
-		try {
-			openAddSession(undefined, currentProject?.path, task.id, {
-				intent,
-				sessionName: intent === 'review' ? `Review: ${task.id}` : undefined,
-				createdBranch: task.created_branch || undefined,
-			});
-		} catch {
-			setActionError('Failed to launch task action');
-		} finally {
-			setLaunchingIntent(null);
-		}
-	};
 
 	if (loading) {
 		return (
@@ -167,17 +116,18 @@ export function TaskContextCard({
 
 	const StatusIcon = statusIcons[task.status] || Circle;
 
+	const handleOpenTask = () => {
+		setSelectedIssueId(task.id);
+	};
+
 	return (
-		<div className="space-y-1">
+		<>
 			<button
-				onClick={() => setExpanded(!expanded)}
-				className="flex items-center gap-1.5 w-full text-left group"
+				onClick={handleOpenTask}
+				type="button"
+				className="flex w-full items-center gap-1.5 text-left group rounded-md p-1 -m-1 hover:bg-muted/40 transition-colors"
+				title={`Open task ${task.id}`}
 			>
-				{expanded ? (
-					<ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
-				) : (
-					<ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
-				)}
 				<StatusIcon
 					className={cn('h-3 w-3 shrink-0', statusColors[task.status])}
 				/>
@@ -185,127 +135,13 @@ export function TaskContextCard({
 					{task.id}
 				</span>
 				<span className="text-xs truncate flex-1">{task.title}</span>
-				<span
-					className={cn('text-xs shrink-0', priorityColors[task.priority])}
-				>
+				<span className={cn('text-xs shrink-0', priorityColors[task.priority])}>
 					{task.priority}
 				</span>
 			</button>
-
-			<div className="pl-5 flex items-center gap-1.5 flex-wrap">
-				{primaryAction && (
-					<Button
-						size="sm"
-						className="h-5 px-2 text-xs"
-						disabled={launchingIntent !== null}
-						onClick={() => handleLaunch(primaryAction.intent)}
-					>
-						{launchingIntent === primaryAction.intent
-							? 'Starting...'
-							: primaryAction.label}
-					</Button>
-				)}
-				<Button
-					size="sm"
-					variant="outline"
-					className="h-5 px-2 text-xs"
-					disabled={launchingIntent !== null}
-					onClick={openTaskBoard}
-				>
-					Open Task
-				</Button>
-			</div>
-			{actionError && (
-				<p className="pl-5 text-xs text-red-500">{actionError}</p>
+			{selectedIssueId && (
+				<TaskDetailModal issueId={selectedIssueId} onClose={closeModal} />
 			)}
-
-			{expanded && (
-				<div className="pl-5 space-y-2 text-xs">
-					{/* Status badge */}
-					<div className="flex items-center gap-2">
-						<span
-							className={cn(
-								'rounded-full px-2 py-0.5 text-xs',
-								task.status === 'in_progress' && 'bg-blue-500/20 text-blue-400',
-								task.status === 'open' && 'bg-muted/50 text-muted-foreground',
-								task.status === 'in_review' &&
-									'bg-purple-500/20 text-purple-400',
-								task.status === 'closed' && 'bg-green-500/20 text-green-400',
-								task.status === 'blocked' && 'bg-red-500/20 text-red-400',
-							)}
-						>
-							{task.status.replace('_', ' ')}
-						</span>
-						{task.type !== 'task' && (
-							<span className="text-xs text-muted-foreground">
-								{task.type}
-							</span>
-						)}
-					</div>
-
-					{/* Description */}
-					{task.description && (
-						<p className="text-muted-foreground leading-relaxed line-clamp-3">
-							{task.description}
-						</p>
-					)}
-
-					{/* Handoff data (latest) */}
-					{handoff && (
-						<div className="space-y-1.5 border-t border-border pt-2">
-							<span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-								Latest Handoff
-							</span>
-							{handoff.done.length > 0 && (
-								<div>
-									<span className="text-green-500">Done:</span>
-									<ul className="ml-3 list-disc list-inside text-muted-foreground">
-										{handoff.done.slice(0, 3).map((item, i) => (
-											<li key={i} className="truncate">
-												{item}
-											</li>
-										))}
-										{handoff.done.length > 3 && (
-											<li className="text-muted-foreground">
-												+{handoff.done.length - 3} more
-											</li>
-										)}
-									</ul>
-								</div>
-							)}
-							{handoff.remaining.length > 0 && (
-								<div>
-									<span className="text-orange-500">Remaining:</span>
-									<ul className="ml-3 list-disc list-inside text-muted-foreground">
-										{handoff.remaining.slice(0, 3).map((item, i) => (
-											<li key={i} className="truncate">
-												{item}
-											</li>
-										))}
-										{handoff.remaining.length > 3 && (
-											<li className="text-muted-foreground">
-												+{handoff.remaining.length - 3} more
-											</li>
-										)}
-									</ul>
-								</div>
-							)}
-							{handoff.uncertain.length > 0 && (
-								<div>
-									<span className="text-yellow-500">Uncertain:</span>
-									<ul className="ml-3 list-disc list-inside text-muted-foreground">
-										{handoff.uncertain.map((item, i) => (
-											<li key={i} className="truncate">
-												{item}
-											</li>
-										))}
-									</ul>
-								</div>
-							)}
-						</div>
-					)}
-				</div>
-			)}
-		</div>
+		</>
 	);
 }

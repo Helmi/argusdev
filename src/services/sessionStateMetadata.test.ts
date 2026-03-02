@@ -63,6 +63,7 @@ describe('sessionStateMetadata', () => {
 			id: 'session-1',
 			name: 'Session 1',
 			path: '/repo/.worktrees/feat',
+			createdAt: expect.any(Number),
 			state: 'pending_auto_approval',
 			autoApprovalFailed: true,
 			autoApprovalReason: 'Approval verifier denied',
