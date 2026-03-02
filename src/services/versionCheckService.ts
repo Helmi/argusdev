@@ -1,5 +1,5 @@
 import {createRequire} from 'node:module';
-import {configurationManager} from './configurationManager.js';
+import type {configurationManager as ConfigManagerType} from './configurationManager.js';
 import {
 	GITHUB_RELEASES_API,
 	UPDATE_CHECK_TTL_MS,
@@ -25,6 +25,25 @@ export interface UpdateCheckResult {
 }
 
 const require = createRequire(import.meta.url);
+
+// Lazy accessor — avoids importing configurationManager at module load time.
+// configurationManager instantiates itself (new ConfigurationManager()) when
+// its module is evaluated, which calls getConfigDir() and throws if
+// initializeConfigDir() hasn't been called yet. Using require() here defers
+// module evaluation to first call, by which point the CLI has already run
+// initializeConfigDir().
+function getConfigManager(): typeof ConfigManagerType | undefined {
+	try {
+		return (
+			require('./configurationManager.js') as {
+				configurationManager: typeof ConfigManagerType;
+			}
+		).configurationManager;
+	} catch {
+		return undefined;
+	}
+}
+
 const DEFAULT_VERSION = '0.0.0';
 
 function getCurrentVersion(): string {
@@ -97,7 +116,7 @@ function normalizeTag(tag: string): string {
 }
 
 export function getCachedUpdateCheck(): UpdateCheckResult | undefined {
-	const cache = configurationManager.getUpdateCheck();
+	const cache = getConfigManager()?.getUpdateCheck();
 	if (!cache?.checkedAt) {
 		return undefined;
 	}
@@ -157,10 +176,10 @@ export async function checkForUpdate(force = false): Promise<UpdateCheckResult> 
 				latestVersion: parsedVersion,
 				latestTag: normalizedTag,
 			};
-			configurationManager.setUpdateCheck(entry);
+			getConfigManager()?.setUpdateCheck(entry);
 			return buildResult(entry, 'network');
 		} catch (error) {
-			const existingCache = configurationManager.getUpdateCheck();
+			const existingCache = getConfigManager()?.getUpdateCheck();
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
 			logger.debug(`Update check failed: ${errorMessage}`);
@@ -182,7 +201,7 @@ export async function checkForUpdate(force = false): Promise<UpdateCheckResult> 
 				latestVersion: undefined,
 				latestVersionError: errorMessage,
 			};
-			configurationManager.setUpdateCheck(failedCache);
+			getConfigManager()?.setUpdateCheck(failedCache);
 
 			return buildResult(failedCache, 'network', errorMessage);
 		} finally {
