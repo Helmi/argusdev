@@ -32,6 +32,10 @@ import {
 	renderTdBranchTemplate,
 	renderTdTemplate,
 } from '@/lib/tdBranchTemplate';
+import {
+	getPreferredPromptTemplateName,
+	shouldAutoReplacePromptTemplate,
+} from '@/lib/tdPromptTemplate';
 import type {
 	AgentConfig,
 	ProjectConfig,
@@ -171,6 +175,8 @@ export function AddSessionScreen() {
 		addSessionIntent === 'fix'
 			? addSessionIntent
 			: null;
+	const requiresExistingWorktree =
+		quickStartIntent === 'review' || quickStartIntent === 'fix';
 
 	useEffect(() => {
 		if (currentProject?.path === selectedProjectPath) {
@@ -274,18 +280,26 @@ export function AddSessionScreen() {
 	}, [resolveConfigValue, selectedProjectConfig?.td?.defaultFixPrompt]);
 
 	const reviewPromptDefault = useMemo(() => {
-		return resolveConfigValue([
-			['quickStart', 'review', 'promptTemplate'],
-			['quickstart', 'review', 'promptTemplate'],
-			['quickStart', 'review', 'defaultPrompt'],
-			['quickstart', 'review', 'defaultPrompt'],
-			['quickStart', 'review', 'prompt'],
-			['quickstart', 'review', 'prompt'],
-			['td', 'quickStart', 'review', 'promptTemplate'],
-			['td', 'defaultReviewPrompt'],
-			['td', 'reviewPrompt'],
-		]);
-	}, [resolveConfigValue]);
+		return (
+			resolveConfigValue([
+				['quickStart', 'review', 'promptTemplate'],
+				['quickstart', 'review', 'promptTemplate'],
+				['quickStart', 'review', 'defaultPrompt'],
+				['quickstart', 'review', 'defaultPrompt'],
+				['quickStart', 'review', 'prompt'],
+				['quickstart', 'review', 'prompt'],
+				['td', 'quickStart', 'review', 'promptTemplate'],
+				['td', 'defaultReviewPrompt'],
+				['td', 'reviewPrompt'],
+			]) ||
+			selectedProjectConfig?.td?.defaultReviewPrompt ||
+			selectedProjectConfig?.td?.reviewPrompt
+		);
+	}, [
+		resolveConfigValue,
+		selectedProjectConfig?.td?.defaultReviewPrompt,
+		selectedProjectConfig?.td?.reviewPrompt,
+	]);
 
 	const reviewSessionNameTemplate = useMemo(() => {
 		return (
@@ -465,7 +479,7 @@ export function AddSessionScreen() {
 	useEffect(() => {
 		if (addSessionWorktreePath) {
 			setSelectedWorktreePath(addSessionWorktreePath);
-			if (quickStartIntent === 'fix' || quickStartIntent === 'review') {
+			if (requiresExistingWorktree) {
 				setMode('existing');
 			}
 			const project = getProjectForWorktree(addSessionWorktreePath);
@@ -473,7 +487,14 @@ export function AddSessionScreen() {
 				setSelectedProjectPath(project.path);
 			}
 		}
-	}, [addSessionWorktreePath, quickStartIntent, getProjectForWorktree]);
+	}, [addSessionWorktreePath, requiresExistingWorktree, getProjectForWorktree]);
+
+	// Review/fix sessions always use an existing task worktree.
+	useEffect(() => {
+		if (requiresExistingWorktree) {
+			setMode('existing');
+		}
+	}, [requiresExistingWorktree]);
 
 	// Work sessions always default to creating a new worktree
 	useEffect(() => {
@@ -673,11 +694,11 @@ export function AddSessionScreen() {
 			return;
 		}
 
-		const normalizedTarget = preferredPromptTemplate?.toLowerCase();
-		const template = normalizedTarget
-			? promptTemplates.find(t => t.name.toLowerCase() === normalizedTarget)
-			: null;
-		const desiredTemplate = template?.name || promptTemplates[0]!.name;
+		const desiredTemplate = getPreferredPromptTemplateName(
+			promptTemplates,
+			preferredPromptTemplate,
+		);
+		if (!desiredTemplate) return;
 		const currentTemplate = selectedPromptTemplate;
 		const currentTemplateValid = promptTemplates.some(
 			t => t.name === currentTemplate,
@@ -689,8 +710,10 @@ export function AddSessionScreen() {
 			return;
 		}
 
-		const canAutoReplace =
-			!currentTemplate || currentTemplate === lastAutoPromptTemplateRef.current;
+		const canAutoReplace = shouldAutoReplacePromptTemplate(
+			currentTemplate,
+			lastAutoPromptTemplateRef.current,
+		);
 		if (canAutoReplace && currentTemplate !== desiredTemplate) {
 			setSelectedPromptTemplate(desiredTemplate);
 			lastAutoPromptTemplateRef.current = desiredTemplate;
@@ -1113,33 +1136,44 @@ export function AddSessionScreen() {
 								{selectedProjectPath && (
 									<>
 										{/* Mode selection */}
-										<div className="space-y-2">
-											<Label>Worktree</Label>
-											<RadioGroup
-												value={mode}
-												onValueChange={v => setMode(v as 'existing' | 'new')}
-												className="flex gap-4"
-											>
-												<div className="flex items-center gap-2">
-													<RadioGroupItem value="existing" id="existing" />
-													<Label
-														htmlFor="existing"
-														className="font-normal cursor-pointer"
-													>
-														Use existing
-													</Label>
-												</div>
-												<div className="flex items-center gap-2">
-													<RadioGroupItem value="new" id="new" />
-													<Label
-														htmlFor="new"
-														className="font-normal cursor-pointer"
-													>
-														Create new
-													</Label>
-												</div>
-											</RadioGroup>
-										</div>
+										{requiresExistingWorktree ? (
+											<div className="space-y-2">
+												<Label>Worktree</Label>
+												<p className="text-xs text-muted-foreground">
+													{quickStartIntent === 'review'
+														? 'Review sessions must run in the task worktree.'
+														: 'Fix sessions must run in the task worktree.'}
+												</p>
+											</div>
+										) : (
+											<div className="space-y-2">
+												<Label>Worktree</Label>
+												<RadioGroup
+													value={mode}
+													onValueChange={v => setMode(v as 'existing' | 'new')}
+													className="flex gap-4"
+												>
+													<div className="flex items-center gap-2">
+														<RadioGroupItem value="existing" id="existing" />
+														<Label
+															htmlFor="existing"
+															className="font-normal cursor-pointer"
+														>
+															Use existing
+														</Label>
+													</div>
+													<div className="flex items-center gap-2">
+														<RadioGroupItem value="new" id="new" />
+														<Label
+															htmlFor="new"
+															className="font-normal cursor-pointer"
+														>
+															Create new
+														</Label>
+													</div>
+												</RadioGroup>
+											</div>
+										)}
 
 										{mode === 'existing' ? (
 											<div className="space-y-2">
@@ -1173,6 +1207,14 @@ export function AddSessionScreen() {
 												{projectWorktrees.length === 0 && (
 													<p className="text-xs text-muted-foreground">
 														No worktrees found. Create a new one instead.
+													</p>
+												)}
+												{requiresExistingWorktree && !selectedWorktreePath && (
+													<p className="text-xs text-amber-600">
+														Could not infer the task worktree automatically.
+														{selectedTdTask?.created_branch
+															? ` Select the worktree for ${selectedTdTask.created_branch}.`
+															: ' Select the correct task worktree manually.'}
 													</p>
 												)}
 											</div>
@@ -1306,7 +1348,7 @@ export function AddSessionScreen() {
 														) : (
 															<Circle className="h-3 w-3 text-muted-foreground shrink-0" />
 														)}
-														<span className="text-[10px] font-mono text-muted-foreground shrink-0">
+														<span className="text-xs font-mono text-muted-foreground shrink-0">
 															{selectedTdTask.id}
 														</span>
 														<span className="text-xs truncate flex-1">
@@ -1366,7 +1408,7 @@ export function AddSessionScreen() {
 																			) : (
 																				<Circle className="h-3 w-3 text-muted-foreground shrink-0" />
 																			)}
-																			<span className="text-[10px] font-mono text-muted-foreground shrink-0">
+																			<span className="text-xs font-mono text-muted-foreground shrink-0">
 																				{task.id}
 																			</span>
 																			<span className="text-xs truncate flex-1">
@@ -1374,7 +1416,7 @@ export function AddSessionScreen() {
 																			</span>
 																			<span
 																				className={cn(
-																					'text-[10px] shrink-0',
+																					'text-xs shrink-0',
 																					task.priority === 'P0' &&
 																						'text-red-500',
 																					task.priority === 'P1' &&
@@ -1435,7 +1477,7 @@ export function AddSessionScreen() {
 																		<FileText className="h-3 w-3" />
 																		{t.name}
 																		{t.source && (
-																			<span className="text-[10px] text-muted-foreground">
+																			<span className="text-xs text-muted-foreground">
 																				({t.source})
 																			</span>
 																		)}

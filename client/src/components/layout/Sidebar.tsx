@@ -57,6 +57,7 @@ export function Sidebar() {
     worktrees,
     sessions,
     agents,
+    tdIssues,
     currentProject,
     selectedSessions,
     sidebarOpen,
@@ -93,6 +94,44 @@ export function Sidebar() {
     if (!agentId) return undefined
     return agents.find(a => a.id === agentId)
   }
+
+  const getLinkedTask = useCallback((session: Session, worktree: Worktree) => {
+    const bySession = tdIssues.find(issue =>
+      issue.implementer_session === session.id || issue.reviewer_session === session.id,
+    )
+    if (bySession) return bySession
+
+    if (worktree.branch) {
+      const byBranch = tdIssues.find(issue => issue.created_branch === worktree.branch)
+      if (byBranch) return byBranch
+    }
+
+    return tdIssues.find(issue => issue.created_branch && session.path.includes(issue.created_branch))
+  }, [tdIssues])
+
+  const getTdOverlay = useCallback((session: Session, worktree: Worktree) => {
+    const status = mapSessionState(session.state)
+    if (status === 'active') return null
+
+    const task = getLinkedTask(session, worktree)
+    if (!task) return null
+
+    if (task.status === 'in_review') {
+      return {
+        color: 'bg-purple-400',
+        title: `TD ${task.id}: In review`,
+      }
+    }
+
+    if (task.status === 'blocked') {
+      return {
+        color: 'bg-red-400',
+        title: `TD ${task.id}: Blocked`,
+      }
+    }
+
+    return null
+  }, [getLinkedTask])
 
   // Separate dialog states for different actions
   const [removeProjectDialog, setRemoveProjectDialog] = useState<{
@@ -827,6 +866,8 @@ export function Sidebar() {
                                 {worktreeSessions.map((session) => {
                                   const isSelected = selectedSessions.includes(session.id)
                                   const agent = getAgentById(session.agentId)
+                                  const status = mapSessionState(session.state)
+                                  const tdOverlay = getTdOverlay(session, worktree)
 
                                   return (
                                     <ContextMenu key={session.id}>
@@ -846,7 +887,17 @@ export function Sidebar() {
                                           }}
                                         >
                                           {/* Status indicator and agent icon */}
-                                          <StatusIndicator status={mapSessionState(session.state)} size="sm" />
+                                          <div className="relative shrink-0" title={tdOverlay?.title}>
+                                            <StatusIndicator status={status} size="sm" />
+                                            {tdOverlay && (
+                                              <span
+                                                className={cn(
+                                                  'absolute -right-1 -top-1 h-2 w-2 rounded-full border border-sidebar',
+                                                  tdOverlay.color,
+                                                )}
+                                              />
+                                            )}
+                                          </div>
                                           <AgentIcon
                                             icon={agent?.icon}
                                             iconColor={agent?.iconColor}

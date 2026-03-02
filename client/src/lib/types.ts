@@ -263,6 +263,8 @@ export interface TdProjectConfig {
 	autoStart?: boolean;
 	defaultPrompt?: string;
 	defaultFixPrompt?: string;
+	defaultReviewPrompt?: string;
+	reviewPrompt?: string;
 	[key: string]: unknown;
 }
 
@@ -365,6 +367,8 @@ export interface ProjectConfig {
 		autoStart?: boolean;
 		defaultPrompt?: string;
 		defaultFixPrompt?: string;
+		defaultReviewPrompt?: string;
+		reviewPrompt?: string;
 	};
 	agentDefaults?: {
 		agentId?: string;
