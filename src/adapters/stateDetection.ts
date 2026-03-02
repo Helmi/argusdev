@@ -186,7 +186,9 @@ function detectClineState(terminal: Terminal): SessionState {
 function detectPiState(terminal: Terminal): SessionState {
 	const content = getTerminalContent(terminal);
 	const lowerContent = content.toLowerCase();
+	const lines = getTerminalLines(terminal);
 
+	// Pi confirmation prompts: "[y/n]", "press enter to confirm", session selection
 	if (
 		lowerContent.includes('[y/n]') ||
 		/press (enter|return) to (confirm|continue)/i.test(content) ||
@@ -197,14 +199,41 @@ function detectPiState(terminal: Terminal): SessionState {
 		return 'waiting_input';
 	}
 
+	// Pi busy indicators:
+	//   "⠋ Working..."                              (initial loading spinner)
+	//   "⠋ Working... (escape to interrupt)"        (after agent_start event)
+	//   "escape to interrupt ctrl+c to clear"       (combined busy status line)
+	//   "Auto-compacting... (escape to cancel)"     (context compaction)
+	//   "Retrying (1/3) in 5s... (escape to cancel)" (retry loader)
+	//
+	// Pi's startup header shows "escape to interrupt" and "ctrl+c to clear" as
+	// separate lines (keybinding hints). We distinguish the combined busy line
+	// from the header by checking if both hints appear on the SAME line.
 	if (
-		lowerContent.includes('ctrl+c to interrupt') ||
-		lowerContent.includes('esc to interrupt') ||
-		lowerContent.includes('esc to cancel')
+		lowerContent.includes('working...') ||
+		lowerContent.includes('auto-compacting...') ||
+		/\(esc(?:ape)? to (?:interrupt|cancel)\)/.test(lowerContent)
 	) {
 		return 'busy';
 	}
 
+	// Check per-line: "escape to interrupt" + "ctrl+c to clear" on the same line
+	// indicates the busy status bar, not the startup header (which has them separate)
+	for (const line of lines) {
+		const lower = line.toLowerCase();
+		if (lower.includes('to interrupt') && lower.includes('to clear')) {
+			return 'busy';
+		}
+	}
+
+	// Pi idle: no loading animation active. Terminal shows the editor input area
+	// between separator lines (────), with a footer showing path/branch and token stats.
+	// Observed terminal content when idle (last lines of buffer):
+	//   ────────────────────────────────────────────────────────
+	//   [empty editor area or user input text]
+	//   ────────────────────────────────────────────────────────
+	//   ~/path (branch) • session-name
+	//   $0.000 (sub) 0.0%/200k (auto)   (provider) model • thinking
 	return 'idle';
 }
 
