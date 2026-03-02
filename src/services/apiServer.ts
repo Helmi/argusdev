@@ -300,6 +300,7 @@ function renderTaskPromptTemplate(
 	templateContent: string,
 	taskDetail: TdIssueWithChildren,
 ): string {
+	const latestHandoff = taskDetail.handoffs[0];
 	const vars: Record<string, string> = {
 		'task.id': taskDetail.id,
 		'task.title': taskDetail.title,
@@ -308,10 +309,17 @@ function renderTaskPromptTemplate(
 		'task.priority': taskDetail.priority,
 		'task.acceptance': taskDetail.acceptance || '',
 		'task.rejection_reason': taskDetail.rejectionReason || '',
+		'task.type': taskDetail.type,
+		'task.branch': taskDetail.created_branch,
+		'task.labels': taskDetail.labels || '',
+		'task.handoff.done': latestHandoff?.done.join('\n') || '',
+		'task.handoff.remaining': latestHandoff?.remaining.join('\n') || '',
+		'task.handoff.decisions': latestHandoff?.decisions.join('\n') || '',
+		'task.handoff.uncertain': latestHandoff?.uncertain.join('\n') || '',
 	};
 	return templateContent.replace(
-		/\{\{(task\.(?:id|title|description|status|priority|acceptance|rejection_reason))\}\}/g,
-		(_match, key: string) => vars[key] ?? '',
+		/\{\{(task\.(?:id|title|description|status|priority|acceptance|rejection_reason|type|branch|labels|handoff\.(?:done|remaining|decisions|uncertain)))\}\}/g,
+		(_match, key: string) => vars[key] || '',
 	);
 }
 

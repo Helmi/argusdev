@@ -1308,6 +1308,176 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		expect(options?.initialPrompt).not.toContain('was rejected');
 	});
 
+	it('renders latest handoff context in task prompt templates', async () => {
+		const mockedSessionManager = (
+			coreService as unknown as {
+				sessionManager: {
+					createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+				};
+			}
+		).sessionManager;
+
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Task with handoff',
+			description: 'Test description',
+			status: 'in_progress',
+			priority: 'P1',
+			acceptance: 'Acceptance criteria',
+			labels: 'backend,api',
+			parent_id: '',
+			type: 'bug',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: 'feature/add-auth',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [
+				{
+					id: 'h2',
+					issueId: 'td-abc123',
+					sessionId: 'ses-2',
+					done: ['Add auth helper', 'Write tests'],
+					remaining: ['Handle timeout edge case'],
+					decisions: ['Use JWT'],
+					uncertain: ['Exact token expiry'],
+					timestamp: '2024-01-01T00:00:00Z',
+				},
+				{
+					id: 'h1',
+					issueId: 'td-abc123',
+					sessionId: 'ses-1',
+					done: ['Old item'],
+					remaining: ['Old remaining'],
+					decisions: ['Old decision'],
+					uncertain: ['Old uncertain'],
+					timestamp: '2023-12-31T00:00:00Z',
+				},
+			],
+			files: [],
+			comments: [],
+			rejectionReason: null,
+		});
+		mockLoadPromptTemplatesByScope.mockReturnValue([
+			{
+				name: 'Begin Work on Task',
+				path: '/tmp/Begin Work on Task.md',
+				content:
+					'{{task.handoff.done}}\n{{task.handoff.remaining}}\n{{task.handoff.decisions}}\n{{task.handoff.uncertain}}\n{{task.type}}|{{task.branch}}|{{task.labels}}',
+				source: 'global',
+			},
+		]);
+
+		await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/feat',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'work',
+			},
+		});
+
+		expect(
+			mockedSessionManager.createSessionWithAgentEffect,
+		).toHaveBeenCalled();
+		const call =
+			mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		const options = call?.[8] as {initialPrompt?: string} | undefined;
+		expect(options?.initialPrompt).toBeDefined();
+		expect(options?.initialPrompt).toContain('Add auth helper\nWrite tests');
+		expect(options?.initialPrompt).toContain('Handle timeout edge case');
+		expect(options?.initialPrompt).toContain('Use JWT');
+		expect(options?.initialPrompt).toContain('Exact token expiry');
+		expect(options?.initialPrompt).toContain(
+			'bug|feature/add-auth|backend,api',
+		);
+	});
+
+	it('renders empty handoff fields as empty strings in templates', async () => {
+		const mockedSessionManager = (
+			coreService as unknown as {
+				sessionManager: {
+					createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+				};
+			}
+		).sessionManager;
+
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Task with no handoff',
+			description: 'Test description',
+			status: 'in_progress',
+			priority: 'P1',
+			acceptance: 'Acceptance criteria',
+			labels: '',
+			parent_id: '',
+			type: 'task',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: null,
+		});
+		mockLoadPromptTemplatesByScope.mockReturnValue([
+			{
+				name: 'Begin Work on Task',
+				path: '/tmp/Begin Work on Task.md',
+				content: 'Done items:\n{{task.handoff.done}}',
+				source: 'global',
+			},
+		]);
+
+		await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'cacd_session=test'},
+			payload: {
+				path: '/repo/.worktrees/feat',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'work',
+			},
+		});
+
+		expect(
+			mockedSessionManager.createSessionWithAgentEffect,
+		).toHaveBeenCalled();
+		const call =
+			mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		const options = call?.[8] as {initialPrompt?: string} | undefined;
+		expect(options?.initialPrompt).toContain('Done items:');
+		expect(options?.initialPrompt).not.toContain('undefined');
+	});
+
 	it('preserves worktree hook warnings at top-level and nested response fields', async () => {
 		mockCreateWorktreeEffect.mockReturnValue(
 			Effect.succeed({
