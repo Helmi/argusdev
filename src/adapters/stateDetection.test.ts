@@ -97,16 +97,42 @@ describe('detectStateForStrategy', () => {
 		).toBe('busy');
 	});
 
+	it('detects Pi "Working... (esc to interrupt)" as busy', () => {
+		expect(detect('pi', [' ⠙ Working... (esc to interrupt)'])).toBe('busy');
+	});
+
 	it('detects Pi auto-compacting as busy', () => {
-		expect(
-			detect('pi', [' ⠋ Auto-compacting... (escape to cancel)']),
-		).toBe('busy');
+		expect(detect('pi', [' ⠋ Auto-compacting... (escape to cancel)'])).toBe(
+			'busy',
+		);
 	});
 
 	it('detects Pi "(escape to cancel)" retry loader as busy', () => {
 		expect(
-			detect('pi', ['Retrying (1/3) in 5s... (escape to cancel)']),
+			detect('pi', [' ⠙ Retrying (1/3) in 5s... (escape to cancel)']),
 		).toBe('busy');
+	});
+
+	it('does not detect busy from plain "Working..." without spinner', () => {
+		expect(
+			detect('pi', [
+				'Working...',
+				'',
+				'Example response from a previous run',
+				'~/project (main)',
+				'$0.000 (sub) 0.0%/200k (auto)   (anthropic) claude-haiku-4-5 • high',
+			]),
+		).toBe('idle');
+	});
+
+	it('does not detect busy from plain "Retrying" line without spinner', () => {
+		expect(
+			detect('pi', [
+				'Retrying (1/3) in 5s... (escape to cancel)',
+				'~/project (main)',
+				'$0.000 (sub) 0.0%/200k (auto)   (anthropic) claude-haiku-4-5 • high',
+			]),
+		).toBe('idle');
 	});
 
 	it('detects Pi combined "escape to interrupt ctrl+c to clear" line as busy', () => {
@@ -121,6 +147,15 @@ describe('detectStateForStrategy', () => {
 		).toBe('busy');
 	});
 
+	it('detects Pi combined "(esc to interrupt) (ctrl+c to clear)" line as busy', () => {
+		expect(
+			detect('pi', [
+				'(esc to interrupt) (ctrl+c to clear)',
+				'────────────────────────────────────────',
+			]),
+		).toBe('busy');
+	});
+
 	it('does NOT false-positive on startup header "escape to interrupt"', () => {
 		// Pi startup header shows bare "escape to interrupt" as keybinding hint.
 		// This must NOT trigger busy — the session is idle at its input prompt.
@@ -130,6 +165,22 @@ describe('detectStateForStrategy', () => {
 				' escape to interrupt',
 				' ctrl+c to clear',
 				' ctrl+c twice to exit',
+				' ctrl+d to exit (empty)',
+				'────────────────────────────────────────',
+				'',
+				'────────────────────────────────────────',
+				'~/project (main)',
+				'$0.000 (sub) 0.0%/200k (auto)   (anthropic) claude-haiku-4-5 • high',
+			]),
+		).toBe('idle');
+	});
+
+	it('does NOT false-positive on startup header "esc to interrupt"', () => {
+		expect(
+			detect('pi', [
+				' pi v0.55.3',
+				' esc to interrupt',
+				' ctrl+c to clear',
 				' ctrl+d to exit (empty)',
 				'────────────────────────────────────────',
 				'',

@@ -209,31 +209,33 @@ function detectPiState(terminal: Terminal): SessionState {
 		return 'waiting_input';
 	}
 
-	// Pi busy indicators:
-	//   "⠋ Working..."                              (initial loading spinner)
-	//   "⠋ Working... (escape to interrupt)"        (after agent_start event)
-	//   "escape to interrupt ctrl+c to clear"       (combined busy status line)
-	//   "Auto-compacting... (escape to cancel)"     (context compaction)
-	//   "Retrying (1/3) in 5s... (escape to cancel)" (retry loader)
-	//
-	// Pi's startup header shows "escape to interrupt" and "ctrl+c to clear" as
-	// separate lines (keybinding hints). We distinguish the combined busy line
-	// from the header by checking if both hints appear on the SAME line.
-	if (
-		lowerContent.includes('working...') ||
-		lowerContent.includes('auto-compacting...') ||
-		/\(esc(?:ape)? to (?:interrupt|cancel)\)/.test(lowerContent)
-	) {
-		return 'busy';
-	}
-
-	// Check per-line: "escape to interrupt" + "ctrl+c to clear" on the same line
-	// indicates the busy status bar, not the startup header (which has them separate)
-	for (const line of lines) {
-		const lower = line.toLowerCase();
-		if (lower.includes('to interrupt') && lower.includes('to clear')) {
-			return 'busy';
+	const hasBusySpinnerStatus = lines.some(line => {
+		const lowerLine = line.toLowerCase();
+		if (!/^\s*[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]\s+/.test(line)) {
+			return false;
 		}
+
+		return (
+			/working\.\.\./.test(lowerLine) ||
+			/auto-compacting\.\.\./.test(lowerLine) ||
+			/retrying .* in \d+s\.\.\./.test(lowerLine)
+		);
+	});
+	const hasBusyInterruptHint = lines.some(line =>
+		/^[\s]*[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]\s+(?:working\.\.\.|auto-compacting\.\.\.|.*retrying .* in \d+s\.\.\.)\s*\((?:esc|escape) to (?:interrupt|cancel)\)/.test(
+			line.toLowerCase(),
+		),
+	);
+	const hasBusyCombinedHintLine = lines.some(line => {
+		const lowerLine = line.toLowerCase();
+		return (
+			/(?:esc|escape) to (?:interrupt|cancel)/.test(lowerLine) &&
+			/ctrl\+c to clear/.test(lowerLine)
+		);
+	});
+
+	if (hasBusySpinnerStatus || hasBusyInterruptHint || hasBusyCombinedHintLine) {
+		return 'busy';
 	}
 
 	// Pi idle: no loading animation active. Terminal shows the editor input area
