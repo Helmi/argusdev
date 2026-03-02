@@ -2667,7 +2667,14 @@ export class APIServer {
 				);
 			}
 
-			if (startupPromptToInject && agent.kind !== 'terminal') {
+			// PTY injection is only needed when the prompt could NOT be passed via CLI arg.
+			// If initialPrompt was passed to createSessionWithAgentEffect (CLI path), the
+			// agent already received the prompt at process start — PTY injection would
+			// double-post it (e.g. Codex starts working but prompt also appears in input field).
+			const promptWasInjectedViaCli =
+				!!(startupPromptToInject &&
+				normalizedPromptArg?.toLowerCase() !== 'none');
+			if (startupPromptToInject && agent.kind !== 'terminal' && !promptWasInjectedViaCli) {
 				this.queueTdPromptInjection(
 					session.id,
 					startupPromptToInject,
