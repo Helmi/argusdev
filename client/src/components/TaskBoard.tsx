@@ -388,11 +388,11 @@ export function TaskBoard() {
           issueId={selectedIssueId}
           onClose={() => setSelectedIssueId(null)}
           onNavigate={setSelectedIssueId}
-          onStartWorking={(taskId) => {
+          onStartWorking={(taskId, intent = 'work') => {
             const issue = tdIssues.find(i => i.id === taskId)
             closeTaskBoard()
             openAddSession(undefined, currentProject?.path, taskId, {
-              intent: 'work',
+              intent: intent || 'work',
               createdBranch: issue?.created_branch || undefined,
             })
           }}

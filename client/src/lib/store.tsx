@@ -26,12 +26,13 @@ const socket: Socket = io({
   autoConnect: false, // Don't connect until AppProvider mounts (after auth)
 })
 
-type AddSessionIntent = 'work' | 'review'
+type AddSessionIntent = 'work' | 'review' | 'fix'
 
 interface AddSessionContext {
   intent?: AddSessionIntent
   sessionName?: string
   createdBranch?: string
+  promptTemplate?: string
 }
 
 interface AppState {

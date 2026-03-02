@@ -176,7 +176,7 @@ interface TaskDetailModalProps {
   issueId: string
   onClose: () => void
   onNavigate?: (issueId: string) => void
-  onStartWorking?: (issueId: string) => void
+  onStartWorking?: (issueId: string, intent?: 'work' | 'review' | 'fix') => void
   onStartReview?: (issueId: string, createdBranch?: string) => void
   onRefresh?: () => void
 }
@@ -562,8 +562,10 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                                   onClick={() => onNavigate?.(child.id)}
                                   className="flex items-center gap-2 flex-1 min-w-0 text-left"
                                 >
-                                  {isNeedsFix && <Wrench className="h-3 w-3 shrink-0 text-orange-400" />}
-                                  {!isNeedsFix && <ChildIcon className={cn('h-3 w-3 shrink-0', childStatus?.color)} />}
+                                  <ChildIcon className={cn('h-3 w-3 shrink-0', childStatus?.color)} />
+                                  {isNeedsFix && (
+                                    <Wrench className="h-3 w-3 shrink-0 text-orange-400 ml-1" />
+                                  )}
                                   <span className="text-[10px] font-mono text-muted-foreground shrink-0">{child.id}</span>
                                   <span className="text-xs truncate flex-1">{child.title}</span>
                                 </button>
@@ -572,7 +574,7 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                                     size="sm"
                                     className="h-5 text-[10px] px-2 bg-orange-500 hover:bg-orange-600"
                                     onClick={() => {
-                                      onStartWorking(child.id)
+                                      onStartWorking(child.id, 'fix')
                                       handleClose()
                                     }}
                                   >
@@ -585,7 +587,7 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                                     size="sm"
                                     className="h-5 text-[10px] px-2"
                                     onClick={() => {
-                                      onStartWorking(child.id)
+                                      onStartWorking(child.id, 'work')
                                       handleClose()
                                     }}
                                   >
