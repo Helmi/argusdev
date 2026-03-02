@@ -319,6 +319,7 @@ const PROFILES: Record<string, AgentConfig> = {
 		kind: 'agent',
 		command: 'opencode',
 		icon: 'opencode',
+		prependCwd: true,
 		options: [
 			{
 				id: 'continue',

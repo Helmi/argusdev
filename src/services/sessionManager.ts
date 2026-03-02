@@ -42,6 +42,7 @@ export interface SessionCounts {
 interface AgentBootstrapOptions {
 	initialPrompt?: string;
 	promptArg?: string;
+	prependCwd?: boolean;
 	sessionIdOverride?: string;
 }
 
@@ -228,6 +229,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		args: string[],
 		initialPrompt: string,
 		promptArg?: string,
+		prependCwd?: boolean,
 	): Promise<string> {
 		const normalizedPromptArg = this.normalizePromptArg(promptArg);
 		const scriptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -236,6 +238,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 
 		const commandTokens = [
 			this.formatPosixToken(command),
+			...(prependCwd ? [this.formatPosixToken('.')] : []),
 			...args.map(arg => this.formatPosixToken(arg)),
 		];
 		if (normalizedPromptArg && normalizedPromptArg.toLowerCase() !== 'none') {
@@ -743,6 +746,10 @@ ${commandTokens.join(' ')}
 				// Terminal-kind sessions are plain interactive shells.
 				// Agent-kind sessions execute one bootstrap command, then return to shell prompt on exit.
 				if (agentKind !== 'terminal') {
+					const commandArgs = resolvedCommand.args;
+					const bootstrapArgs = bootstrapOptions?.prependCwd
+						? ['.', ...commandArgs]
+						: commandArgs;
 					const shouldSkipPromptInjection =
 						this.promptLauncherDisabledKeys.has(promptLauncherFailureKey) &&
 						this.shouldUsePromptLauncher(
@@ -764,9 +771,10 @@ ${commandTokens.join(' ')}
 							const scriptPath = await this.writePromptLauncherScript(
 								worktreePath,
 								resolvedCommand.command,
-								resolvedCommand.args,
+								commandArgs,
 								bootstrapOptions.initialPrompt,
 								bootstrapOptions.promptArg,
+								bootstrapOptions.prependCwd,
 							);
 							this.bootstrapCommandInShell(shellProcess, shellCommand, 'bash', [
 								scriptPath,
@@ -780,7 +788,7 @@ ${commandTokens.join(' ')}
 								shellProcess,
 								shellCommand,
 								resolvedCommand.command,
-								resolvedCommand.args,
+								bootstrapArgs,
 							);
 						}
 					} else {
@@ -788,7 +796,7 @@ ${commandTokens.join(' ')}
 							shellProcess,
 							shellCommand,
 							resolvedCommand.command,
-							resolvedCommand.args,
+							bootstrapArgs,
 							shouldSkipPromptInjection
 								? undefined
 								: bootstrapOptions?.initialPrompt,

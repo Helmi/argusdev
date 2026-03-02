@@ -765,6 +765,7 @@ export class APIServer {
 				agent.kind,
 				{
 					promptArg,
+					prependCwd: agent.prependCwd,
 					sessionIdOverride: record.id,
 					initialPrompt: canInjectFallbackPrompt ? fallbackPrompt : undefined,
 				},
@@ -2717,6 +2718,7 @@ export class APIServer {
 						normalizedPromptArg?.toLowerCase() !== 'none'
 							? startupPromptToInject
 							: undefined,
+					prependCwd: agent.prependCwd,
 					promptArg: normalizedPromptArg,
 				},
 			);
