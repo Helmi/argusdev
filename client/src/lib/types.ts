@@ -364,6 +364,7 @@ export interface ProjectConfig {
 		enabled?: boolean;
 		autoStart?: boolean;
 		defaultPrompt?: string;
+		defaultFixPrompt?: string;
 	};
 	agentDefaults?: {
 		agentId?: string;
