@@ -102,7 +102,7 @@ export class ProjectManager implements IProjectManager {
 	/**
 	 * Load projects from disk, migrating from legacy format if needed
 	 */
-	private loadProjects(): void {
+	public loadProjects(): void {
 		try {
 			if (existsSync(this.dataPath)) {
 				// Load from new projects.json
@@ -476,6 +476,10 @@ export const projectManager = {
 	// Proxy methods for convenience
 	getProjects() {
 		return this.instance.getProjects();
+	},
+
+	loadProjects() {
+		return this.instance.loadProjects();
 	},
 
 	addProject(projectPath: string, name?: string) {

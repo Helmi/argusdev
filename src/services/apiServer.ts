@@ -49,6 +49,7 @@ import {sessionStore, SessionIntent} from './sessionStore.js';
 import type {SessionRecord} from './sessionStore.js';
 import {adapterRegistry} from '../adapters/index.js';
 import {globalSessionOrchestrator} from './globalSessionOrchestrator.js';
+import {fileWatcherService} from './fileWatcherService.js';
 import type {SessionManager} from './sessionManager.js';
 import type {
 	AgentConfig,
@@ -3585,6 +3586,9 @@ export class APIServer {
 		coreService.on('projectSelected', () => {
 			this.setupTdDbWatcher();
 		});
+
+		// Setup file watchers for external changes
+		this.setupFileWatchers();
 	}
 
 	/**
@@ -3648,12 +3652,56 @@ export class APIServer {
 	}
 
 	/**
+	 * Setup file watchers for worktrees and projects.
+	 * Forwards change events to connected clients via socket.io.
+	 */
+	private setupFileWatchers(): void {
+		// Start watching projects.json global file
+		fileWatcherService.startWatchingProjects();
+
+		// Start watching the currently selected project's worktrees
+		const selectedProject = coreService.getSelectedProject();
+		if (selectedProject) {
+			fileWatcherService.startWatchingWorktrees(selectedProject.path);
+		}
+
+		// Forward worktrees_changed events to clients
+		fileWatcherService.on(
+			'worktrees_changed',
+			(projectPath: string) => {
+				logger.info(
+					`API: File watcher detected worktrees change for ${projectPath}`,
+				);
+				this.io?.emit('worktrees_changed', {projectPath});
+			},
+		);
+
+		// Forward projects_changed events to clients
+		fileWatcherService.on('projects_changed', () => {
+			logger.info('API: File watcher detected projects.json change');
+
+			// Reload projects from disk
+			projectManager.loadProjects();
+
+			this.io?.emit('projects_changed');
+		});
+
+		// Update watchers on project switch
+		coreService.on('projectSelected', (project) => {
+			fileWatcherService.updateWatchedProjects(project ? [project.path] : []);
+		});
+	}
+
+	/**
 	 * Stop the API server and cleanup all resources.
 	 * Called during daemon shutdown.
 	 */
 	public async stop(): Promise<void> {
 		// Cleanup TD watcher
 		this.teardownTdDbWatcher();
+
+		// Cleanup filesystem watchers
+		fileWatcherService.stopAll();
 
 		// Close Socket.IO
 		if (this.io) {

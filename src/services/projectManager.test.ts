@@ -159,6 +159,37 @@ describe('ProjectManager', () => {
 		});
 	});
 
+	describe('loadProjects', () => {
+		it('should reload projects from disk when called directly', () => {
+			projectManager = new ProjectManager();
+			expect(projectManager.getProjects()).toHaveLength(0);
+
+			const mockProjects: Project[] = [
+				{
+					path: '/path/to/project1',
+					name: 'project1',
+					lastAccessed: Date.now(),
+					isValid: true,
+				},
+			];
+
+			mockFs.existsSync.mockImplementation((filePath: string) => {
+				if (filePath === mockConfigDir) return true;
+				if (filePath === mockProjectsPath) return true;
+				return false;
+			});
+			mockFs.readFileSync.mockReturnValue(JSON.stringify(mockProjects));
+
+			// Act
+			projectManager.loadProjects();
+
+			// Assert
+			const projects = projectManager.getProjects();
+			expect(projects).toHaveLength(1);
+			expect(projects[0]?.name).toBe('project1');
+		});
+	});
+
 	describe('addProject', () => {
 		beforeEach(() => {
 			projectManager = new ProjectManager();

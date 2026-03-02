@@ -323,6 +323,7 @@ const {globalSessionOrchestrator} = await import(
 	'./services/globalSessionOrchestrator.js'
 );
 const {apiServer} = await import('./services/apiServer.js');
+const {fileWatcherService} = await import('./services/fileWatcherService.js');
 const {ENV_VARS, generateRandomPort} = await import('./constants/env.js');
 
 const knownCommands = new Set([
@@ -696,6 +697,13 @@ if (isDaemonMode) {
 		}
 		isShuttingDown = true;
 		console.log(`\nReceived ${signal}, shutting down...`);
+
+		// Stop file watchers
+		try {
+			fileWatcherService.stopAll();
+		} catch (_error) {
+			// ignore watcher cleanup errors
+		}
 
 		try {
 			// Stop API server and cleanup resources (TD watcher, sockets, etc.)

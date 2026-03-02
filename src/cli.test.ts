@@ -168,6 +168,7 @@ describe('CLI', () => {
 			vi.doMock('os', () => ({
 				default: {
 					hostname: vi.fn(() => 'cacd-host'),
+					homedir: vi.fn(() => '/home/user'),
 				},
 			}));
 
@@ -335,6 +336,7 @@ describe('CLI', () => {
 			vi.doMock('os', () => ({
 				default: {
 					hostname: vi.fn(() => 'cacd-host'),
+					homedir: vi.fn(() => '/home/user'),
 				},
 			}));
 			vi.doMock('./utils/configDir.js', () => ({
