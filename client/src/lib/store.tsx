@@ -799,6 +799,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
     })
 
+    // File watcher events - refresh data when external changes detected
+    socket.on('worktrees_changed', () => {
+      // Refresh worktrees list (and projects for consistency)
+      fetchData()
+    })
+    socket.on('projects_changed', () => {
+      // Refresh projects list
+      fetchData()
+    })
+
     // Connect socket now that auth is complete (AppProvider only mounts after auth)
     socket.connect()
 
@@ -812,6 +822,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       socket.off('connect_error')
       socket.off('session_update')
       socket.off('td_review_ready')
+      socket.off('worktrees_changed')
+      socket.off('projects_changed')
       debouncedFetchSessionData.cancel()
     }
   }, [fetchData, fetchAgents, fetchSessionData, debouncedFetchSessionData])

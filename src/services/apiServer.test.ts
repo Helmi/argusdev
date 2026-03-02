@@ -26,7 +26,9 @@ const mockSessionStoreMarkSessionResumed = vi.fn();
 const mockSessionStoreHydratePreview = vi.fn(async () => {});
 const mockSessionStoreGetLatestByTdSessionId = vi.fn(() => null);
 const mockSessionStoreCountSessions = vi.fn(() => 0);
-const mockSessionStoreGetOriginalWorkTdSessionId = vi.fn(() => null);
+const mockSessionStoreGetOriginalWorkTdSessionId = vi.fn(
+	() => null as string | null,
+);
 
 vi.mock('child_process', async importOriginal => {
 	const actual = await importOriginal<typeof import('child_process')>();

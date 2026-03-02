@@ -49,6 +49,7 @@ import {sessionStore, SessionIntent} from './sessionStore.js';
 import type {SessionRecord} from './sessionStore.js';
 import {adapterRegistry} from '../adapters/index.js';
 import {globalSessionOrchestrator} from './globalSessionOrchestrator.js';
+import {fileWatcherService} from './fileWatcherService.js';
 import type {SessionManager} from './sessionManager.js';
 import type {
 	AgentConfig,
@@ -3531,6 +3532,63 @@ export class APIServer {
 		// Poll every 30 seconds, start after 5s
 		setTimeout(pollTdReviews, 5000);
 		setInterval(pollTdReviews, 30000);
+
+		// Setup file watchers for external changes
+		this.setupFileWatchers();
+	}
+
+	/**
+	 * Setup file watchers for worktrees and projects.
+	 * Forwards change events to connected clients via socket.io.
+	 */
+	private setupFileWatchers(): void {
+		// Start watching all registered projects
+		const projects = projectManager.getProjects();
+		const projectPaths = projects
+			.filter(p => p.isValid !== false)
+			.map(p => p.path);
+		fileWatcherService.startWatching(projectPaths);
+
+		// Forward worktrees_changed events to clients
+		fileWatcherService.on(
+			'worktrees_changed',
+			(projectPath: string) => {
+				logger.info(
+					`API: File watcher detected worktrees change for ${projectPath}`,
+				);
+				this.io?.emit('worktrees_changed', {projectPath});
+			},
+		);
+
+		// Forward projects_changed events to clients
+		fileWatcherService.on('projects_changed', () => {
+			logger.info('API: File watcher detected projects.json change');
+			this.io?.emit('projects_changed');
+
+			// Update watchers for new project list
+			const updatedProjects = projectManager.getProjects();
+			const updatedPaths = updatedProjects
+				.filter(p => p.isValid !== false)
+				.map(p => p.path);
+			fileWatcherService.updateWatchedProjects(updatedPaths);
+		});
+
+		// Also update watchers when project is added/removed via UI
+		coreService.on('projectAdded', () => {
+			const updatedProjects = projectManager.getProjects();
+			const updatedPaths = updatedProjects
+				.filter(p => p.isValid !== false)
+				.map(p => p.path);
+			fileWatcherService.updateWatchedProjects(updatedPaths);
+		});
+
+		coreService.on('projectRemoved', () => {
+			const updatedProjects = projectManager.getProjects();
+			const updatedPaths = updatedProjects
+				.filter(p => p.isValid !== false)
+				.map(p => p.path);
+			fileWatcherService.updateWatchedProjects(updatedPaths);
+		});
 	}
 
 	/**
