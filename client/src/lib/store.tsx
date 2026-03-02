@@ -26,7 +26,7 @@ const socket: Socket = io({
   autoConnect: false, // Don't connect until AppProvider mounts (after auth)
 })
 
-type AddSessionIntent = 'work' | 'review' | 'fix'
+type AddSessionIntent = 'work' | 'review' | 'fix' | 'fix'
 
 interface AddSessionContext {
   intent?: AddSessionIntent

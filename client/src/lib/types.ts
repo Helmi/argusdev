@@ -246,6 +246,7 @@ export interface TdProjectConfig {
   enabled?: boolean
   autoStart?: boolean
   defaultPrompt?: string
+  defaultFixPrompt?: string
   [key: string]: unknown
 }
 

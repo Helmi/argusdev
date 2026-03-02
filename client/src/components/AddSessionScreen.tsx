@@ -222,6 +222,21 @@ export function AddSessionScreen() {
     ]) || selectedProjectConfig?.td?.defaultPrompt
   }, [resolveConfigValue, selectedProjectConfig?.td?.defaultPrompt])
 
+  const fixPromptDefault = useMemo(() => {
+    return resolveConfigValue([
+      ['quickStart', 'fix', 'promptTemplate'],
+      ['quickstart', 'fix', 'promptTemplate'],
+      ['quickStart', 'fix', 'defaultPrompt'],
+      ['quickstart', 'fix', 'defaultPrompt'],
+      ['quickStart', 'fix', 'prompt'],
+      ['quickstart', 'fix', 'prompt'],
+      ['td', 'quickStart', 'fix', 'promptTemplate'],
+      ['td', 'defaultFixPrompt'],
+      ['td', 'fixPrompt'],
+    ]) || selectedProjectConfig?.td?.defaultFixPrompt
+  }, [resolveConfigValue, selectedProjectConfig?.td?.defaultFixPrompt])
+
+  
   const reviewPromptDefault = useMemo(() => {
     return resolveConfigValue([
       ['quickStart', 'review', 'promptTemplate'],
@@ -245,8 +260,10 @@ export function AddSessionScreen() {
   }, [resolveConfigValue])
 
   const preferredPromptTemplate = useMemo(() => {
-    return quickStartIntent === 'review' ? reviewPromptDefault : workPromptDefault
-  }, [quickStartIntent, reviewPromptDefault, workPromptDefault])
+    if (quickStartIntent === 'review') return reviewPromptDefault
+    if (quickStartIntent === 'fix') return fixPromptDefault
+    return workPromptDefault
+  }, [quickStartIntent, reviewPromptDefault, workPromptDefault, fixPromptDefault])
 
   const selectedTdTask = useMemo(
     () => tdTasks.find(t => t.id === selectedTdTaskId),
