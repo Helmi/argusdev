@@ -1056,7 +1056,9 @@ export function AppProvider({children}: {children: ReactNode}) {
 		});
 
 		// Connect socket now that auth is complete (AppProvider only mounts after auth)
-		socket.connect();
+		if (!socket.connected) {
+			socket.connect();
+		}
 
 		// Initial full fetch on mount
 		fetchDataRef.current();
@@ -1072,7 +1074,11 @@ export function AppProvider({children}: {children: ReactNode}) {
 			socket.off('worktrees_changed');
 			socket.off('projects_changed');
 			debouncedFetchSessionDataRef.current.cancel();
-			socket.disconnect();
+			// Don't disconnect the socket in cleanup — React StrictMode
+			// double-invokes effects in dev, and disconnecting here kills
+			// the connection before the second mount can re-establish it.
+			// The socket lives for the app's lifetime; it will be cleaned
+			// up naturally when the page unloads.
 		};
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
