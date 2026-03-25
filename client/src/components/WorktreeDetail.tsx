@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/apiFetch';
 import { GitBranch, Play, Trash2, GitMerge, AlertTriangle, ArrowRight, Square, ExternalLink, Terminal } from 'lucide-react';
 import { PresetSelector } from './PresetSelector';
 
@@ -40,7 +41,7 @@ export const WorktreeDetail = ({
     useEffect(() => {
         if (mode === 'merge') {
             setLoading(true);
-            fetch('/api/branches', { headers: { 'x-access-token': token } })
+            apiFetch('/api/branches')
                 .then(res => res.json())
                 .then(data => {
                     setBranches(data);
@@ -52,17 +53,16 @@ export const WorktreeDetail = ({
         }
         setError(null);
         setSuccessMsg(null);
-    }, [mode, token]);
+    }, [mode]);
 
     const handleMerge = async () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch('/api/worktree/merge', {
+            const res = await apiFetch('/api/worktree/merge', {
                 method: 'POST',
-                headers: { 
-                    'x-access-token': token,
-                    'Content-Type': 'application/json' 
+                headers: {
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     sourceBranch: worktree.branch,
@@ -108,11 +108,10 @@ export const WorktreeDetail = ({
                 await onStopSession(activeSessionId);
             }
 
-            const res = await fetch('/api/worktree/delete', {
+            const res = await apiFetch('/api/worktree/delete', {
                 method: 'POST',
-                headers: { 
-                    'x-access-token': token,
-                    'Content-Type': 'application/json' 
+                headers: {
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     path: worktree.path,

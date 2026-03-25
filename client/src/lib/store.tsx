@@ -8,6 +8,7 @@ import {
 	ReactNode,
 } from 'react';
 import {io, Socket} from 'socket.io-client';
+import {apiFetch, getToken} from './apiFetch';
 import type {
 	Session,
 	Worktree,
@@ -56,6 +57,7 @@ function debounce<T extends (...args: Parameters<T>) => void>(
 const socket: Socket = io({
 	withCredentials: true, // Send cookies with socket requests
 	autoConnect: false, // Don't connect until AppProvider mounts (after auth)
+	auth: () => ({'x-access-token': getToken()}),
 });
 
 type AddSessionIntent = 'work' | 'review' | 'fix';
@@ -523,8 +525,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const fetchSessionData = useCallback(async () => {
 		try {
 			const [stateRes, sessionsRes] = await Promise.all([
-				fetch('/api/state', {credentials: 'include'}),
-				fetch('/api/sessions', {credentials: 'include'}),
+				apiFetch('/api/state'),
+				apiFetch('/api/sessions'),
 			]);
 
 			if (!stateRes.ok || !sessionsRes.ok) {
@@ -591,9 +593,9 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const fetchReferenceData = useCallback(async () => {
 		try {
 			const [worktreesRes, projectsRes, configRes] = await Promise.all([
-				fetch('/api/worktrees', {credentials: 'include'}),
-				fetch('/api/projects', {credentials: 'include'}),
-				fetch('/api/config', {credentials: 'include'}),
+				apiFetch('/api/worktrees'),
+				apiFetch('/api/projects'),
+				apiFetch('/api/config'),
 			]);
 
 			if (!worktreesRes.ok || !projectsRes.ok) {
@@ -635,9 +637,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const fetchAgents = useCallback(async () => {
 		try {
 			setAgentsLoading(true);
-			const res = await fetch('/api/agents?includeDisabled=true', {
-				credentials: 'include',
-			});
+			const res = await apiFetch('/api/agents?includeDisabled=true');
 			if (res.ok) {
 				const data: AgentsConfig = await res.json();
 				setAgents(data.agents);
@@ -654,7 +654,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const fetchTdStatus = useCallback(async () => {
 		setTdStatusLoading(true);
 		try {
-			const res = await fetch('/api/td/status', {credentials: 'include'});
+			const res = await apiFetch('/api/td/status');
 			if (!res.ok) {
 				setTdStatus(null);
 				return;
@@ -672,7 +672,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const fetchProjectConfig = useCallback(async () => {
 		try {
-			const res = await fetch('/api/project/config', {credentials: 'include'});
+			const res = await apiFetch('/api/project/config');
 			if (res.ok) {
 				const data = await res.json();
 				setProjectConfig(data.config || {});
@@ -691,9 +691,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const saveProjectConfigAction = useCallback(
 		async (nextConfig: ProjectConfig): Promise<boolean> => {
 			try {
-				const res = await fetch('/api/project/config', {
+				const res = await apiFetch('/api/project/config', {
 					method: 'POST',
-					credentials: 'include',
 					headers: {'Content-Type': 'application/json'},
 					body: JSON.stringify({config: nextConfig}),
 				});
@@ -720,9 +719,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const initializeTdProject = useCallback(async (): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/td/init', {
+			const res = await apiFetch('/api/td/init', {
 				method: 'POST',
-				credentials: 'include',
 			});
 
 			if (!res.ok) {
@@ -745,9 +743,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 			scope: 'project' | 'global' | 'effective' | 'all' = 'project',
 		): Promise<TdPromptTemplate[]> => {
 			try {
-				const res = await fetch(`/api/td/prompts?scope=${scope}`, {
-					credentials: 'include',
-				});
+				const res = await apiFetch(`/api/td/prompts?scope=${scope}`);
 				if (!res.ok) return [];
 				const data = await res.json();
 				return data.templates || [];
@@ -766,9 +762,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 			scope: 'project' | 'global' = 'project',
 		): Promise<boolean> => {
 			try {
-				const res = await fetch('/api/td/prompts', {
+				const res = await apiFetch('/api/td/prompts', {
 					method: 'POST',
-					credentials: 'include',
 					headers: {'Content-Type': 'application/json'},
 					body: JSON.stringify({name, content, scope}),
 				});
@@ -796,10 +791,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 			try {
 				const res = await fetch(
 					`/api/td/prompts/${encodeURIComponent(name)}?scope=${scope}`,
-					{
-						method: 'DELETE',
-						credentials: 'include',
-					},
+					{method: 'DELETE'},
 				);
 
 				if (!res.ok) {
@@ -825,9 +817,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 				if (options?.type) params.set('type', options.type);
 				if (options?.parentId) params.set('parentId', options.parentId);
 				const qs = params.toString();
-				const res = await fetch(`/api/td/issues${qs ? `?${qs}` : ''}`, {
-					credentials: 'include',
-				});
+				const res = await apiFetch(`/api/td/issues${qs ? `?${qs}` : ''}`);
 				if (res.ok) {
 					const data = await res.json();
 					setTdIssues(data.issues);
@@ -841,7 +831,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const fetchTdBoard = useCallback(async () => {
 		try {
-			const res = await fetch('/api/td/board', {credentials: 'include'});
+			const res = await apiFetch('/api/td/board');
 			if (res.ok) {
 				const data = await res.json();
 				setTdBoardView(data.board);
@@ -929,9 +919,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 			const url = isNew ? '/api/agents' : `/api/agents/${agent.id}`;
 			const method = isNew ? 'POST' : 'PUT';
 
-			const res = await fetch(url, {
+			const res = await apiFetch(url, {
 				method,
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify(agent),
 			});
@@ -963,9 +952,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 	// Delete an agent
 	const deleteAgentAction = async (agentId: string): Promise<boolean> => {
 		try {
-			const res = await fetch(`/api/agents/${agentId}`, {
+			const res = await apiFetch(`/api/agents/${agentId}`, {
 				method: 'DELETE',
-				credentials: 'include',
 			});
 
 			if (!res.ok) {
@@ -986,9 +974,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 	// Set default agent
 	const setDefaultAgentIdAction = async (agentId: string): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/agents/default', {
+			const res = await apiFetch('/api/agents/default', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({id: agentId}),
 			});
@@ -1066,6 +1053,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 			socket.off('worktrees_changed');
 			socket.off('projects_changed');
 			debouncedFetchSessionData.cancel();
+			socket.disconnect();
 		};
 	}, [
 		fetchData,
@@ -1159,9 +1147,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const selectProject = async (path: string): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/project/select', {
+			const res = await apiFetch('/api/project/select', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({path}),
 			});
@@ -1297,9 +1284,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 		sessionName?: string,
 	): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/session/create', {
+			const res = await apiFetch('/api/session/create', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({path, presetId, sessionName}),
 			});
@@ -1345,9 +1331,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 		intent?: 'work' | 'review' | 'fix' | 'manual',
 	): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/session/create-with-agent', {
+			const res = await apiFetch('/api/session/create-with-agent', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({
 					path,
@@ -1396,9 +1381,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 	): Promise<boolean> => {
 		try {
 			const normalizedName = name.trim();
-			const res = await fetch('/api/session/rename', {
+			const res = await apiFetch('/api/session/rename', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({
 					id: sessionId,
@@ -1429,9 +1413,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const stopSession = async (sessionId: string) => {
 		try {
-			const res = await fetch('/api/session/stop', {
+			const res = await apiFetch('/api/session/stop', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({id: sessionId}),
 			});
@@ -1449,9 +1432,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const restartSession = async (sessionId: string) => {
 		try {
-			const res = await fetch('/api/session/restart', {
+			const res = await apiFetch('/api/session/restart', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({id: sessionId}),
 			});
@@ -1562,9 +1544,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const updateConfig = async (newConfig: AppConfig): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/config', {
+			const res = await apiFetch('/api/config', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify(mapFrontendToBackend(newConfig)),
 			});
@@ -1584,9 +1565,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const addProject = async (path: string, name?: string): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/project/add', {
+			const res = await apiFetch('/api/project/add', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({path, name}),
 			});
@@ -1612,9 +1592,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 		name: string,
 	): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/project/update', {
+			const res = await apiFetch('/api/project/update', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({path, name}),
 			});
@@ -1644,9 +1623,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const removeProject = async (path: string): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/project/remove', {
+			const res = await apiFetch('/api/project/remove', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({path}),
 			});
@@ -1676,9 +1654,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 		projectPath?: string,
 	): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/worktree/create', {
+			const res = await apiFetch('/api/worktree/create', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({
 					path,
@@ -1712,9 +1689,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 		projectPath?: string,
 	): Promise<boolean> => {
 		try {
-			const res = await fetch('/api/worktree/delete', {
+			const res = await apiFetch('/api/worktree/delete', {
 				method: 'POST',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({path, deleteBranch, projectPath}),
 			});

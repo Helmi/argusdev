@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/apiFetch'
 import { useAppStore } from '@/lib/store'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -76,9 +77,7 @@ export function SettingsProject() {
     setSelectedPromptSource(source)
     setPromptName(name)
     try {
-      const res = await fetch(`/api/td/prompts/${encodeURIComponent(name)}?scope=${source}`, {
-        credentials: 'include',
-      })
+      const res = await apiFetch(`/api/td/prompts/${encodeURIComponent(name)}?scope=${source}`)
       const data = await res.json()
       setPromptContent(data.template?.content || '')
     } catch {

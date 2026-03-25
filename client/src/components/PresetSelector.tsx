@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/apiFetch';
 
 interface CommandPreset {
     id: string;
@@ -12,11 +13,11 @@ interface CommandPreset {
 interface PresetSelectorProps {
     onSelect: (presetId: string) => void;
     onCancel: () => void;
-    token: string;
+    token?: string;
     selectedWorktreePath: string;
 }
 
-export const PresetSelector = ({ onSelect, onCancel, token, selectedWorktreePath }: PresetSelectorProps) => {
+export const PresetSelector = ({ onSelect, onCancel, selectedWorktreePath }: PresetSelectorProps) => {
     const [presets, setPresets] = useState<CommandPreset[]>([]);
     const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -27,9 +28,7 @@ export const PresetSelector = ({ onSelect, onCancel, token, selectedWorktreePath
             setLoading(true);
             setError(null);
             try {
-                const res = await fetch('/api/presets', {
-                    headers: { 'x-access-token': token || '' }
-                });
+                const res = await apiFetch('/api/presets');
                 if (!res.ok) {
                     throw new Error(`HTTP error! status: ${res.status}`);
                 }
@@ -45,7 +44,7 @@ export const PresetSelector = ({ onSelect, onCancel, token, selectedWorktreePath
             }
         };
         fetchPresets();
-    }, [token]);
+    }, []);
 
     const handleSelect = (e: React.FormEvent) => {
         e.preventDefault();

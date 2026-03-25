@@ -1,4 +1,5 @@
 import {useState, useEffect, useCallback, useMemo, useRef} from 'react';
+import {apiFetch} from '@/lib/apiFetch';
 import {useAppStore} from '@/lib/store';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -195,11 +196,8 @@ export function AddSessionScreen() {
 		let cancelled = false;
 		setSelectedProjectConfig(null);
 		setSelectedProjectConfigReady(false);
-		fetch(
+		apiFetch(
 			`/api/project/config?projectPath=${encodeURIComponent(selectedProjectPath)}`,
-			{
-				credentials: 'include',
-			},
 		)
 			.then(async res => {
 				if (!res.ok) return null;
@@ -582,11 +580,8 @@ export function AddSessionScreen() {
 			return;
 		}
 
-		fetch(
+		apiFetch(
 			`/api/project/task-list-names?projectPath=${encodeURIComponent(selectedProjectPath)}`,
-			{
-				credentials: 'include',
-			},
 		)
 			.then(res => res.json())
 			.then(data => {
@@ -631,9 +626,7 @@ export function AddSessionScreen() {
 			return;
 		}
 		setLoadingTdTasks(true);
-		fetch('/api/td/issues?status=open,in_progress,in_review,blocked', {
-			credentials: 'include',
-		})
+		apiFetch('/api/td/issues?status=open,in_progress,in_review,blocked')
 			.then(res => res.json())
 			.then(data => setTdTasks(data.issues || []))
 			.catch(() => setTdTasks([]))
@@ -818,11 +811,8 @@ export function AddSessionScreen() {
 		if (!selectedProjectPath) return;
 
 		setLoadingBranches(true);
-		fetch(
+		apiFetch(
 			`/api/branches?projectPath=${encodeURIComponent(selectedProjectPath)}`,
-			{
-				credentials: 'include',
-			},
 		)
 			.then(res => res.json())
 			.then(data => {
@@ -896,9 +886,8 @@ export function AddSessionScreen() {
 		if (!selectedProjectPath) return;
 
 		try {
-			const res = await fetch('/api/project/task-list-names', {
+			const res = await apiFetch('/api/project/task-list-names', {
 				method: 'DELETE',
-				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({
 					projectPath: selectedProjectPath,
@@ -949,9 +938,7 @@ export function AddSessionScreen() {
 
 				await fetchData();
 
-				const updatedWorktrees = await fetch('/api/worktrees', {
-					credentials: 'include',
-				}).then(r => r.json());
+				const updatedWorktrees = await apiFetch('/api/worktrees').then(r => r.json());
 				const newWorktree = updatedWorktrees.find(
 					(w: {branch: string}) => w.branch === newBranchName.trim(),
 				);

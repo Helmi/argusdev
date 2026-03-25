@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { apiFetch } from '@/lib/apiFetch'
 import { useAppStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -113,9 +114,7 @@ export function AddWorktreeScreen() {
     }
 
     setLoadingBranches(true)
-    fetch(`/api/branches?projectPath=${encodeURIComponent(selectedProjectPath)}`, {
-      credentials: 'include',
-    })
+    apiFetch(`/api/branches?projectPath=${encodeURIComponent(selectedProjectPath)}`)
       .then(res => res.json())
       .then(data => {
         setBranches(data || [])

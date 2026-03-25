@@ -3328,7 +3328,9 @@ export class APIServer {
 				const authToken =
 					typeof socket.handshake.auth?.['token'] === 'string'
 						? socket.handshake.auth['token']
-						: undefined;
+						: typeof socket.handshake.auth?.['x-access-token'] === 'string'
+							? socket.handshake.auth['x-access-token']
+							: undefined;
 
 				if (
 					configuredAccessToken &&

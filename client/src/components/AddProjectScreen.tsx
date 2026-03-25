@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { apiFetch } from '@/lib/apiFetch'
 import { useAppStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -144,8 +145,7 @@ export function AddProjectScreen() {
       validationAbortRef.current = new AbortController()
 
       try {
-        const res = await fetch(`/api/validate-path?path=${encodeURIComponent(path)}`, {
-          credentials: 'include',
+        const res = await apiFetch(`/api/validate-path?path=${encodeURIComponent(path)}`, {
           signal: validationAbortRef.current.signal,
         })
 
@@ -182,9 +182,7 @@ export function AddProjectScreen() {
         showHidden: showHidden.toString(),
       })
 
-      const res = await fetch(`/api/browse?${params}`, {
-        credentials: 'include',
-      })
+      const res = await apiFetch(`/api/browse?${params}`)
 
       if (res.ok) {
         const data: BrowseResult = await res.json()
@@ -288,9 +286,8 @@ export function AddProjectScreen() {
     // Quick check via API
     const checkCurrentDir = async () => {
       try {
-        const res = await fetch(
+        const res = await apiFetch(
           `/api/validate-path?path=${encodeURIComponent(browseResult.currentPath)}`,
-          { credentials: 'include' }
         )
         if (res.ok) {
           const data: PathValidation = await res.json()

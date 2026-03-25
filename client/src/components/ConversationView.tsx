@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { apiFetch } from '@/lib/apiFetch'
 import { useAppStore } from '@/lib/store'
 import { AgentIcon } from '@/components/AgentIcon'
 import { Button } from '@/components/ui/button'
@@ -295,9 +296,7 @@ export function ConversationView() {
         params.set('taskId', conversationTaskFilterId)
       }
 
-      const res = await fetch(`/api/conversations?${params.toString()}`, {
-        credentials: 'include',
-      })
+      const res = await apiFetch(`/api/conversations?${params.toString()}`)
       if (!res.ok) {
         throw new Error('Failed to load conversations')
       }
@@ -365,9 +364,7 @@ export function ConversationView() {
         offset: String(nextOffset),
       })
 
-      const res = await fetch(`/api/conversations/${encodeURIComponent(sessionId)}/messages?${params.toString()}`, {
-        credentials: 'include',
-      })
+      const res = await apiFetch(`/api/conversations/${encodeURIComponent(sessionId)}/messages?${params.toString()}`)
       if (!res.ok) {
         throw new Error('Failed to load messages')
       }
@@ -417,9 +414,7 @@ export function ConversationView() {
       let cancelled = false
       void (async () => {
         try {
-          const res = await fetch(`/api/conversations/${encodeURIComponent(conversationInitialSessionId)}`, {
-            credentials: 'include',
-          })
+          const res = await apiFetch(`/api/conversations/${encodeURIComponent(conversationInitialSessionId)}`)
           if (!res.ok) return
           const data = (await res.json()) as { session?: ConversationSession }
           if (!data.session || cancelled) return

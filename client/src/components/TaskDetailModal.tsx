@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { apiFetch } from '@/lib/apiFetch'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -224,7 +225,7 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
     setActiveTab('overview')
     setShowCommentInput(false)
     setCommentText('')
-    fetch(`/api/td/issues/${issueId}`, { credentials: 'include' })
+    apiFetch(`/api/td/issues/${issueId}`)
       .then(res => res.json())
       .then(data => setIssue(data.issue || null))
       .catch(() => setIssue(null))
@@ -260,9 +261,7 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
       if (currentProject?.path) {
         params.set('projectPath', currentProject.path)
       }
-      const res = await fetch(`/api/conversations/resolve-linked-session?${params.toString()}`, {
-        credentials: 'include',
-      })
+      const res = await apiFetch(`/api/conversations/resolve-linked-session?${params.toString()}`)
       if (!res.ok) return null
       const data = (await res.json()) as { sessionId?: string | null }
       return typeof data.sessionId === 'string' ? data.sessionId : null
@@ -358,12 +357,11 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                       onClick={async () => {
                         setActionLoading(true)
                         try {
-                          const res = await fetch(`/api/td/issues/${issue.id}/review`, {
+                          const res = await apiFetch(`/api/td/issues/${issue.id}/review`, {
                             method: 'POST',
-                            credentials: 'include',
                           })
                           if (res.ok) {
-                            const data = await fetch(`/api/td/issues/${issue.id}`, { credentials: 'include' }).then(r => r.json())
+                            const data = await apiFetch(`/api/td/issues/${issue.id}`).then(r => r.json())
                             if (data.issue) setIssue(data.issue)
                             onRefresh?.()
                           }
@@ -398,12 +396,11 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                         onClick={async () => {
                           setActionLoading(true)
                           try {
-                            const res = await fetch(`/api/td/issues/${issue.id}/approve`, {
+                            const res = await apiFetch(`/api/td/issues/${issue.id}/approve`, {
                               method: 'POST',
-                              credentials: 'include',
                             })
                             if (res.ok) {
-                              const data = await fetch(`/api/td/issues/${issue.id}`, { credentials: 'include' }).then(r => r.json())
+                              const data = await apiFetch(`/api/td/issues/${issue.id}`).then(r => r.json())
                               if (data.issue) setIssue(data.issue)
                               onRefresh?.()
                             }
@@ -462,14 +459,13 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                         onClick={async () => {
                           setActionLoading(true)
                           try {
-                            const res = await fetch(`/api/td/issues/${issue.id}/request-changes`, {
+                            const res = await apiFetch(`/api/td/issues/${issue.id}/request-changes`, {
                               method: 'POST',
-                              credentials: 'include',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ comment: commentText.trim() || undefined }),
                             })
                             if (res.ok) {
-                              const data = await fetch(`/api/td/issues/${issue.id}`, { credentials: 'include' }).then(r => r.json())
+                              const data = await apiFetch(`/api/td/issues/${issue.id}`).then(r => r.json())
                               if (data.issue) setIssue(data.issue)
                               setShowCommentInput(false)
                               setCommentText('')

@@ -1,4 +1,5 @@
 import {useState, useEffect, useCallback} from 'react';
+import {apiFetch} from '@/lib/apiFetch';
 import {useAppStore} from '@/lib/store';
 import type {TdIssue} from '@/lib/types';
 import {cn} from '@/lib/utils';
@@ -60,9 +61,7 @@ export function TaskContextCard({worktreePath}: TaskContextCardProps) {
 			setLoading(true);
 			try {
 				// Get all in-progress tasks and find one linked to this worktree
-				const res = await fetch('/api/td/issues?status=in_progress', {
-					credentials: 'include',
-				});
+				const res = await apiFetch('/api/td/issues?status=in_progress');
 				if (!res.ok) return;
 
 				const data = await res.json();

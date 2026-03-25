@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { apiFetch } from '@/lib/apiFetch'
 import { useAppStore } from '@/lib/store'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -56,9 +57,8 @@ export function SettingsTd() {
 
     setSavingDefaultPrompt(true)
     try {
-      const res = await fetch('/api/config', {
+      const res = await apiFetch('/api/config', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           td: {
@@ -109,9 +109,7 @@ export function SettingsTd() {
     }
 
     setLoadingPrompt(true)
-    fetch(`/api/td/prompts/${encodeURIComponent(selectedPrompt)}?scope=global`, {
-      credentials: 'include',
-    })
+    apiFetch(`/api/td/prompts/${encodeURIComponent(selectedPrompt)}?scope=global`)
       .then(res => res.json())
       .then(data => {
         setPromptContent(data.template?.content || '')
