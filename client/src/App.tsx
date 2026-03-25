@@ -343,6 +343,15 @@ function AppContent() {
     return () => window.removeEventListener('cacd-lock', handleLockEvent)
   }, [authState, lockScreen])
 
+  // Circuit breaker: redirect to passcode on 401 from any API call
+  useEffect(() => {
+    if (authState !== 'authenticated') return
+
+    const handleAuthExpired = () => setAuthState('needs-passcode')
+    window.addEventListener('cacd-auth-expired', handleAuthExpired)
+    return () => window.removeEventListener('cacd-auth-expired', handleAuthExpired)
+  }, [authState])
+
   const checkAuthStatus = async () => {
     const token = getAccessToken()
 
