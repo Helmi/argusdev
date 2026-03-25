@@ -5,6 +5,7 @@ import {
 	useCallback,
 	useEffect,
 	useMemo,
+	useRef,
 	ReactNode,
 } from 'react';
 import {io, Socket} from 'socket.io-client';
@@ -995,17 +996,37 @@ export function AppProvider({children}: {children: ReactNode}) {
 		}
 	};
 
-	// Socket.IO event handlers
+	// Stable refs for callbacks used in socket handlers — prevents the
+	// socket useEffect from re-running (and reconnecting) when callbacks
+	// get new identities after state updates.
+	const fetchDataRef = useRef(fetchData);
+	const fetchAgentsRef = useRef(fetchAgents);
+	const fetchSessionDataRef = useRef(fetchSessionData);
+	const debouncedFetchSessionDataRef = useRef(debouncedFetchSessionData);
+	const fetchTdBoardRef = useRef(fetchTdBoard);
+	const fetchTdIssuesRef = useRef(fetchTdIssues);
+	const tdDismissedReviewIdsRef = useRef(tdDismissedReviewIds);
+	useEffect(() => {
+		fetchDataRef.current = fetchData;
+		fetchAgentsRef.current = fetchAgents;
+		fetchSessionDataRef.current = fetchSessionData;
+		debouncedFetchSessionDataRef.current = debouncedFetchSessionData;
+		fetchTdBoardRef.current = fetchTdBoard;
+		fetchTdIssuesRef.current = fetchTdIssues;
+		tdDismissedReviewIdsRef.current = tdDismissedReviewIds;
+	});
+
+	// Socket.IO event handlers — runs once on mount, uses refs for latest callbacks
 	useEffect(() => {
 		socket.on('connect', () => {
 			setConnectionStatus('connected');
-			fetchSessionData();
+			fetchSessionDataRef.current();
 		});
 		socket.on('disconnect', () => setConnectionStatus('disconnected'));
 		socket.on('connect_error', () => setConnectionStatus('error'));
 		// Use debounced session fetch for socket events - prevents API storm
 		// Only fetches sessions/state (2 calls), not full data (5 calls)
-		socket.on('session_update', debouncedFetchSessionData);
+		socket.on('session_update', () => debouncedFetchSessionDataRef.current());
 		socket.on(
 			'td_review_ready',
 			(data: {
@@ -1015,33 +1036,31 @@ export function AppProvider({children}: {children: ReactNode}) {
 					mergeIncomingReviewNotifications(
 						prev,
 						data.issues,
-						tdDismissedReviewIds,
+						tdDismissedReviewIdsRef.current,
 					),
 				);
 			},
 		);
 		// Auto-refresh TD board when issues.db changes externally (td CLI commands)
 		socket.on('td_board_changed', () => {
-			fetchTdBoard();
-			fetchTdIssues();
+			fetchTdBoardRef.current();
+			fetchTdIssuesRef.current();
 		});
 
 		// File watcher events - refresh data when external changes detected
 		socket.on('worktrees_changed', () => {
-			// Refresh worktrees list (and projects for consistency)
-			fetchData();
+			fetchDataRef.current();
 		});
 		socket.on('projects_changed', () => {
-			// Refresh projects list
-			fetchData();
+			fetchDataRef.current();
 		});
 
 		// Connect socket now that auth is complete (AppProvider only mounts after auth)
 		socket.connect();
 
 		// Initial full fetch on mount
-		fetchData();
-		fetchAgents();
+		fetchDataRef.current();
+		fetchAgentsRef.current();
 
 		return () => {
 			socket.off('connect');
@@ -1052,18 +1071,11 @@ export function AppProvider({children}: {children: ReactNode}) {
 			socket.off('td_board_changed');
 			socket.off('worktrees_changed');
 			socket.off('projects_changed');
-			debouncedFetchSessionData.cancel();
+			debouncedFetchSessionDataRef.current.cancel();
 			socket.disconnect();
 		};
-	}, [
-		fetchData,
-		fetchAgents,
-		fetchSessionData,
-		debouncedFetchSessionData,
-		fetchTdBoard,
-		fetchTdIssues,
-		tdDismissedReviewIds,
-	]);
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Keep project-specific td/config state in sync with selected project
 	// Always fetch td status (availability is system-wide), only clear project-specific state
