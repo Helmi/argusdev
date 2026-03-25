@@ -54,10 +54,17 @@ function debounce<T extends (...args: Parameters<T>) => void>(
 	return debounced;
 }
 
-// Initialize socket - don't auto-connect, we'll connect after auth
-const socket: Socket = io({
-	withCredentials: true, // Send cookies with socket requests
-	autoConnect: false, // Don't connect until AppProvider mounts (after auth)
+// Initialize socket - don't auto-connect, we'll connect after auth.
+// In dev mode, connect directly to the backend port — Vite's proxy
+// doesn't reliably forward Socket.IO handshakes.
+// VITE_API_PORT is set in client/.env.development (written by dev:server startup).
+const socketUrl = import.meta.env.VITE_API_PORT
+	? `http://localhost:${import.meta.env.VITE_API_PORT}`
+	: undefined;
+const socket: Socket = io(socketUrl as string, {
+	withCredentials: true,
+	autoConnect: false,
+	reconnection: true,
 	auth: () => ({'x-access-token': getToken()}),
 });
 
@@ -1055,10 +1062,10 @@ export function AppProvider({children}: {children: ReactNode}) {
 			fetchDataRef.current();
 		});
 
-		// Connect socket now that auth is complete (AppProvider only mounts after auth)
-		if (!socket.connected) {
-			socket.connect();
-		}
+		// Connect socket now that auth is complete (AppProvider only mounts after auth).
+		// Always call connect() — it's idempotent if already connected, and recovers
+		// from a prior disconnect (e.g., React StrictMode cleanup in dev).
+		socket.connect();
 
 		// Initial full fetch on mount
 		fetchDataRef.current();

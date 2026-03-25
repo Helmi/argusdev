@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => ({
         },
       },
       '/socket.io': {
-        target: `ws://localhost:${apiPort}`,
+        target: `http://localhost:${apiPort}`,
         ws: true,
         changeOrigin: true,
       }

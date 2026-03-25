@@ -40,3 +40,5 @@ TASK.md
 
 # Use bun.lock, not package-lock.json
 package-lock.json
+.gstack/
+client/.env.development
