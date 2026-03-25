@@ -54,17 +54,10 @@ function debounce<T extends (...args: Parameters<T>) => void>(
 	return debounced;
 }
 
-// Initialize socket - don't auto-connect, we'll connect after auth.
-// In dev mode, connect directly to the backend port — Vite's proxy
-// doesn't reliably forward Socket.IO handshakes.
-// VITE_API_PORT is set in client/.env.development (written by dev:server startup).
-const socketUrl = import.meta.env.VITE_API_PORT
-	? `http://localhost:${import.meta.env.VITE_API_PORT}`
-	: undefined;
-const socket: Socket = io(socketUrl as string, {
+// Initialize socket - don't auto-connect, we'll connect after auth
+const socket: Socket = io({
 	withCredentials: true,
 	autoConnect: false,
-	reconnection: true,
 	auth: () => ({'x-access-token': getToken()}),
 });
 
