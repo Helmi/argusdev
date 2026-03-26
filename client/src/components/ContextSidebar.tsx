@@ -257,7 +257,7 @@ export function ContextSidebar() {
 			</div>
 
 			{/* Task Context (only when td is enabled) */}
-			<TaskContextCard worktreePath={session.path} sessionId={session.id} />
+			<TaskContextCard worktreePath={session.path} />
 
 			{/* Divider */}
 			<div className="border-t border-border" />

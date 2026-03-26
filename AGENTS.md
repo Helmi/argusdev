@@ -105,6 +105,14 @@ The UI runs at a density that balances information and readability. Do not go sm
 - Expanded columns: `flex-1 min-w-[220px] max-w-[480px]`
 - Collapsed columns: `w-10 shrink-0` (icon + count only, no manual toggle)
 
+## gstack
+
+Use `/browse` from gstack for **all web browsing**. Never use `mcp__claude-in-chrome__*` tools.
+
+Available skills: `/office-hours`, `/plan-ceo-review`, `/plan-eng-review`, `/plan-design-review`, `/design-consultation`, `/review`, `/ship`, `/land-and-deploy`, `/canary`, `/benchmark`, `/browse`, `/qa`, `/qa-only`, `/design-review`, `/setup-browser-cookies`, `/setup-deploy`, `/retro`, `/investigate`, `/document-release`, `/codex`, `/cso`, `/careful`, `/freeze`, `/guard`, `/unfreeze`, `/gstack-upgrade`.
+
+If gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
+
 ## Conventions
 
 - **Commits:** Conventional Commits — `type: subject` (e.g., `feat: add session restore`, `fix: worktree cleanup on exit`). Note if change affects backend, frontend, or both.
