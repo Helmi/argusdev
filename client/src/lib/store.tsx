@@ -58,7 +58,7 @@ function debounce<T extends (...args: Parameters<T>) => void>(
 const socket: Socket = io({
 	withCredentials: true,
 	autoConnect: false,
-	auth: () => ({'x-access-token': getToken()}),
+	auth: cb => cb({'x-access-token': getToken()}),
 });
 
 type AddSessionIntent = 'work' | 'review' | 'fix';
@@ -1058,7 +1058,12 @@ export function AppProvider({children}: {children: ReactNode}) {
 		// Connect socket now that auth is complete (AppProvider only mounts after auth).
 		// Always call connect() — it's idempotent if already connected, and recovers
 		// from a prior disconnect (e.g., React StrictMode cleanup in dev).
-		socket.connect();
+		if (socket.connected) {
+			setConnectionStatus('connected');
+			fetchSessionDataRef.current();
+		} else {
+			socket.connect();
+		}
 
 		// Initial full fetch on mount
 		fetchDataRef.current();
