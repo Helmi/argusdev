@@ -3329,12 +3329,11 @@ export class APIServer {
 				}
 
 				const args = configurationManager.buildAgentArgs(agent, options || {});
-				const fullArgs = [...(agent.baseArgs || []), ...args];
-				logger.info(`API: Creating SDK session for ${worktreePath} with agent ${agentId}, args: [${fullArgs.join(', ')}]`);
+				logger.info(`API: Creating SDK session for ${worktreePath} with agent ${agentId}, args: [${args.join(', ')}]`);
 
 				const session = sdkSessionManager.createSession(
 					worktreePath,
-					fullArgs,
+					args,
 					undefined,
 					initialPrompt,
 					sessionName,

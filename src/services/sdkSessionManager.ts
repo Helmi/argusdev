@@ -7,10 +7,8 @@ import type {
 	SdkSession,
 	SdkSessionState,
 	SdkEvent,
-	SdkMessage,
 	SdkContentBlock,
 	SdkUsage,
-	SdkPendingApproval,
 	SdkStreamEvent,
 	SdkAssistantEvent,
 	SdkResultEvent,
@@ -22,14 +20,18 @@ function createEmptyUsage(): SdkUsage {
 }
 
 /**
- * Manages SDK sessions — Claude Code subprocesses with structured JSON streaming.
- * Parallel to SessionManager (PTY sessions). Does not use node-pty or xterm.
+ * Manages SDK sessions — Claude Code with structured JSON streaming.
+ *
+ * Each turn spawns a new `claude -p` subprocess (print mode is single-shot).
+ * Multi-turn uses `--resume <claudeSessionId>` to continue the conversation.
+ * The session stays alive across turns; the subprocess is per-turn.
  */
 export class SdkSessionManager extends EventEmitter {
 	private sessions = new Map<string, SdkSession>();
-	private processes = new Map<string, ChildProcess>();
-	private parsers = new Map<string, SdkEventParser>();
-	/** In-flight assistant message being streamed (assembled from content_block_delta events) */
+	private activeProcesses = new Map<string, ChildProcess>();
+	/** Base args from the agent profile (stream-json flags etc.) */
+	private sessionArgs = new Map<string, string[]>();
+	private sessionEnv = new Map<string, Record<string, string>>();
 	private streamingMessages = new Map<string, {blocks: Map<number, SdkContentBlock>; parentToolUseId: string | null}>();
 
 	getAllSessions(): SdkSession[] {
@@ -61,81 +63,21 @@ export class SdkSessionManager extends EventEmitter {
 		};
 
 		this.sessions.set(id, session);
-
-		const child = spawn('claude', args, {
-			cwd: worktreePath,
-			env: {...process.env, ...env},
-			stdio: ['pipe', 'pipe', 'pipe'],
-		});
-
-		if (!child.pid) {
-			session.state = 'error';
-			this.emit('sdkSessionStateChanged', session);
-			logger.error(`[SdkSessionManager] Failed to spawn claude subprocess for ${id}`);
-			return session;
-		}
-
-		logger.info(`[SdkSessionManager] Spawned claude SDK session ${id} (PID ${child.pid}) in ${worktreePath}`);
-		this.processes.set(id, child);
-
-		const parser = new SdkEventParser();
-		this.parsers.set(id, parser);
-
-		child.stdout?.on('data', (data: Buffer) => {
-			parser.write(data.toString());
-		});
-
-		child.stderr?.on('data', (data: Buffer) => {
-			const text = data.toString().trim();
-			if (text) logger.warn(`[SdkSessionManager] stderr (${id}): ${text.slice(0, 500)}`);
-		});
-
-		child.on('exit', (code, signal) => {
-			logger.info(`[SdkSessionManager] Session ${id} exited (code=${code}, signal=${signal})`);
-			parser.flush();
-			this.updateState(id, 'closed');
-			this.emit('sdkSessionExit', session);
-			this.processes.delete(id);
-			this.parsers.delete(id);
-			this.streamingMessages.delete(id);
-		});
-
-		parser.on('event', (event: SdkEvent) => {
-			session.lastActivity = new Date();
-			this.handleEvent(id, event);
-		});
-
-		// Send initial prompt after a short delay to let the process initialize
-		if (initialPrompt) {
-			const sendInitialPrompt = () => {
-				if (session.state === 'idle') {
-					this.sendMessage(id, initialPrompt);
-				} else {
-					// Wait for init event
-					const checkReady = () => {
-						if (session.state === 'idle') {
-							this.sendMessage(id, initialPrompt);
-						} else if (session.state !== 'closed' && session.state !== 'error') {
-							setTimeout(checkReady, 100);
-						}
-					};
-					setTimeout(checkReady, 100);
-				}
-			};
-			sendInitialPrompt();
-		}
+		this.sessionArgs.set(id, args);
+		if (env) this.sessionEnv.set(id, env);
 
 		this.emit('sdkSessionCreated', session);
+
+		// Spawn the first turn — if initialPrompt provided, use it; otherwise just init
+		const prompt = initialPrompt || 'You are ready. The user will send a message.';
+		this.spawnTurn(id, prompt);
+
 		return session;
 	}
 
 	sendMessage(sessionId: string, content: string): boolean {
-		const child = this.processes.get(sessionId);
 		const session = this.sessions.get(sessionId);
-		if (!child?.stdin || !session) return false;
-
-		const msg = JSON.stringify({type: 'user', content}) + '\n';
-		child.stdin.write(msg);
+		if (!session || session.state === 'busy' || session.state === 'closed') return false;
 
 		session.messages.push({
 			id: randomUUID(),
@@ -145,38 +87,32 @@ export class SdkSessionManager extends EventEmitter {
 		});
 
 		this.emit('sdkSessionData', session, {type: 'user_message', content});
+		this.spawnTurn(sessionId, content);
 		return true;
 	}
 
 	approveToolCall(sessionId: string): boolean {
-		const child = this.processes.get(sessionId);
 		const session = this.sessions.get(sessionId);
-		if (!child?.stdin || !session?.pendingApproval) return false;
-
-		// TODO: Determine the correct JSON format for tool approval in stream-json mode.
-		// For now, this is a placeholder — the actual approval mechanism needs investigation.
+		if (!session?.pendingApproval) return false;
 		logger.info(`[SdkSessionManager] Approving tool call ${session.pendingApproval.id} in ${sessionId}`);
 		session.pendingApproval = undefined;
 		return true;
 	}
 
 	rejectToolCall(sessionId: string): boolean {
-		const child = this.processes.get(sessionId);
 		const session = this.sessions.get(sessionId);
-		if (!child?.stdin || !session?.pendingApproval) return false;
-
+		if (!session?.pendingApproval) return false;
 		logger.info(`[SdkSessionManager] Rejecting tool call ${session.pendingApproval.id} in ${sessionId}`);
 		session.pendingApproval = undefined;
 		return true;
 	}
 
 	stopSession(sessionId: string): void {
-		const child = this.processes.get(sessionId);
+		const child = this.activeProcesses.get(sessionId);
 		if (child) {
 			child.kill('SIGTERM');
-			// Force kill after 5 seconds
 			setTimeout(() => {
-				if (this.processes.has(sessionId)) {
+				if (this.activeProcesses.has(sessionId)) {
 					child.kill('SIGKILL');
 				}
 			}, 5000);
@@ -188,6 +124,73 @@ export class SdkSessionManager extends EventEmitter {
 		for (const id of this.sessions.keys()) {
 			this.stopSession(id);
 		}
+	}
+
+	/** Spawn a single-turn subprocess for one prompt. */
+	private spawnTurn(sessionId: string, prompt: string): void {
+		const session = this.sessions.get(sessionId);
+		const baseArgs = this.sessionArgs.get(sessionId);
+		if (!session || !baseArgs) return;
+
+		// Kill any previous turn process
+		const existing = this.activeProcesses.get(sessionId);
+		if (existing) {
+			existing.kill('SIGTERM');
+			this.activeProcesses.delete(sessionId);
+		}
+
+		// Build args: base args + prompt + optional resume
+		const turnArgs = [...baseArgs];
+		if (session.claudeSessionId) {
+			turnArgs.push('--resume', session.claudeSessionId);
+		}
+		turnArgs.push(prompt);
+
+		const env = this.sessionEnv.get(sessionId);
+		logger.info(`[SdkSessionManager] Spawning turn for ${sessionId}: claude ${turnArgs.join(' ').slice(0, 200)}`);
+
+		const child = spawn('claude', turnArgs, {
+			cwd: session.worktreePath,
+			env: {...process.env, ...env},
+			stdio: ['pipe', 'pipe', 'pipe'],
+		});
+
+		if (!child.pid) {
+			this.updateState(sessionId, 'error');
+			logger.error(`[SdkSessionManager] Failed to spawn turn for ${sessionId}`);
+			return;
+		}
+
+		this.activeProcesses.set(sessionId, child);
+		this.updateState(sessionId, 'busy');
+
+		const parser = new SdkEventParser();
+
+		child.stdout?.on('data', (data: Buffer) => {
+			parser.write(data.toString());
+		});
+
+		child.stderr?.on('data', (data: Buffer) => {
+			const text = data.toString().trim();
+			if (text) logger.warn(`[SdkSessionManager] stderr (${sessionId}): ${text.slice(0, 500)}`);
+		});
+
+		child.on('exit', (code, signal) => {
+			logger.info(`[SdkSessionManager] Turn for ${sessionId} exited (code=${code}, signal=${signal})`);
+			parser.flush();
+			this.activeProcesses.delete(sessionId);
+			this.streamingMessages.delete(sessionId);
+			// Don't set closed — the session stays alive for more turns.
+			// Only set idle if it was busy (normal completion).
+			if (session.state === 'busy') {
+				this.updateState(sessionId, 'idle');
+			}
+		});
+
+		parser.on('event', (event: SdkEvent) => {
+			session.lastActivity = new Date();
+			this.handleEvent(sessionId, event);
+		});
 	}
 
 	private updateState(sessionId: string, state: SdkSessionState): void {
@@ -216,7 +219,6 @@ export class SdkSessionManager extends EventEmitter {
 				break;
 		}
 
-		// Forward raw event to API/Socket.IO layer
 		this.emit('sdkSessionData', session, event);
 	}
 
@@ -225,15 +227,17 @@ export class SdkSessionManager extends EventEmitter {
 		session.model = event.model;
 		session.tools = event.tools;
 
-		session.messages.push({
-			id: randomUUID(),
-			role: 'system',
-			content: [{type: 'system_info', text: `Session started`, model: event.model, sessionId: event.session_id}],
-			timestamp: Date.now(),
-		});
+		// Only add init message on first turn
+		if (session.messages.length === 0 || session.messages[0]?.role !== 'system') {
+			session.messages.unshift({
+				id: randomUUID(),
+				role: 'system',
+				content: [{type: 'system_info', text: 'Session started', model: event.model, sessionId: event.session_id}],
+				timestamp: Date.now(),
+			});
+		}
 
-		this.updateState(sessionId, 'idle');
-		logger.info(`[SdkSessionManager] Session ${sessionId} initialized (model=${event.model}, tools=${event.tools.length})`);
+		logger.info(`[SdkSessionManager] Session ${sessionId} initialized (model=${event.model}, claudeSession=${event.session_id})`);
 	}
 
 	private handleStreamEvent(sessionId: string, session: SdkSession, event: SdkStreamEvent): void {
@@ -267,9 +271,6 @@ export class SdkSessionManager extends EventEmitter {
 			if (block && delta.type === 'text_delta' && delta.text && (block.type === 'text' || block.type === 'thinking')) {
 				block.text += delta.text;
 			}
-			if (block && delta.type === 'input_json_delta' && delta.partial_json && block.type === 'tool_use') {
-				// Accumulate partial JSON for tool input — will be fully parsed from the assistant event
-			}
 		}
 	}
 
@@ -298,14 +299,14 @@ export class SdkSessionManager extends EventEmitter {
 	}
 
 	private handleResultEvent(sessionId: string, session: SdkSession, event: SdkResultEvent): void {
-		session.usage.totalCostUsd = event.total_cost_usd;
+		session.usage.totalCostUsd += event.total_cost_usd;
 		session.usage.turns = event.num_turns;
 
 		const usage = event.usage as Record<string, number>;
-		session.usage.inputTokens = usage['input_tokens'] ?? 0;
-		session.usage.outputTokens = usage['output_tokens'] ?? 0;
-		session.usage.cacheReadTokens = usage['cache_read_input_tokens'] ?? 0;
-		session.usage.cacheCreationTokens = usage['cache_creation_input_tokens'] ?? 0;
+		session.usage.inputTokens += usage['input_tokens'] ?? 0;
+		session.usage.outputTokens += usage['output_tokens'] ?? 0;
+		session.usage.cacheReadTokens += usage['cache_read_input_tokens'] ?? 0;
+		session.usage.cacheCreationTokens += usage['cache_creation_input_tokens'] ?? 0;
 
 		session.messages.push({
 			id: randomUUID(),

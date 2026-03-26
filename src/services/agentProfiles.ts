@@ -74,7 +74,7 @@ const PROFILES: Record<string, AgentConfig> = {
 		command: 'claude',
 		icon: 'claude',
 		sessionType: 'sdk',
-		baseArgs: ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages'],
+		baseArgs: ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages'],
 		promptArg: 'none',
 		options: [
 			{
