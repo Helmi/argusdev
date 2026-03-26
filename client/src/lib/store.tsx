@@ -1354,19 +1354,18 @@ export function AppProvider({children}: {children: ReactNode}) {
 		intent?: 'work' | 'review' | 'fix' | 'manual',
 	): Promise<boolean> => {
 		try {
-			const res = await apiFetch('/api/session/create-with-agent', {
+			// Route SDK agents to the SDK endpoint
+			const agent = agents.find(a => a.id === agentId);
+			const isSdk = (agent as unknown as Record<string, unknown> | undefined)?.sessionType === 'sdk';
+			const endpoint = isSdk ? '/api/sdk-session/create' : '/api/session/create-with-agent';
+			const body = isSdk
+				? {worktreePath: path, agentId, options: options || {}, sessionName, initialPrompt: promptTemplate}
+				: {path, agentId, options: options || {}, sessionName, taskListName, tdTaskId, promptTemplate, intent};
+
+			const res = await apiFetch(endpoint, {
 				method: 'POST',
 				headers: {'Content-Type': 'application/json'},
-				body: JSON.stringify({
-					path,
-					agentId,
-					options: options || {},
-					sessionName,
-					taskListName,
-					tdTaskId,
-					promptTemplate,
-					intent,
-				}),
+				body: JSON.stringify(body),
 			});
 			const data = await res.json();
 			if (!res.ok) {

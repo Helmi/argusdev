@@ -46,7 +46,7 @@ const DEFAULT_TD_CONFIG: Required<
 	injectTdUsage: true,
 };
 
-const CORE_DEFAULT_AGENT_IDS = ['claude', 'codex', 'gemini', 'pi', 'terminal'];
+const CORE_DEFAULT_AGENT_IDS = ['claude', 'claude-sdk', 'codex', 'gemini', 'pi', 'terminal'];
 
 function defaultAgents(): AgentConfig[] {
 	return getAgentProfilesByIds(CORE_DEFAULT_AGENT_IDS);
