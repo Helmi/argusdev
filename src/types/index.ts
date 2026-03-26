@@ -13,6 +13,7 @@ export type SessionState =
 
 export type StateDetectionStrategy =
 	| 'claude'
+	| 'claude-sdk'
 	| 'gemini'
 	| 'codex'
 	| 'cursor'
@@ -180,8 +181,120 @@ export interface AgentConfig {
 	promptArg?: string; // Startup prompt passing mode: positional (empty), flag (e.g. '--prompt'), or 'none'
 	prependCwd?: boolean; // Inject the worktree path as the first positional argument
 	detectionStrategy?: StateDetectionStrategy; // For state detection (agents only)
+	sessionType?: 'pty' | 'sdk'; // Session type: PTY terminal (default) or SDK subprocess with structured JSON
 	icon?: string; // Brand icon ID or generic Lucide icon name
 	iconColor?: string; // Hex color (only for generic icons)
+}
+
+// ============================================================================
+// SDK Session Types (structured JSON subprocess, not PTY)
+// ============================================================================
+
+/** State of an SDK session, derived from structured JSON events */
+export type SdkSessionState = 'connecting' | 'idle' | 'busy' | 'waiting_input' | 'closed' | 'error';
+
+/** A tool call pending user approval */
+export interface SdkPendingApproval {
+	id: string; // Tool use ID from the event
+	toolName: string;
+	input: Record<string, unknown>;
+	timestamp: number;
+}
+
+/** Accumulated cost/usage for an SDK session */
+export interface SdkUsage {
+	totalCostUsd: number;
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheCreationTokens: number;
+	turns: number;
+}
+
+/** A message in the SDK session conversation */
+export interface SdkMessage {
+	id: string;
+	role: 'user' | 'assistant' | 'system' | 'result';
+	content: SdkContentBlock[];
+	timestamp: number;
+	usage?: Partial<SdkUsage>;
+	costUsd?: number;
+}
+
+/** Content block within a message */
+export type SdkContentBlock =
+	| {type: 'text'; text: string}
+	| {type: 'thinking'; text: string}
+	| {type: 'tool_use'; id: string; name: string; input: Record<string, unknown>}
+	| {type: 'tool_result'; toolUseId: string; content: string; isError?: boolean}
+	| {type: 'system_info'; text: string; model?: string; sessionId?: string};
+
+// --- SDK Event Types (parsed from Claude CLI --output-format stream-json) ---
+
+export interface SdkSystemEvent {
+	type: 'system';
+	subtype: 'init';
+	session_id: string;
+	model: string;
+	tools: string[];
+	cwd: string;
+}
+
+export interface SdkStreamEvent {
+	type: 'stream_event';
+	session_id: string;
+	parent_tool_use_id: string | null;
+	event: {
+		type: 'message_start' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'message_delta' | 'message_stop';
+		index?: number;
+		content_block?: {type: string; text?: string; id?: string; name?: string};
+		delta?: {type: string; text?: string; stop_reason?: string; partial_json?: string};
+		message?: Record<string, unknown>;
+		usage?: Record<string, unknown>;
+	};
+}
+
+export interface SdkAssistantEvent {
+	type: 'assistant';
+	session_id: string;
+	message: {
+		role: 'assistant';
+		content: Array<{type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown>}>;
+		stop_reason: string | null;
+		usage?: Record<string, unknown>;
+	};
+}
+
+export interface SdkResultEvent {
+	type: 'result';
+	subtype: 'success' | 'error';
+	session_id: string;
+	result: string;
+	is_error: boolean;
+	duration_ms: number;
+	num_turns: number;
+	total_cost_usd: number;
+	usage: Record<string, unknown>;
+	stop_reason?: string;
+}
+
+export type SdkEvent = SdkSystemEvent | SdkStreamEvent | SdkAssistantEvent | SdkResultEvent;
+
+/** SDK session — parallel to Session (PTY) */
+export interface SdkSession {
+	id: string;
+	name?: string;
+	worktreePath: string;
+	agentId: string;
+	claudeSessionId?: string; // Claude's session_id from init event
+	state: SdkSessionState;
+	messages: SdkMessage[];
+	pendingApproval?: SdkPendingApproval;
+	usage: SdkUsage;
+	model?: string;
+	tools?: string[];
+	lastActivity: Date;
+	createdAt: Date;
 }
 
 /**

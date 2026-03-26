@@ -63,6 +63,10 @@ import {
 	toSessionUpdatePayload,
 	resolveSessionCreatedAtFromSource,
 } from './sessionStateMetadata.js';
+import {SdkSessionManager} from './sdkSessionManager.js';
+import type {SdkSession, SdkEvent} from '../types/index.js';
+
+const sdkSessionManager = new SdkSessionManager();
 import {checkForUpdate, getCachedUpdateCheck} from './versionCheckService.js';
 
 // --- Clipboard Image Paste Constants ---
@@ -916,6 +920,7 @@ export class APIServer {
 		this.setupRoutes();
 		this.setupSocketHandlers();
 		this.setupCoreListeners();
+		this.setupSdkListeners();
 	}
 
 	private setupRoutes() {
@@ -1789,8 +1794,26 @@ export class APIServer {
 
 		// --- Sessions ---
 		this.app.get('/api/sessions', async () => {
-			const sessions = globalSessionOrchestrator.getAllActiveSessions();
-			return sessions.map(toApiSessionPayload);
+			const ptySessions = globalSessionOrchestrator.getAllActiveSessions().map(s => ({
+				...toApiSessionPayload(s),
+				type: 'pty' as const,
+			}));
+			const sdkSessions = sdkSessionManager.getAllSessions()
+				.filter(s => s.state !== 'closed')
+				.map(s => ({
+					id: s.id,
+					name: s.name,
+					path: s.worktreePath,
+					state: s.state === 'connecting' ? 'busy' as const : s.state === 'closed' ? 'idle' as const : s.state as SessionState,
+					createdAt: Math.floor(s.createdAt.getTime() / 1000),
+					isActive: s.state !== 'closed' && s.state !== 'error',
+					agentId: s.agentId,
+					type: 'sdk' as const,
+					pid: 0,
+					autoApprovalFailed: false,
+					autoApprovalReason: undefined,
+				}));
+			return [...ptySessions, ...sdkSessions];
 		});
 
 		this.app.get<{
@@ -3289,6 +3312,97 @@ export class APIServer {
 			);
 			return {success: true};
 		});
+
+		// --- SDK Sessions ---
+
+		this.app.post<{Body: {worktreePath: string; agentId: string; options?: Record<string, boolean | string>; sessionName?: string; initialPrompt?: string}}>(
+			'/api/sdk-session/create',
+			async (request, reply) => {
+				const {worktreePath, agentId, options, sessionName, initialPrompt} = request.body;
+				if (!worktreePath || !agentId) {
+					return reply.code(400).send({error: 'worktreePath and agentId required'});
+				}
+
+				const agent = configurationManager.getAgentById(agentId);
+				if (!agent || agent.sessionType !== 'sdk') {
+					return reply.code(400).send({error: 'Agent is not an SDK session type'});
+				}
+
+				const args = configurationManager.buildAgentArgs(agent, options || {});
+				const fullArgs = [...(agent.baseArgs || []), ...args];
+				logger.info(`API: Creating SDK session for ${worktreePath} with agent ${agentId}, args: [${fullArgs.join(', ')}]`);
+
+				const session = sdkSessionManager.createSession(
+					worktreePath,
+					fullArgs,
+					undefined,
+					initialPrompt,
+					sessionName,
+				);
+
+				return {success: true, id: session.id, agentId};
+			},
+		);
+
+		this.app.post<{Body: {content: string}; Params: {id: string}}>(
+			'/api/sdk-session/:id/message',
+			async (request, reply) => {
+				const sent = sdkSessionManager.sendMessage(request.params.id, request.body.content);
+				if (!sent) return reply.code(404).send({error: 'SDK session not found or not writable'});
+				return {success: true};
+			},
+		);
+
+		this.app.post<{Params: {id: string}}>(
+			'/api/sdk-session/:id/approve',
+			async (request, reply) => {
+				const ok = sdkSessionManager.approveToolCall(request.params.id);
+				if (!ok) return reply.code(404).send({error: 'No pending approval'});
+				return {success: true};
+			},
+		);
+
+		this.app.post<{Params: {id: string}}>(
+			'/api/sdk-session/:id/reject',
+			async (request, reply) => {
+				const ok = sdkSessionManager.rejectToolCall(request.params.id);
+				if (!ok) return reply.code(404).send({error: 'No pending approval'});
+				return {success: true};
+			},
+		);
+
+		this.app.post<{Params: {id: string}}>(
+			'/api/sdk-session/:id/stop',
+			async (request, reply) => {
+				sdkSessionManager.stopSession(request.params.id);
+				return {success: true};
+			},
+		);
+
+		this.app.get<{Params: {id: string}}>(
+			'/api/sdk-session/:id/messages',
+			async (request, reply) => {
+				const session = sdkSessionManager.getSession(request.params.id);
+				if (!session) return reply.code(404).send({error: 'SDK session not found'});
+				return session.messages;
+			},
+		);
+
+		// Include SDK sessions in the main sessions listing
+		const originalSessionsRoute = this.app.get('/api/sdk-sessions', async () => {
+			return sdkSessionManager.getAllSessions().map(s => ({
+				id: s.id,
+				name: s.name,
+				path: s.worktreePath,
+				state: s.state === 'connecting' ? 'busy' : s.state === 'closed' ? 'idle' : s.state,
+				createdAt: Math.floor(s.createdAt.getTime() / 1000),
+				isActive: s.state !== 'closed' && s.state !== 'error',
+				agentId: s.agentId,
+				type: 'sdk' as const,
+				model: s.model,
+				usage: s.usage,
+			}));
+		});
 	}
 
 	private setupSocketHandlers() {
@@ -3405,16 +3519,27 @@ export class APIServer {
 					logger.info(`Client ${socketId} subscribed to session ${sessionId}`);
 
 					// Find session and send current history
-					const session =
+					const ptySession =
 						globalSessionOrchestrator.findSession(sessionId)?.session;
-					if (session) {
-						const fullHistory = Buffer.concat(session.outputHistory).toString(
+					if (ptySession) {
+						const fullHistory = Buffer.concat(ptySession.outputHistory).toString(
 							'utf8',
 						);
-						// Send as object to match new protocol
 						socket.emit('terminal_data', {
-							sessionId: session.id,
+							sessionId: ptySession.id,
 							data: fullHistory,
+						});
+					}
+
+					// Check for SDK session and send message history
+					const sdkSession = sdkSessionManager.getSession(sessionId);
+					if (sdkSession) {
+						socket.emit('sdk_session_history', {
+							sessionId: sdkSession.id,
+							messages: sdkSession.messages,
+							state: sdkSession.state,
+							usage: sdkSession.usage,
+							model: sdkSession.model,
 						});
 					}
 				});
@@ -3540,6 +3665,44 @@ export class APIServer {
 					this.socketSubscriptions.delete(socketId);
 					logger.info(`Client ${socketId} disconnected`);
 				});
+			});
+		});
+	}
+
+	private setupSdkListeners() {
+		sdkSessionManager.on('sdkSessionData', (session: SdkSession, event: SdkEvent) => {
+			this.io?.to(`session:${session.id}`).emit('sdk_session_event', {
+				sessionId: session.id,
+				event,
+			});
+		});
+
+		sdkSessionManager.on('sdkSessionStateChanged', (session: SdkSession) => {
+			this.io?.emit('session_update', {
+				id: session.id,
+				state: session.state === 'connecting' ? 'busy' : session.state === 'closed' ? 'idle' : session.state,
+				autoApprovalFailed: false,
+				autoApprovalReason: undefined,
+			});
+		});
+
+		sdkSessionManager.on('sdkSessionCreated', (session: SdkSession) => {
+			logger.info(`API: SDK session created: ${session.id}`);
+			this.io?.emit('session_update', {
+				id: session.id,
+				state: session.state,
+				autoApprovalFailed: false,
+				autoApprovalReason: undefined,
+			});
+		});
+
+		sdkSessionManager.on('sdkSessionExit', (session: SdkSession) => {
+			logger.info(`API: SDK session exited: ${session.id}`);
+			this.io?.emit('session_update', {
+				id: session.id,
+				state: 'idle',
+				autoApprovalFailed: false,
+				autoApprovalReason: undefined,
 			});
 		});
 	}
