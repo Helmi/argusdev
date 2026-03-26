@@ -12,6 +12,8 @@ export default defineConfig({
 			'**/node_modules/**',
 			'**/dist/**',
 			'.dev-projects/**',
+			'.agents/**',
+			'.claude/**',
 		],
 		coverage: {
 			reporter: ['text', 'json', 'html'],

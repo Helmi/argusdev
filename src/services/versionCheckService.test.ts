@@ -37,6 +37,7 @@ describe('versionCheckService', () => {
 		globalThis.fetch = mockFetch as unknown as typeof fetch
 		vi.resetModules()
 		versionCheckService = await import('./versionCheckService.js')
+		await versionCheckService._configManagerReady
 	})
 
 	afterEach(() => {

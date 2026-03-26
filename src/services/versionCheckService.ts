@@ -29,19 +29,20 @@ const require = createRequire(import.meta.url);
 // Lazy accessor — avoids importing configurationManager at module load time.
 // configurationManager instantiates itself (new ConfigurationManager()) when
 // its module is evaluated, which calls getConfigDir() and throws if
-// initializeConfigDir() hasn't been called yet. Using require() here defers
-// module evaluation to first call, by which point the CLI has already run
-// initializeConfigDir().
+// initializeConfigDir() hasn't been called yet. Dynamic import() defers
+// module evaluation; the resolved reference is cached for sync access.
+let _configManager: typeof ConfigManagerType | undefined;
+
+export const _configManagerReady = import('./configurationManager.js')
+	.then(mod => {
+		_configManager = mod.configurationManager;
+	})
+	.catch(() => {
+		// configurationManager not available (e.g. initializeConfigDir not yet called)
+	});
+
 function getConfigManager(): typeof ConfigManagerType | undefined {
-	try {
-		return (
-			require('./configurationManager.js') as {
-				configurationManager: typeof ConfigManagerType;
-			}
-		).configurationManager;
-	} catch {
-		return undefined;
-	}
+	return _configManager;
 }
 
 const DEFAULT_VERSION = '0.0.0';

@@ -111,8 +111,8 @@ describe('SessionManager - State Persistence', () => {
 		// Initial state should be busy
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
+		// Simulate output that would trigger idle state (↵ send is the Claude idle marker)
+		eventEmitter.emit('data', '↵ send');
 
 		// Advance time less than persistence duration (use async to process mutex updates)
 		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
@@ -136,8 +136,8 @@ describe('SessionManager - State Persistence', () => {
 		// Initial state should be busy
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
+		// Simulate output that would trigger idle state (↵ send is the Claude idle marker)
+		eventEmitter.emit('data', '↵ send');
 
 		// Advance time less than persistence duration (use async to process mutex updates)
 		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
@@ -164,8 +164,8 @@ describe('SessionManager - State Persistence', () => {
 		// Initial state should be busy
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
+		// Simulate output that would trigger idle state (↵ send is the Claude idle marker)
+		eventEmitter.emit('data', '↵ send');
 
 		// Advance time less than persistence duration (use async to process mutex updates)
 		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
@@ -192,8 +192,8 @@ describe('SessionManager - State Persistence', () => {
 		// Initial state should be busy
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
+		// Simulate output that would trigger idle state (↵ send is the Claude idle marker)
+		eventEmitter.emit('data', '↵ send');
 
 		// Advance time less than persistence duration (use async to process mutex updates)
 		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
@@ -225,8 +225,8 @@ describe('SessionManager - State Persistence', () => {
 		// Initial state should be busy
 		expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
-		// Try to change to idle
-		eventEmitter.emit('data', 'Some idle output\n');
+		// Try to change to idle (↵ send is the Claude idle marker)
+		eventEmitter.emit('data', '↵ send\n');
 
 		// Wait for detection but not full persistence (less than 200ms) (use async to process mutex updates)
 		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS); // 100ms
@@ -260,8 +260,8 @@ describe('SessionManager - State Persistence', () => {
 		);
 		const eventEmitter = eventEmitters.get('/test/path')!;
 
-		// Simulate output that would trigger idle state
-		eventEmitter.emit('data', 'Some output without busy indicators');
+		// Simulate output that would trigger idle state (↵ send is the Claude idle marker)
+		eventEmitter.emit('data', '↵ send');
 
 		// Advance time less than persistence duration (use async to process mutex updates)
 		await vi.advanceTimersByTimeAsync(STATE_CHECK_INTERVAL_MS * 2);
@@ -292,8 +292,8 @@ describe('SessionManager - State Persistence', () => {
 		expect(session2.stateMutex.getSnapshot().state).toBe('busy');
 
 		// Simulate different outputs for each session
-		// Session 1 goes to idle
-		eventEmitter1.emit('data', 'Idle output for session 1');
+		// Session 1 goes to idle (↵ send is the Claude idle marker)
+		eventEmitter1.emit('data', '↵ send');
 
 		// Session 2 goes to waiting_input
 		eventEmitter2.emit('data', 'Do you want to continue?\n❯ 1. Yes');
