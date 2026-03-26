@@ -3670,13 +3670,65 @@ export class APIServer {
 
 	private setupSdkListeners() {
 		sdkSessionManager.on('sdkSessionData', (session: SdkSession, event: SdkEvent) => {
-			this.io?.to(`session:${session.id}`).emit('sdk_session_event', {
-				sessionId: session.id,
-				event,
-			});
+			const room = `session:${session.id}`;
+
+			// Transform raw Claude events into frontend-expected format
+			if (event.type === 'system') {
+				this.io?.to(room).emit('sdk_session_event', {
+					sessionId: session.id,
+					type: 'model_info',
+					model: (event as SdkEvent & {model?: string}).model,
+				});
+			}
+
+			if (event.type === 'assistant') {
+				// Send the complete assistant message
+				const lastMsg = session.messages[session.messages.length - 1];
+				if (lastMsg) {
+					this.io?.to(room).emit('sdk_session_event', {
+						sessionId: session.id,
+						type: 'message',
+						message: lastMsg,
+					});
+				}
+			}
+
+			if (event.type === 'result') {
+				const lastMsg = session.messages[session.messages.length - 1];
+				if (lastMsg) {
+					this.io?.to(room).emit('sdk_session_event', {
+						sessionId: session.id,
+						type: 'message',
+						message: lastMsg,
+					});
+				}
+				this.io?.to(room).emit('sdk_session_event', {
+					sessionId: session.id,
+					type: 'usage_update',
+					usage: session.usage,
+				});
+			}
+
+			// User messages (from sendMessage)
+			if ((event as unknown as Record<string, unknown>)['type'] === 'user_message') {
+				const lastUserMsg = [...session.messages].reverse().find(m => m.role === 'user');
+				if (lastUserMsg) {
+					this.io?.to(room).emit('sdk_session_event', {
+						sessionId: session.id,
+						type: 'message',
+						message: lastUserMsg,
+					});
+				}
+			}
 		});
 
 		sdkSessionManager.on('sdkSessionStateChanged', (session: SdkSession) => {
+			// Send state change to subscribed clients
+			this.io?.to(`session:${session.id}`).emit('sdk_session_event', {
+				sessionId: session.id,
+				type: 'state_change',
+				state: session.state,
+			});
 			this.io?.emit('session_update', {
 				id: session.id,
 				state: session.state === 'connecting' ? 'busy' : session.state === 'closed' ? 'idle' : session.state,
