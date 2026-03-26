@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
 import { TerminalSession } from '@/components/TerminalSession'
+import { SdkSession } from '@/components/SdkSession'
 import { cn } from '@/lib/utils'
 
 export function SessionGrid() {
@@ -54,16 +55,26 @@ export function SessionGrid() {
         getGridClass(activeSessions.length)
       )}
     >
-      {activeSessions.map((session, index) => (
-        <TerminalSession
-          key={session!.id}
-          session={session!}
-          slotIndex={index}
-          isFocused={focusedSessionId === session!.id}
-          onFocus={handleFocus}
-          onRemove={handleRemove}
-        />
-      ))}
+      {activeSessions.map((session, index) =>
+        session!.type === 'sdk' ? (
+          <SdkSession
+            key={session!.id}
+            session={session!}
+            isFocused={focusedSessionId === session!.id}
+            onFocus={handleFocus}
+            onRemove={handleRemove}
+          />
+        ) : (
+          <TerminalSession
+            key={session!.id}
+            session={session!}
+            slotIndex={index}
+            isFocused={focusedSessionId === session!.id}
+            onFocus={handleFocus}
+            onRemove={handleRemove}
+          />
+        )
+      )}
     </div>
   )
 }

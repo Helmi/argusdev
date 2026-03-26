@@ -56,6 +56,33 @@ export interface Session {
 	endedAt?: number | null;
 	isActive: boolean;
 	agentId?: string;
+	type?: 'pty' | 'sdk';
+}
+
+// --- SDK Session Types ---
+
+export type SdkContentBlock =
+	| {type: 'text'; text: string}
+	| {type: 'thinking'; text: string}
+	| {type: 'tool_use'; id: string; name: string; input: Record<string, unknown>}
+	| {type: 'tool_result'; toolUseId: string; content: string; isError?: boolean}
+	| {type: 'system_info'; text: string; model?: string; sessionId?: string};
+
+export interface SdkMessage {
+	id: string;
+	role: 'user' | 'assistant' | 'system' | 'result';
+	content: SdkContentBlock[];
+	timestamp: number;
+	costUsd?: number;
+}
+
+export interface SdkUsage {
+	totalCostUsd: number;
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheCreationTokens: number;
+	turns: number;
 }
 
 export interface ConversationSession {
