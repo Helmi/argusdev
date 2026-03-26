@@ -210,16 +210,6 @@ export const TerminalSession = memo(function TerminalSession({
 		const currentSessionId = session.id;
 		const isDevMode = import.meta.env.DEV;
 
-		// Debug log in dev mode
-		if (isDevMode) {
-			console.log(
-				`[TerminalSession] Subscribing to session ${currentSessionId}, socket ${currentSocket.id}`,
-			);
-		}
-
-		// Subscribe to session
-		currentSocket.emit('subscribe_session', currentSessionId);
-
 		// Handle incoming data - uses ref for latest session.id check
 		const handleData = (msg: {sessionId: string; data: string} | string) => {
 			const content = typeof msg === 'string' ? msg : msg.data;
@@ -443,6 +433,28 @@ export const TerminalSession = memo(function TerminalSession({
 			);
 		};
 
+		const subscribeSession = () => {
+			if (isDevMode) {
+				console.log(
+					`[TerminalSession] Subscribing to session ${currentSessionId}, socket ${currentSocket.id}`,
+				);
+			}
+
+			currentSocket.emit('subscribe_session', currentSessionId);
+		};
+
+		const handleConnect = () => {
+			subscribeSession();
+			lastDimsRef.current.cols = 0;
+			lastDimsRef.current.rows = 0;
+			handleResize();
+		};
+
+		currentSocket.on('connect', handleConnect);
+		if (currentSocket.connected) {
+			handleConnect();
+		}
+
 		// Re-fit multiple times during startup because iOS Safari often reports
 		// unstable viewport/font metrics right after mount.
 		const initialFitTimers = [0, 220, 700, 1400].map(delay =>
@@ -514,6 +526,7 @@ export const TerminalSession = memo(function TerminalSession({
 			currentSocket.emit('unsubscribe_session', currentSessionId);
 
 			// Use captured references for cleanup to ensure correct socket/session
+			currentSocket.off('connect', handleConnect);
 			currentSocket.off('terminal_data', handleData);
 			currentSocket.off('image_path', handleImagePath);
 			initialFitTimers.forEach(timer => clearTimeout(timer));
