@@ -1,4 +1,4 @@
-import {spawnSync} from 'child_process';
+import {spawn, spawnSync} from 'child_process';
 import dgram from 'dgram';
 import dns from 'dns';
 import os from 'os';
@@ -64,6 +64,11 @@ export function getLocalHostname(
 			}
 		});
 	});
+}
+
+export function openBrowser(url: string): void {
+	const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+	spawn(cmd, [url], {stdio: 'ignore', detached: true}).unref();
 }
 
 export async function withNetworkLinks(

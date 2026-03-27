@@ -6,6 +6,7 @@ import {checkForUpdate} from '../../services/versionCheckService.js';
 import {
 	formatDaemonVersionHeader,
 	getProcessUptime,
+	openBrowser,
 	withNetworkLinks,
 } from './daemonUtils.js';
 
@@ -240,6 +241,11 @@ export async function runDaemonLifecycleCommand(
 				logFile: context.daemonLogPath,
 			},
 		});
+
+		if (result.started && result.webConfig.url) {
+			openBrowser(result.webConfig.url);
+		}
+
 		void checkForUpdate();
 		return 0;
 	}

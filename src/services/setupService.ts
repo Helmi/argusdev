@@ -515,7 +515,7 @@ export async function runSetup(
 	writeFileSync(configPath, JSON.stringify(config, null, 2));
 
 	console.log(`\nConfiguration saved to ${configPath}`);
-	console.log('\nSetup complete! Starting ArgusDev...');
+	console.log('\nSetup complete! Starting ArgusDev and opening your browser...');
 
 	return {
 		configPath,

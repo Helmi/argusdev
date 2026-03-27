@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { ThemeSelector } from '@/components/ThemeSelector'
 import { FontSelector } from '@/components/FontSelector'
 import { FontScaleControl } from '@/components/FontScaleControl'
-import { PanelLeft, Settings, Zap } from 'lucide-react'
+import { PanelLeft, Settings } from 'lucide-react'
 
 export function Header() {
   const { toggleSidebar, isDevMode, openSettings, updateInfo } = useAppStore()
@@ -24,7 +24,7 @@ export function Header() {
 
         {/* Logo */}
         <span className="text-lg font-bold tracking-tight text-foreground flex items-center">
-          Argus<Zap className="h-4 w-4 mx-0.5 text-yellow-500 fill-yellow-500" />Dev
+          ArgusDev
         </span>
 
         {/* DEV indicator */}
