@@ -151,7 +151,12 @@ export const TerminalSession = memo(function TerminalSession({
 	};
 	const fontFamily = fontFamilyMap[font] || fontFamilyMap.jetbrains;
 	const [isMaximized, setIsMaximized] = useState(false);
-	const [isScrolledUp, setIsScrolledUp] = useState(false);
+	const [isScrolledUp, setIsScrolledUpState] = useState(false);
+	const isScrolledUpRef = useRef(false);
+	const setIsScrolledUp = useCallback((value: boolean) => {
+		isScrolledUpRef.current = value;
+		setIsScrolledUpState(value);
+	}, []);
 	const terminalRef = useRef<HTMLDivElement>(null);
 	const xtermRef = useRef<XTerm | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
@@ -417,9 +422,20 @@ export const TerminalSession = memo(function TerminalSession({
 		termEl.addEventListener('pointerup', pointerUpHandler, { capture: true });
 		termEl.addEventListener('pointercancel', pointerUpHandler, { capture: true });
 
-		// Also check position when new content arrives
+		// Track when data arrives so we can auto-scroll ONLY if the user is at the bottom.
+		// Do NOT call checkScrollPosition here — it causes scroll jumps when the user
+		// is scrolled up reading output and new data arrives (e.g. AskUserQuestion).
 		const onWriteDisposable = term.onWriteParsed(() => {
-			checkScrollPosition();
+			// If user was at the bottom, keep them there by re-checking.
+			// If user was scrolled up, do nothing — preserve their position.
+			if (!isScrolledUpRef.current) {
+				// User was following output — ensure we stay at bottom
+				const buffer = term.buffer.active;
+				const isAtBottom = buffer.viewportY >= buffer.baseY;
+				if (!isAtBottom) {
+					term.scrollToBottom();
+				}
+			}
 		});
 
 		// Debounced resize handler - prevents feedback loop and API storm
@@ -608,24 +624,29 @@ export const TerminalSession = memo(function TerminalSession({
 		}
 	}, [font, fontFamily, debouncedFit, socket, session.id]);
 
-	// Focus terminal and scroll to bottom when isFocused becomes true
+	// Focus terminal when isFocused becomes true, only scroll to bottom if
+	// user was already at the bottom — prevents scroll jumps when regaining focus
+	// while reading scrollback (e.g. during AskUserQuestion tool execution).
 	useEffect(() => {
 		if (isFocused && xtermRef.current) {
-			// Set lock BEFORE scrolling to prevent race with checkScrollPosition
+			const wasScrolledUp = isScrolledUp;
+
 			isProgrammaticScrollRef.current = true;
 
-			// Small delay to ensure DOM is ready after state updates
 			requestAnimationFrame(() => {
 				xtermRef.current?.focus();
-				xtermRef.current?.scrollToBottom();
-				setIsScrolledUp(false);
 
-				// Clear lock after viewport settles (double rAF from here)
+				if (!wasScrolledUp) {
+					xtermRef.current?.scrollToBottom();
+					setIsScrolledUp(false);
+				}
+
 				requestAnimationFrame(() => {
 					isProgrammaticScrollRef.current = false;
 				});
 			});
 		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isFocused]);
 
 	const handleCopyOutput = () => {
