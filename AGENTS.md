@@ -1,6 +1,6 @@
 # ArgusDev
 
-A local development orchestrator for AI coding agent sessions. Runs as a **daemon** exposing a **Fastify API + Socket.IO** server, a **React WebUI**, and a **CLI** (`argusdev`). Manages PTY sessions for coding agents (Codex, Claude Code, Pi, etc.), git worktrees, and task integration via `td`.
+A local development orchestrator for AI coding agent sessions. Runs as a **daemon** exposing a **Fastify API + Socket.IO** server, a **React WebUI**, and a **CLI** (`argusdev`). Manages PTY sessions for coding agents (Codex, Claude Code, Pi, etc.), git worktrees, and optional task integration via `td`.
 
 Originally forked from [kbwo/ccmanager](https://github.com/kbwo/ccmanager) — codebases have fully diverged, no compatibility. Occasionally worth checking their `sessionManager` and `worktreeService` for bug fix ideas.
 
@@ -8,7 +8,7 @@ Originally forked from [kbwo/ccmanager](https://github.com/kbwo/ccmanager) — c
 
 ## Task Management
 
-Run `td usage --new-session` at conversation start (or after `/clear`). Use `td usage -q` for subsequent reads.
+Optional: If `td` is installed, run `td usage --new-session` at conversation start for task context. The app works without `td`.
 
 ## Safety Guardrails
 
@@ -50,7 +50,6 @@ PTY sessions die on backend restart during dev — just restart them.
 - **WebUI:** React SPA served by the daemon. Vite dev server proxies to backend in dev.
 - **CLI:** `argusdev` — thin client that talks to the daemon API. No business logic in CLI layer.
 - **Core Service:** Singleton (`coreService.ts`) orchestrating state across all interfaces.
-- **Legacy TUI:** Ink-based terminal UI exists but is being phased out.
 
 ## Coding Style
 
@@ -58,7 +57,7 @@ Prettier + ESLint enforced. Beyond that:
 
 ```ts
 // const over let — use ternaries or early returns
-const mode = headless ? 'daemon' : 'tui'
+const mode = headless ? 'daemon' : 'server'
 
 // Avoid else — prefer early returns
 function resolve(session: Session) {
