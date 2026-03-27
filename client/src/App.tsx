@@ -179,7 +179,7 @@ function NoTokenView() {
 
         {/* Footer */}
         <div className="mt-4 text-center text-[10px] text-[#2a4a2a] font-mono">
-          Coding Agent Control Desk v{import.meta.env.VITE_APP_VERSION || '0.0.0'}
+          ArgusDev v{import.meta.env.VITE_APP_VERSION || '0.0.0'}
         </div>
       </div>
     </div>
@@ -274,7 +274,7 @@ function InvalidTokenView() {
 
         {/* Footer */}
         <div className="mt-4 text-center text-[10px] text-[#4a2a2a] font-mono">
-          Coding Agent Control Desk v{import.meta.env.VITE_APP_VERSION || '0.0.0'}
+          ArgusDev v{import.meta.env.VITE_APP_VERSION || '0.0.0'}
         </div>
       </div>
     </div>
