@@ -1071,7 +1071,7 @@ export class APIServer {
 				return;
 			}
 
-			// Allow API access token header (used by trusted local TUI clients)
+			// Allow API access token header (used by trusted local CLI clients)
 			const configuredAccessToken = configurationManager.getAccessToken();
 			const accessTokenHeader = request.headers['x-access-token'];
 			const providedAccessToken = Array.isArray(accessTokenHeader)

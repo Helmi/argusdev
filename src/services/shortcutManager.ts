@@ -161,8 +161,7 @@ export class ShortcutManager {
 
 		// Check modifiers
 		if (shortcut.ctrl !== key.ctrl) return false;
-		// Note: ink's Key type doesn't support alt or shift modifiers
-		// so we can't check them here. For now, we'll only support ctrl modifier
+		// Only ctrl modifier is supported for shortcuts currently
 		if (shortcut.alt || shortcut.shift) return false;
 
 		// Check key

@@ -67,7 +67,7 @@ describe('daemonControl', () => {
 		);
 	});
 
-	it('removes stale PID and fails in tui-only mode when daemon is missing', async () => {
+	it('removes stale PID and fails when daemon is missing and autoStart is false', async () => {
 		const removePidFile = vi.fn(async () => {});
 
 		await expect(
