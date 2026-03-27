@@ -8,7 +8,7 @@ ArgusDev lets you run multiple AI coding assistant sessions in parallel — Clau
 
 ## Features
 
-- **WebUI + TUI** - Full web interface alongside the terminal UI
+- **WebUI** - Full web interface for managing sessions
 - **Multi-agent** - Claude Code, Gemini CLI, Codex CLI, GitHub Copilot, Cursor
 - **Multi-project** - Manage multiple repositories from one interface
 - **Git worktree integration** - Create, merge, and delete worktrees without leaving the app

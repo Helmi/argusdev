@@ -21,7 +21,7 @@ import {
 } from './utils/daemonLifecycle.js';
 import {
 	buildDaemonWebConfig,
-	ensureDaemonForTui,
+	ensureDaemon,
 	spawnDetachedDaemon,
 	waitForDaemonApiReady,
 	waitForDaemonPid,
@@ -74,8 +74,7 @@ const cli = meow(
     $ argusdev approve <id>         Alias for argusdev ui approve ... (stub)
     $ argusdev notify <msg>         Alias for argusdev ui notify ... (stub)
     $ argusdev restart [--force]    Restart daemon (preserve sessions by default)
-    $ argusdev tui                  Launch TUI (daemon must already be running)
-    $ argusdev daemon               Run daemon in foreground (for service managers)
+$ argusdev daemon               Run daemon in foreground (for service managers)
     $ argusdev setup                Run first-time setup wizard
     $ argusdev add [path]           Add a project (alias for 'argusdev project add')
     $ argusdev remove <path>        Remove a project (alias for 'argusdev project remove')
@@ -151,8 +150,7 @@ const cli = meow(
     $ argusdev focus session-123      # Alias for ui focus
     $ argusdev stop                   # Stop daemon and preserve sessions for recovery
     $ argusdev stop --force           # Stop daemon and terminate active sessions
-    $ argusdev tui                    # Launch TUI (requires running daemon)
-    $ argusdev daemon                 # Foreground daemon mode for systemd/launchd
+$ argusdev daemon                 # Foreground daemon mode for systemd/launchd
     $ argusdev setup --port 8080      # Setup with custom port
     $ argusdev add                    # Add current directory as project
     $ argusdev add /path/to/project   # Add specific project
@@ -277,7 +275,6 @@ const subcommand =
 		? 'daemon'
 		: (rawSubcommand ?? 'start');
 const isDaemonMode = subcommand === 'daemon';
-const isTuiOnlyMode = subcommand === 'tui';
 
 // Handle setup subcommand BEFORE importing services (which auto-create config)
 if (subcommand === 'setup') {
@@ -330,7 +327,6 @@ const knownCommands = new Set([
 	...getRegisteredCommands(),
 	'setup',
 	'daemon',
-	'tui',
 ]);
 
 if (subcommand && !knownCommands.has(subcommand)) {
@@ -359,7 +355,6 @@ if (subcommand && !knownCommands.has(subcommand)) {
 			'  argusdev project ...   Project subcommands',
 			'  argusdev auth <cmd>    Manage WebUI auth',
 			'  argusdev worktree <cmd> Manage worktrees via daemon API',
-			'  argusdev tui           Launch TUI (daemon required)',
 			'  argusdev daemon        Run API server in foreground',
 			'  argusdev              Start daemon in background',
 		],
@@ -389,7 +384,6 @@ if (subcommand && !knownCommands.has(subcommand)) {
 					'project',
 					'auth',
 					'worktree',
-					'tui',
 					'daemon',
 				],
 			},
@@ -531,7 +525,7 @@ const commandContext: CliCommandContext = {
 		},
 		control: {
 			buildDaemonWebConfig,
-			ensureDaemonForTui,
+			ensureDaemon,
 			spawnDetachedDaemon,
 			waitForDaemonPid,
 			waitForDaemonApiReady,
@@ -544,17 +538,18 @@ if (commandResult !== undefined) {
 	process.exit(commandResult);
 }
 
-// If no daemon mode, continue to TUI - check TTY
-if (!isDaemonMode && (!process.stdin.isTTY || !process.stdout.isTTY)) {
+// Only daemon foreground mode reaches here — all other commands are registered
+if (!isDaemonMode) {
 	formatter.writeError({
 		text: [
-			'Error: argusdev must be run in an interactive terminal (TTY)',
+			`Unknown command mode: ${subcommand}`,
 			'Use `argusdev start` to run daemon in background',
+			'Use `argusdev daemon` to run daemon in foreground',
 		],
 		data: {
 			ok: false,
 			error: {
-				message: 'argusdev must be run in an interactive terminal (TTY)',
+				message: `Unknown command mode: ${subcommand}`,
 			},
 		},
 	});
@@ -566,204 +561,123 @@ worktreeConfigManager.initialize();
 
 let webConfig: DaemonWebConfig | undefined;
 
-if (isDaemonMode) {
-	try {
-		const result = await apiServer.start(
-			port,
-			'0.0.0.0',
-			devModeActive,
-			!isPortConfigured,
-		);
-		const actualPort = result.port;
+try {
+	const result = await apiServer.start(
+		port,
+		'0.0.0.0',
+		devModeActive,
+		!isPortConfigured,
+	);
+	const actualPort = result.port;
 
-		webConfig = await withNetworkLinks(
-			{
-				url:
-					result.address.replace('0.0.0.0', 'localhost') +
-					(accessToken ? `/${accessToken}` : ''),
-				port: actualPort,
-				configDir,
-				isCustomConfigDir: customConfigDir,
-				isDevMode: devModeActive,
-			},
-			accessToken,
-		);
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		formatter.writeError({
-			text: [`Failed to start daemon API server: ${message}`],
-			data: {
-				ok: false,
-				command: 'daemon',
-				error: {
-					message,
-				},
-			},
-		});
-		process.exit(1);
-	}
-} else {
-	try {
-		const daemonConnection = await ensureDaemonForTui({
+	webConfig = await withNetworkLinks(
+		{
+			url:
+				result.address.replace('0.0.0.0', 'localhost') +
+				(accessToken ? `/${accessToken}` : ''),
+			port: actualPort,
 			configDir,
-			port,
-			accessToken,
 			isCustomConfigDir: customConfigDir,
 			isDevMode: devModeActive,
-			autoStart: !isTuiOnlyMode,
-		});
-		webConfig = await withNetworkLinks(daemonConnection.webConfig, accessToken);
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		const prefix = isTuiOnlyMode
-			? 'Failed to connect TUI to daemon'
-			: 'Failed to start or connect to daemon';
-		formatter.writeError({
-			text: [`${prefix}: ${message}`],
-			data: {
-				ok: false,
-				command: subcommand,
-				error: {
-					message: `${prefix}: ${message}`,
-				},
-			},
-		});
-		process.exit(1);
-	}
-}
-
-// Prepare devcontainer config
-const devcontainerConfig =
-	parsedCliArgs.flags.devcUpCommand && parsedCliArgs.flags.devcExecCommand
-		? {
-				upCommand: parsedCliArgs.flags.devcUpCommand,
-				execCommand: parsedCliArgs.flags.devcExecCommand,
-			}
-		: undefined;
-
-// Pass config to App
-const appProps = {
-	...(devcontainerConfig ? {devcontainerConfig} : {}),
-	webConfig,
-};
-
-// In daemon mode, run API server only without TUI
-if (isDaemonMode) {
-	const daemonPid = process.pid;
-
-	try {
-		await prepareDaemonPidFile(daemonPidFilePath, daemonPid);
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		formatter.writeError({
-			text: [`Failed to initialize daemon PID file: ${message}`],
-			data: {
-				ok: false,
-				command: 'daemon',
-				error: {
-					message,
-				},
-			},
-		});
-		process.exit(1);
-	}
-
-	formatter.write({
-		text: [
-			'ArgusDev daemon started',
-			`Local URL:    ${webConfig?.url || `http://localhost:${port}`}`,
-			`Token:        ${accessToken || '(none configured)'}`,
-			`External URL: ${webConfig?.externalUrl || '(unavailable)'}`,
-			`PID:          ${daemonPid}`,
-			`Config Dir:   ${configDir}`,
-			`PID File:     ${daemonPidFilePath}`,
-			'',
-			'Use SIGTERM or Ctrl+C to stop',
-		],
+		},
+		accessToken,
+	);
+} catch (error) {
+	const message = error instanceof Error ? error.message : String(error);
+	formatter.writeError({
+		text: [`Failed to start daemon API server: ${message}`],
 		data: {
-			ok: true,
+			ok: false,
 			command: 'daemon',
-			pid: daemonPid,
-			webConfig,
-			accessToken,
-			configDir,
-			pidFile: daemonPidFilePath,
+			error: {
+				message,
+			},
 		},
 	});
+	process.exit(1);
+}
 
-	let isShuttingDown = false;
-	const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
-		if (isShuttingDown) {
-			return;
-		}
-		isShuttingDown = true;
-		console.log(`\nReceived ${signal}, shutting down...`);
+const daemonPid = process.pid;
 
-		// Stop file watchers
-		try {
-			fileWatcherService.stopAll();
-		} catch (_error) {
-			// ignore watcher cleanup errors
-		}
-
-		try {
-			// Stop API server and cleanup resources (TD watcher, sockets, etc.)
-			await apiServer.stop();
-		} catch (_error) {
-			// ignore stop errors during shutdown
-		}
-
-		try {
-			// Intentionally avoid force-destroying sessions here.
-			// Startup rehydration recovers active sessions after daemon restarts.
-			await cleanupDaemonPidFile(daemonPidFilePath, daemonPid);
-		} catch (_error) {
-			// ignore cleanup errors during shutdown
-		}
-		process.exit(0);
-	};
-
-	process.on('SIGINT', () => {
-		void shutdown('SIGINT');
-	});
-
-	process.on('SIGTERM', () => {
-		void shutdown('SIGTERM');
-	});
-} else {
-	if (!webConfig) {
-		formatter.writeError({
-			text: ['Failed to configure TUI daemon connection'],
-			data: {
-				ok: false,
-				error: {
-					message: 'Failed to configure TUI daemon connection',
-				},
+try {
+	await prepareDaemonPidFile(daemonPidFilePath, daemonPid);
+} catch (error) {
+	const message = error instanceof Error ? error.message : String(error);
+	formatter.writeError({
+		text: [`Failed to initialize daemon PID file: ${message}`],
+		data: {
+			ok: false,
+			command: 'daemon',
+			error: {
+				message,
 			},
-		});
-		process.exit(1);
+		},
+	});
+	process.exit(1);
+}
+
+formatter.write({
+	text: [
+		'ArgusDev daemon started',
+		`Local URL:    ${webConfig?.url || `http://localhost:${port}`}`,
+		`Token:        ${accessToken || '(none configured)'}`,
+		`External URL: ${webConfig?.externalUrl || '(unavailable)'}`,
+		`PID:          ${daemonPid}`,
+		`Config Dir:   ${configDir}`,
+		`PID File:     ${daemonPidFilePath}`,
+		'',
+		'Use SIGTERM or Ctrl+C to stop',
+	],
+	data: {
+		ok: true,
+		command: 'daemon',
+		pid: daemonPid,
+		webConfig,
+		accessToken,
+		configDir,
+		pidFile: daemonPidFilePath,
+	},
+});
+
+let isShuttingDown = false;
+const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
+	if (isShuttingDown) {
+		return;
+	}
+	isShuttingDown = true;
+	console.log(`\nReceived ${signal}, shutting down...`);
+
+	// Stop file watchers
+	try {
+		fileWatcherService.stopAll();
+	} catch (_error) {
+		// ignore watcher cleanup errors
 	}
 
-	// Normal TUI mode - import ink and React only when needed
-	const {default: React} = await import('react');
-	const {render} = await import('ink');
-	const {default: App} = await import('./components/App.js');
+	try {
+		// Stop API server and cleanup resources (TD watcher, sockets, etc.)
+		await apiServer.stop();
+	} catch (_error) {
+		// ignore stop errors during shutdown
+	}
 
-	const app = render(React.createElement(App, appProps));
+	try {
+		// Intentionally avoid force-destroying sessions here.
+		// Startup rehydration recovers active sessions after daemon restarts.
+		await cleanupDaemonPidFile(daemonPidFilePath, daemonPid);
+	} catch (_error) {
+		// ignore cleanup errors during shutdown
+	}
+	process.exit(0);
+};
 
-	// Clean up sessions on exit
-	process.on('SIGINT', () => {
-		globalSessionOrchestrator.destroyAllSessions();
-		app.unmount();
-		process.exit(0);
-	});
+process.on('SIGINT', () => {
+	void shutdown('SIGINT');
+});
 
-	process.on('SIGTERM', () => {
-		globalSessionOrchestrator.destroyAllSessions();
-		app.unmount();
-		process.exit(0);
-	});
-}
+process.on('SIGTERM', () => {
+	void shutdown('SIGTERM');
+});
 
 // Export for testing
 export const parsedArgs = cli;

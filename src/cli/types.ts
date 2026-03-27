@@ -87,7 +87,7 @@ export interface DaemonControlAdapter {
 		isCustomConfigDir: boolean;
 		isDevMode: boolean;
 	}): DaemonWebConfig;
-	ensureDaemonForTui(params: {
+	ensureDaemon(params: {
 		configDir: string;
 		port: number;
 		accessToken?: string;

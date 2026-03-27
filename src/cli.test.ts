@@ -189,7 +189,7 @@ describe('CLI', () => {
 
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -418,7 +418,7 @@ describe('CLI', () => {
 			const spawnDetachedDaemon = vi.fn(() => ({pid: 4242, unref: vi.fn()}));
 			const waitForDaemonPid = vi.fn(async () => 4242);
 			const waitForDaemonApiReady = vi.fn(async () => {});
-			const ensureDaemonForTui = vi.fn();
+			const ensureDaemon = vi.fn();
 			const buildDaemonWebConfig = vi.fn(() => ({
 				url: 'http://127.0.0.1:3000/token',
 				port: 3000,
@@ -436,7 +436,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig,
-				ensureDaemonForTui,
+				ensureDaemon,
 				spawnDetachedDaemon,
 				waitForDaemonPid,
 				waitForDaemonApiReady,
@@ -462,7 +462,7 @@ describe('CLI', () => {
 					deadline: expect.any(Number),
 					pollIntervalMs: 200,
 				});
-				expect(ensureDaemonForTui).not.toHaveBeenCalled();
+				expect(ensureDaemon).not.toHaveBeenCalled();
 			} finally {
 				processExitSpy.mockRestore();
 			}
@@ -495,7 +495,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig,
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon,
 				waitForDaemonPid,
 				waitForDaemonApiReady,
@@ -540,7 +540,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -612,7 +612,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -664,7 +664,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig,
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -709,7 +709,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -767,7 +767,7 @@ describe('CLI', () => {
 					isCustomConfigDir: false,
 					isDevMode: false,
 				})),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon,
 				waitForDaemonPid,
 				waitForDaemonApiReady,
@@ -849,7 +849,7 @@ describe('CLI', () => {
 					isCustomConfigDir: false,
 					isDevMode: false,
 				})),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon,
 				waitForDaemonPid,
 				waitForDaemonApiReady,
@@ -879,65 +879,6 @@ describe('CLI', () => {
 			}
 		});
 
-		it('keeps `argusdev tui` daemon-required behavior', async () => {
-			process.argv = ['node', '/tmp/unified-entry.tsx', 'tui'];
-			Object.defineProperty(process.stdin, 'isTTY', {
-				value: true,
-				configurable: true,
-			});
-			Object.defineProperty(process.stdout, 'isTTY', {
-				value: true,
-				configurable: true,
-			});
-			setupCommonMocks();
-
-			const ensureDaemonForTui = vi.fn(async () => {
-				throw new Error('No running ArgusDev daemon found');
-			});
-
-			vi.doMock('./utils/daemonLifecycle.js', () => ({
-				prepareDaemonPidFile: vi.fn(),
-				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
-				readDaemonPidFile: vi.fn(),
-				isProcessRunning: vi.fn(),
-			}));
-			vi.doMock('./utils/daemonControl.js', () => ({
-				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui,
-				spawnDetachedDaemon: vi.fn(),
-				waitForDaemonPid: vi.fn(),
-				waitForDaemonApiReady: vi.fn(),
-			}));
-
-			const consoleErrorSpy = vi
-				.spyOn(console, 'error')
-				.mockImplementation(() => {});
-			const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(((
-				code?: number,
-			) => {
-				throw new Error(`exit:${code ?? 0}`);
-			}) as never);
-
-			try {
-				await expect(import('./cli.js')).rejects.toThrow('exit:1');
-				expect(ensureDaemonForTui).toHaveBeenCalledWith({
-					configDir: '/tmp/argusdev-test',
-					port: 3000,
-					accessToken: 'token',
-					isCustomConfigDir: false,
-					isDevMode: false,
-					autoStart: false,
-				});
-				expect(consoleErrorSpy).toHaveBeenCalledWith(
-					'Failed to connect TUI to daemon: No running ArgusDev daemon found',
-				);
-			} finally {
-				consoleErrorSpy.mockRestore();
-				processExitSpy.mockRestore();
-			}
-		});
-
 		it('supports `argusdev status --sessions --json`', async () => {
 			process.argv = [
 				'node',
@@ -963,7 +904,7 @@ describe('CLI', () => {
 					isCustomConfigDir: false,
 					isDevMode: false,
 				})),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -1052,7 +993,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -1154,7 +1095,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -1236,7 +1177,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -1323,7 +1264,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -1385,7 +1326,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),
@@ -1463,7 +1404,7 @@ describe('CLI', () => {
 			}));
 			vi.doMock('./utils/daemonControl.js', () => ({
 				buildDaemonWebConfig: vi.fn(),
-				ensureDaemonForTui: vi.fn(),
+				ensureDaemon: vi.fn(),
 				spawnDetachedDaemon: vi.fn(),
 				waitForDaemonPid: vi.fn(),
 				waitForDaemonApiReady: vi.fn(),

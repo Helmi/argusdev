@@ -1,6 +1,20 @@
 import {ShortcutKey, ShortcutConfig} from '../types/index.js';
-import {Key} from 'ink';
 import {configurationManager} from './configurationManager.js';
+
+interface Key {
+	upArrow: boolean;
+	downArrow: boolean;
+	leftArrow: boolean;
+	rightArrow: boolean;
+	return: boolean;
+	escape: boolean;
+	ctrl: boolean;
+	shift: boolean;
+	tab: boolean;
+	backspace: boolean;
+	delete: boolean;
+	meta: boolean;
+}
 
 export class ShortcutManager {
 	private reservedKeys: ShortcutKey[] = [

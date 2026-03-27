@@ -20,7 +20,7 @@ export interface DaemonWebConfig {
 	isDevMode: boolean;
 }
 
-export interface EnsureDaemonForTuiOptions {
+export interface EnsureDaemonOptions {
 	configDir: string;
 	port: number;
 	accessToken?: string;
@@ -51,7 +51,7 @@ interface DaemonControlDependencies {
 	now: () => number;
 }
 
-export interface EnsureDaemonForTuiResult {
+export interface EnsureDaemonResult {
 	webConfig: DaemonWebConfig;
 	pidFilePath: string;
 	pid?: number;
@@ -225,10 +225,10 @@ export async function waitForDaemonApiReady(params: {
 	);
 }
 
-export async function ensureDaemonForTui(
-	options: EnsureDaemonForTuiOptions,
+export async function ensureDaemon(
+	options: EnsureDaemonOptions,
 	dependencies?: Partial<DaemonControlDependencies>,
-): Promise<EnsureDaemonForTuiResult> {
+): Promise<EnsureDaemonResult> {
 	const deps = createDaemonControlDependencies(dependencies);
 	const timeoutMs = options.timeoutMs ?? DEFAULT_READY_TIMEOUT_MS;
 	const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;

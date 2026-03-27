@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {join} from 'path';
-import {buildDaemonWebConfig, ensureDaemonForTui} from './daemonControl.js';
+import {buildDaemonWebConfig, ensureDaemon} from './daemonControl.js';
 
 describe('daemonControl', () => {
 	const originalArgv = [...process.argv];
@@ -34,7 +34,7 @@ describe('daemonControl', () => {
 			async () => new globalThis.Response('{}', {status: 200}),
 		);
 
-		const result = await ensureDaemonForTui(
+		const result = await ensureDaemon(
 			{
 				configDir: '/tmp/argusdev',
 				port: 3000,
@@ -71,7 +71,7 @@ describe('daemonControl', () => {
 		const removePidFile = vi.fn(async () => {});
 
 		await expect(
-			ensureDaemonForTui(
+			ensureDaemon(
 				{
 					configDir: '/tmp/argusdev',
 					port: 3000,
@@ -107,7 +107,7 @@ describe('daemonControl', () => {
 			async () => new globalThis.Response('{}', {status: 200}),
 		);
 
-		const result = await ensureDaemonForTui(
+		const result = await ensureDaemon(
 			{
 				configDir: '/tmp/argusdev',
 				port: 3999,
@@ -159,7 +159,7 @@ describe('daemonControl', () => {
 			async () => new globalThis.Response('{}', {status: 200}),
 		);
 
-		const result = await ensureDaemonForTui(
+		const result = await ensureDaemon(
 			{
 				configDir: '/tmp/argusdev',
 				port: 3000,
@@ -208,7 +208,7 @@ describe('daemonControl', () => {
 			async () => new globalThis.Response('{}', {status: 200}),
 		);
 
-		const result = await ensureDaemonForTui(
+		const result = await ensureDaemon(
 			{
 				configDir: '/tmp/argusdev',
 				port: 4001,
