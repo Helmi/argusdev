@@ -22,13 +22,13 @@ describe('apiClient', () => {
 		expect(resolved.accessToken).toBe('token-123');
 	});
 
-	it('prefers CACD_PORT over config port when resolving API config', () => {
+	it('prefers ARGUSDEV_PORT over config port when resolving API config', () => {
 		const resolved = resolveDaemonApiConfig({
 			config: {
 				port: 3000,
 			},
 			env: {
-				CACD_PORT: '5151',
+				ARGUSDEV_PORT: '5151',
 			} as NodeJS.ProcessEnv,
 		});
 
@@ -100,7 +100,7 @@ describe('apiClient', () => {
 		});
 
 		await expect(client.get('/api/state')).rejects.toThrow(
-			'Unable to connect to CACD daemon at http://localhost:3333. Is the daemon running? Try `cacd start`.',
+			'Unable to connect to ArgusDev daemon at http://localhost:3333. Is the daemon running? Try `argusdev start`.',
 		);
 	});
 

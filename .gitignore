@@ -7,7 +7,7 @@ ui-reference/
 .ui-reference/
 
 # Dev mode local config directory
-.cacd-dev/
+.argusdev-dev/
 
 # Dev test projects
 .dev-projects/

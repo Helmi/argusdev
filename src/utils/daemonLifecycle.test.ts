@@ -12,7 +12,7 @@ describe('daemonLifecycle', () => {
 	let testDir: string | undefined;
 
 	const createPidFilePath = async (): Promise<string> => {
-		testDir = await mkdtemp(join(tmpdir(), 'cacd-daemon-pid-'));
+		testDir = await mkdtemp(join(tmpdir(), 'argusdev-daemon-pid-'));
 		return join(testDir, 'daemon.pid');
 	};
 

@@ -54,9 +54,9 @@ function normalizeApiError(error: unknown): Error {
 			);
 		}
 
-		if (error.message.includes('Unable to connect to CACD daemon at')) {
+		if (error.message.includes('Unable to connect to ArgusDev daemon at')) {
 			return new Error(
-				'No running CA⚡CD daemon found. Start it with `cacd start`.',
+				'No running ArgusDev daemon found. Start it with `argusdev start`.',
 			);
 		}
 
@@ -181,7 +181,7 @@ async function runWorktreeCreateCommand(
 		context.formatter.writeError({
 			text: [
 				'Error: Missing branch. Provide --branch <name> or --task <td-task-id>.',
-				'Usage: cacd worktree create [--branch <name>] [--project <path>] [--task <td-task-id>]',
+				'Usage: argusdev worktree create [--branch <name>] [--project <path>] [--task <td-task-id>]',
 			],
 			data: {
 				ok: false,
@@ -190,7 +190,7 @@ async function runWorktreeCreateCommand(
 					message:
 						'Missing branch. Provide --branch <name> or --task <td-task-id>.',
 					usage:
-						'cacd worktree create [--branch <name>] [--project <path>] [--task <td-task-id>]',
+						'argusdev worktree create [--branch <name>] [--project <path>] [--task <td-task-id>]',
 				},
 			},
 		});
@@ -431,14 +431,14 @@ async function runWorktreeDeleteCommand(
 		context.formatter.writeError({
 			text: [
 				'Error: Missing worktree path',
-				'Usage: cacd worktree delete <path>',
+				'Usage: argusdev worktree delete <path>',
 			],
 			data: {
 				ok: false,
 				command: 'worktree delete',
 				error: {
 					message: 'Missing worktree path',
-					usage: 'cacd worktree delete <path>',
+					usage: 'argusdev worktree delete <path>',
 				},
 			},
 		});
@@ -485,14 +485,14 @@ async function runWorktreeMergeCommand(
 		context.formatter.writeError({
 			text: [
 				'Error: Missing worktree path',
-				'Usage: cacd worktree merge <path> [--target <branch>]',
+				'Usage: argusdev worktree merge <path> [--target <branch>]',
 			],
 			data: {
 				ok: false,
 				command: 'worktree merge',
 				error: {
 					message: 'Missing worktree path',
-					usage: 'cacd worktree merge <path> [--target <branch>]',
+					usage: 'argusdev worktree merge <path> [--target <branch>]',
 				},
 			},
 		});
@@ -624,10 +624,10 @@ export async function runWorktreeCommand(
 		text: [
 			`Unknown worktree command: ${action}`,
 			'Available worktree commands:',
-			'  cacd worktree create [--branch <name>] [--project <path>] [--task <td-task-id>]',
-			'  cacd worktree list [--project <path>]',
-			'  cacd worktree delete <path>',
-			'  cacd worktree merge <path> [--target <branch>]',
+			'  argusdev worktree create [--branch <name>] [--project <path>] [--task <td-task-id>]',
+			'  argusdev worktree list [--project <path>]',
+			'  argusdev worktree delete <path>',
+			'  argusdev worktree merge <path> [--target <branch>]',
 		],
 		data: {
 			ok: false,

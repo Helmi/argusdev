@@ -25,7 +25,7 @@ function isFallbackEligibleApiError(error: unknown): boolean {
 		return false;
 	}
 
-	return error.message.includes('Unable to connect to CACD daemon at');
+	return error.message.includes('Unable to connect to ArgusDev daemon at');
 }
 
 function toErrorMessage(error: unknown): string {
@@ -75,8 +75,8 @@ function writeProjectListOutput(
 				'No projects tracked yet.',
 				'',
 				'Add a project with:',
-				'  cacd add .              # Add current directory',
-				'  cacd project add /path/to/repo',
+				'  argusdev add .              # Add current directory',
+				'  argusdev project add /path/to/repo',
 			],
 			data: {
 				ok: true,
@@ -186,8 +186,8 @@ async function handleRemove(
 			text: [
 				'Error: Path required for remove command',
 				context.subcommand === 'project'
-					? 'Usage: cacd project remove <path>'
-					: 'Usage: cacd remove <path>',
+					? 'Usage: argusdev project remove <path>'
+					: 'Usage: argusdev remove <path>',
 			],
 			data: {
 				ok: false,
@@ -196,8 +196,8 @@ async function handleRemove(
 					message: 'Path required for remove command',
 					usage:
 						context.subcommand === 'project'
-							? 'cacd project remove <path>'
-							: 'cacd remove <path>',
+							? 'argusdev project remove <path>'
+							: 'argusdev remove <path>',
 				},
 			},
 		});
@@ -296,7 +296,7 @@ async function handleConfigure(
 		context.formatter.writeError({
 			text: [
 				'Error: Path required for configure command',
-				'Usage: cacd project configure <path> [--name <name>] [--description <desc>]',
+				'Usage: argusdev project configure <path> [--name <name>] [--description <desc>]',
 			],
 			data: {
 				ok: false,
@@ -304,7 +304,7 @@ async function handleConfigure(
 				error: {
 					message: 'Path required for configure command',
 					usage:
-						'cacd project configure <path> [--name <name>] [--description <desc>]',
+						'argusdev project configure <path> [--name <name>] [--description <desc>]',
 				},
 			},
 		});
@@ -461,14 +461,14 @@ export async function runProjectCommand(
 		if (context.subcommand !== 'project') {
 			context.formatter.writeError({
 				text: [
-					'Error: configure is available under `cacd project configure` only',
+					'Error: configure is available under `argusdev project configure` only',
 				],
 				data: {
 					ok: false,
 					command: commandLabel,
 					error: {
 						message:
-							'configure is available under `cacd project configure` only',
+							'configure is available under `argusdev project configure` only',
 					},
 				},
 			});
@@ -484,10 +484,10 @@ export async function runProjectCommand(
 				`Unknown project command: ${action}`,
 				'',
 				'Available project commands:',
-				'  cacd project add [path]',
-				'  cacd project list',
-				'  cacd project remove <path>',
-				'  cacd project configure <path> [--name <name>] [--description <desc>]',
+				'  argusdev project add [path]',
+				'  argusdev project list',
+				'  argusdev project remove <path>',
+				'  argusdev project configure <path> [--name <name>] [--description <desc>]',
 			],
 			data: {
 				ok: false,

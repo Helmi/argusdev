@@ -167,7 +167,7 @@ describe('ProjectList', () => {
 
 		const frame = lastFrame();
 		expect(frame).toContain('No projects tracked yet.');
-		expect(frame).toContain('cacd add /path/to/project');
+		expect(frame).toContain('argusdev add /path/to/project');
 	});
 
 	it('should display invalid project indicator', async () => {

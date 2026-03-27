@@ -11,7 +11,7 @@ describe('daemonControl', () => {
 
 	it('builds daemon web config with access token path', () => {
 		const config = buildDaemonWebConfig({
-			configDir: '/tmp/cacd',
+			configDir: '/tmp/argusdev',
 			port: 3100,
 			accessToken: 'abc123',
 			isCustomConfigDir: true,
@@ -21,7 +21,7 @@ describe('daemonControl', () => {
 		expect(config).toEqual({
 			url: 'http://127.0.0.1:3100/abc123',
 			port: 3100,
-			configDir: '/tmp/cacd',
+			configDir: '/tmp/argusdev',
 			isCustomConfigDir: true,
 			isDevMode: false,
 		});
@@ -36,7 +36,7 @@ describe('daemonControl', () => {
 
 		const result = await ensureDaemonForTui(
 			{
-				configDir: '/tmp/cacd',
+				configDir: '/tmp/argusdev',
 				port: 3000,
 				accessToken: 'token',
 				isCustomConfigDir: false,
@@ -73,7 +73,7 @@ describe('daemonControl', () => {
 		await expect(
 			ensureDaemonForTui(
 				{
-					configDir: '/tmp/cacd',
+					configDir: '/tmp/argusdev',
 					port: 3000,
 					isCustomConfigDir: false,
 					isDevMode: false,
@@ -89,7 +89,7 @@ describe('daemonControl', () => {
 					now: () => 0,
 				},
 			),
-		).rejects.toThrow('No running CA⚡CD daemon found');
+		).rejects.toThrow('No running ArgusDev daemon found');
 
 		expect(removePidFile).toHaveBeenCalledTimes(1);
 	});
@@ -109,7 +109,7 @@ describe('daemonControl', () => {
 
 		const result = await ensureDaemonForTui(
 			{
-				configDir: '/tmp/cacd',
+				configDir: '/tmp/argusdev',
 				port: 3999,
 				accessToken: 'token',
 				isCustomConfigDir: true,
@@ -161,7 +161,7 @@ describe('daemonControl', () => {
 
 		const result = await ensureDaemonForTui(
 			{
-				configDir: '/tmp/cacd',
+				configDir: '/tmp/argusdev',
 				port: 3000,
 				accessToken: 'token',
 				isCustomConfigDir: false,
@@ -186,7 +186,7 @@ describe('daemonControl', () => {
 
 		expect(result.started).toBe(true);
 		expect(result.pid).toBe(8888);
-		expect(removePidFile).toHaveBeenCalledWith(join('/tmp/cacd', 'daemon.pid'));
+		expect(removePidFile).toHaveBeenCalledWith(join('/tmp/argusdev', 'daemon.pid'));
 		expect(removePidFile.mock.invocationCallOrder[0]).toBeLessThan(
 			spawnDaemon.mock.invocationCallOrder[0]!,
 		);
@@ -210,7 +210,7 @@ describe('daemonControl', () => {
 
 		const result = await ensureDaemonForTui(
 			{
-				configDir: '/tmp/cacd',
+				configDir: '/tmp/argusdev',
 				port: 4001,
 				accessToken: 'token',
 				isCustomConfigDir: false,

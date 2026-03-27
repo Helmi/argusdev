@@ -64,7 +64,7 @@ export function getWorktreeParentBranch(
 	return Effect.catchAll(
 		Effect.tryPromise({
 			try: signal =>
-				execFileAsync('git', ['config', '--worktree', 'cacd.parentBranch'], {
+				execFileAsync('git', ['config', '--worktree', 'argusdev.parentBranch'], {
 					cwd: worktreePath,
 					encoding: 'utf8',
 					signal,
@@ -130,13 +130,13 @@ export function setWorktreeParentBranch(
 		return Effect.void;
 	}
 
-	const command = `git config --worktree cacd.parentBranch ${parentBranch}`;
+	const command = `git config --worktree argusdev.parentBranch ${parentBranch}`;
 	return Effect.catchAll(
 		Effect.tryPromise({
 			try: signal =>
 				execFileAsync(
 					'git',
-					['config', '--worktree', 'cacd.parentBranch', parentBranch],
+					['config', '--worktree', 'argusdev.parentBranch', parentBranch],
 					{
 						cwd: worktreePath,
 						encoding: 'utf8',

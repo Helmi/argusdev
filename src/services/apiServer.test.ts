@@ -63,8 +63,8 @@ vi.mock('fs', async importOriginal => {
 
 vi.mock('../utils/projectConfig.js', () => ({
 	loadProjectConfig: vi.fn(() => ({td: {enabled: true, autoStart: true}})),
-	getProjectConfigPath: vi.fn(() => '/repo/.cacd/config.json'),
-	saveProjectConfig: vi.fn(() => '/repo/.cacd/config.json'),
+	getProjectConfigPath: vi.fn(() => '/repo/.argusdev/config.json'),
+	saveProjectConfig: vi.fn(() => '/repo/.argusdev/config.json'),
 	loadPromptTemplatesByScope: mockLoadPromptTemplatesByScope,
 	loadPromptTemplateByScope: vi.fn(() => null),
 	savePromptTemplateByScope: vi.fn(),
@@ -723,7 +723,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/restart',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {id: 'session-restart-1'},
 		});
 
@@ -783,7 +783,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat',
 				agentId: 'codex',
@@ -807,7 +807,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat',
 				agentId: 'codex',
@@ -861,7 +861,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/fix-cache',
 				agentId: 'codex',
@@ -938,7 +938,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/fix-cache',
 				agentId: 'codex',
@@ -1014,7 +1014,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/review-cache',
 				agentId: 'codex',
@@ -1110,7 +1110,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat',
 				agentId: 'codex',
@@ -1189,7 +1189,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat',
 				agentId: 'codex',
@@ -1261,7 +1261,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat',
 				agentId: 'codex',
@@ -1325,7 +1325,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat',
 				agentId: 'codex',
@@ -1419,7 +1419,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat',
 				agentId: 'codex',
@@ -1496,7 +1496,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat',
 				agentId: 'codex',
@@ -1568,7 +1568,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat',
 				agentId: 'codex',
@@ -1645,7 +1645,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/session/create-with-agent',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat',
 				agentId: 'codex',
@@ -1724,7 +1724,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			const response = await apiServer.app.inject({
 				method: 'POST',
 				url: '/api/session/create-with-agent',
-				headers: {cookie: 'cacd_session=test'},
+				headers: {cookie: 'argusdev_session=test'},
 				payload: {
 					path: '/repo/.worktrees/feat',
 					agentId,
@@ -1763,7 +1763,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'POST',
 			url: '/api/worktree/create',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 			payload: {
 				path: '/repo/.worktrees/feat-warning',
 				branch: 'feat-warning',
@@ -1816,7 +1816,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'GET',
 			url: '/api/sessions',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 		});
 
 		expect(response.statusCode).toBe(200);
@@ -1836,7 +1836,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'GET',
 			url: '/api/sessions',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 		});
 
 		expect(response.statusCode).toBe(200);
@@ -1885,7 +1885,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		const response = await apiServer.app.inject({
 			method: 'GET',
 			url: '/api/worktrees',
-			headers: {cookie: 'cacd_session=test'},
+			headers: {cookie: 'argusdev_session=test'},
 		});
 
 		expect(response.statusCode).toBe(200);

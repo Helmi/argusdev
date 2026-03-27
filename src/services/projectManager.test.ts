@@ -16,7 +16,7 @@ vi.mock('os', () => {
 	};
 });
 vi.mock('../utils/configDir.js', () => ({
-	getConfigDir: vi.fn(() => '/home/user/.config/cacd'),
+	getConfigDir: vi.fn(() => '/home/user/.config/argusdev'),
 }));
 
 // Now import modules that depend on the mocked modules
@@ -29,7 +29,7 @@ const mockFs = fs as any;
 
 describe('ProjectManager', () => {
 	let projectManager: ProjectManager;
-	const mockConfigDir = '/home/user/.config/cacd';
+	const mockConfigDir = '/home/user/.config/argusdev';
 	const mockProjectsPath = path.join(mockConfigDir, 'projects.json');
 	const mockLegacyPath = path.join(mockConfigDir, 'recent-projects.json');
 

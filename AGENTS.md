@@ -1,10 +1,10 @@
-# CACD — Coding Agent Control Desk
+# ArgusDev
 
-A local development orchestrator for AI coding agent sessions. Runs as a **daemon** exposing a **Fastify API + Socket.IO** server, a **React WebUI**, and a **CLI** (`cacd`). Manages PTY sessions for coding agents (Codex, Claude Code, Pi, etc.), git worktrees, and task integration via `td`.
+A local development orchestrator for AI coding agent sessions. Runs as a **daemon** exposing a **Fastify API + Socket.IO** server, a **React WebUI**, and a **CLI** (`argusdev`). Manages PTY sessions for coding agents (Codex, Claude Code, Pi, etc.), git worktrees, and task integration via `td`.
 
 Originally forked from [kbwo/ccmanager](https://github.com/kbwo/ccmanager) — codebases have fully diverged, no compatibility. Occasionally worth checking their `sessionManager` and `worktreeService` for bug fix ideas.
 
-**Repo:** [github.com/Helmi/cacd](https://github.com/Helmi/cacd) (private)
+**Repo:** [github.com/Helmi/argusdev](https://github.com/Helmi/argusdev) (private)
 
 ## Task Management
 
@@ -13,7 +13,7 @@ Run `td usage --new-session` at conversation start (or after `/clear`). Use `td 
 ## Safety Guardrails
 
 - **CRITICAL:** Never run `bun run build` or `bun run install:global` without explicit user confirmation. The global install is used productively.
-- **NEVER** execute release commands autonomously. See the `cacd-release` skill for the release workflow.
+- **NEVER** execute release commands autonomously. See the `argusdev-release` skill for the release workflow.
 - **NEVER** push to `main` without a passing build.
 
 ## Project Structure
@@ -48,7 +48,7 @@ PTY sessions die on backend restart during dev — just restart them.
 - **Daemon:** Node.js process owning all PTY sessions. Runs headless by default.
 - **API:** Fastify server (configurable port) + Socket.IO for real-time terminal streaming.
 - **WebUI:** React SPA served by the daemon. Vite dev server proxies to backend in dev.
-- **CLI:** `cacd` — thin client that talks to the daemon API. No business logic in CLI layer.
+- **CLI:** `argusdev` — thin client that talks to the daemon API. No business logic in CLI layer.
 - **Core Service:** Singleton (`coreService.ts`) orchestrating state across all interfaces.
 - **Legacy TUI:** Ink-based terminal UI exists but is being phased out.
 

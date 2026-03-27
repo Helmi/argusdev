@@ -647,7 +647,7 @@ describe('SessionManager', () => {
 						) => Promise<string>;
 					},
 					'writePromptLauncherScript',
-				).mockResolvedValue('/tmp/.cacd-startup-test.sh');
+				).mockResolvedValue('/tmp/.argusdev-startup-test.sh');
 
 				await Effect.runPromise(
 					sessionManager.createSessionWithAgentEffect(
@@ -667,7 +667,7 @@ describe('SessionManager', () => {
 
 				const bootstrapCommand = mockPty.write.mock.calls[0]?.[0] as string;
 				expect(bootstrapCommand).toContain('bash');
-				expect(bootstrapCommand).toContain('/tmp/.cacd-startup-test.sh');
+				expect(bootstrapCommand).toContain('/tmp/.argusdev-startup-test.sh');
 			},
 		);
 
@@ -675,7 +675,7 @@ describe('SessionManager', () => {
 			'should add project cwd to launcher command for agents that prependCwd',
 			async () => {
 				const worktreePath = await mkdtemp(
-					join(tmpdir(), 'cacd-startup-worktree-'),
+					join(tmpdir(), 'argusdev-startup-worktree-'),
 				);
 				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
@@ -703,7 +703,7 @@ describe('SessionManager', () => {
 					.replace(/^bash\s+/, '');
 				const scriptContent = await readFile(scriptPath, 'utf-8');
 				expect(scriptContent).toContain(
-					'opencode . -m openai/gpt-5 --prompt "$CACD_PROMPT"',
+					'opencode . -m openai/gpt-5 --prompt "$ARGUSDEV_PROMPT"',
 				);
 
 				await rm(worktreePath, {recursive: true, force: true});
@@ -714,7 +714,7 @@ describe('SessionManager', () => {
 			'should add startup script to git exclude when using launcher',
 			async () => {
 				const worktreePath = await mkdtemp(
-					join(tmpdir(), 'cacd-startup-worktree-'),
+					join(tmpdir(), 'argusdev-startup-worktree-'),
 				);
 				const ensureSpy = vi
 					.spyOn(startupScript, 'ensureStartupScriptInGitExclude')
@@ -739,12 +739,12 @@ describe('SessionManager', () => {
 
 				const bootstrapCommand = mockPty.write.mock.calls[0]?.[0] as string;
 				expect(bootstrapCommand).toContain('bash');
-				expect(bootstrapCommand).toContain('.cacd-startup-');
+				expect(bootstrapCommand).toContain('.argusdev-startup-');
 				expect(ensureSpy).toHaveBeenCalledTimes(1);
 				const [registeredWorktreePath, launcherName] = ensureSpy.mock
 					.calls[0] as [string, string];
 				expect(registeredWorktreePath).toBe(worktreePath);
-				expect(launcherName).toMatch(/\.cacd-startup-.*\.sh/);
+				expect(launcherName).toMatch(/\.argusdev-startup-.*\.sh/);
 
 				await rm(worktreePath, {recursive: true, force: true});
 			},
@@ -754,7 +754,7 @@ describe('SessionManager', () => {
 			'should continue with session bootstrap when git exclude update fails',
 			async () => {
 				const worktreePath = await mkdtemp(
-					join(tmpdir(), 'cacd-startup-worktree-'),
+					join(tmpdir(), 'argusdev-startup-worktree-'),
 				);
 				const ensureSpy = vi
 					.spyOn(startupScript, 'ensureStartupScriptInGitExclude')
@@ -779,7 +779,7 @@ describe('SessionManager', () => {
 
 				const bootstrapCommand = mockPty.write.mock.calls[0]?.[0] as string;
 				expect(bootstrapCommand).toContain('bash');
-				expect(bootstrapCommand).toContain('.cacd-startup-');
+				expect(bootstrapCommand).toContain('.argusdev-startup-');
 				expect(ensureSpy).toHaveBeenCalledTimes(1);
 
 				await rm(worktreePath, {recursive: true, force: true});

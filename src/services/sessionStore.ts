@@ -137,7 +137,7 @@ function resolveDefaultDbPath(): string {
 	try {
 		return path.join(getConfigDir(), DB_FILENAME);
 	} catch {
-		return path.join(homedir(), '.config', 'cacd', DB_FILENAME);
+		return path.join(homedir(), '.config', 'argusdev', DB_FILENAME);
 	}
 }
 

@@ -36,9 +36,9 @@ describe('hookExecutor Integration Tests', () => {
 			// Arrange
 			const tmpDir = await mkdtemp(join(tmpdir(), 'hook-test-'));
 			const environment = {
-				CACD_WORKTREE_PATH: tmpDir,
-				CACD_WORKTREE_BRANCH: 'test-branch',
-				CACD_GIT_ROOT: tmpDir,
+				ARGUSDEV_WORKTREE_PATH: tmpDir,
+				ARGUSDEV_WORKTREE_BRANCH: 'test-branch',
+				ARGUSDEV_GIT_ROOT: tmpDir,
 			};
 
 			try {
@@ -62,9 +62,9 @@ describe('hookExecutor Integration Tests', () => {
 			// Arrange
 			const tmpDir = await mkdtemp(join(tmpdir(), 'hook-test-'));
 			const environment = {
-				CACD_WORKTREE_PATH: tmpDir,
-				CACD_WORKTREE_BRANCH: 'test-branch',
-				CACD_GIT_ROOT: tmpDir,
+				ARGUSDEV_WORKTREE_PATH: tmpDir,
+				ARGUSDEV_WORKTREE_BRANCH: 'test-branch',
+				ARGUSDEV_GIT_ROOT: tmpDir,
 			};
 
 			try {
@@ -86,9 +86,9 @@ describe('hookExecutor Integration Tests', () => {
 				// Arrange
 				const tmpDir = await mkdtemp(join(tmpdir(), 'hook-test-'));
 				const environment = {
-					CACD_WORKTREE_PATH: tmpDir,
-					CACD_WORKTREE_BRANCH: 'test-branch',
-					CACD_GIT_ROOT: tmpDir,
+					ARGUSDEV_WORKTREE_PATH: tmpDir,
+					ARGUSDEV_WORKTREE_BRANCH: 'test-branch',
+					ARGUSDEV_GIT_ROOT: tmpDir,
 				};
 
 				try {
@@ -119,9 +119,9 @@ describe('hookExecutor Integration Tests', () => {
 				// Arrange
 				const tmpDir = await mkdtemp(join(tmpdir(), 'hook-test-'));
 				const environment = {
-					CACD_WORKTREE_PATH: tmpDir,
-					CACD_WORKTREE_BRANCH: 'test-branch',
-					CACD_GIT_ROOT: tmpDir,
+					ARGUSDEV_WORKTREE_PATH: tmpDir,
+					ARGUSDEV_WORKTREE_BRANCH: 'test-branch',
+					ARGUSDEV_GIT_ROOT: tmpDir,
 				};
 
 				try {
@@ -172,9 +172,9 @@ describe('hookExecutor Integration Tests', () => {
 			// Arrange
 			const tmpDir = await mkdtemp(join(tmpdir(), 'hook-test-'));
 			const environment = {
-				CACD_WORKTREE_PATH: tmpDir,
-				CACD_WORKTREE_BRANCH: 'test-branch',
-				CACD_GIT_ROOT: tmpDir,
+				ARGUSDEV_WORKTREE_PATH: tmpDir,
+				ARGUSDEV_WORKTREE_BRANCH: 'test-branch',
+				ARGUSDEV_GIT_ROOT: tmpDir,
 			};
 
 			try {
@@ -202,10 +202,10 @@ describe('hookExecutor Integration Tests', () => {
 			const tmpDir = await mkdtemp(join(tmpdir(), 'hook-cwd-test-'));
 			const outputFile = join(tmpDir, 'cwd.txt');
 			const environment = {
-				CACD_WORKTREE_PATH: tmpDir,
-				CACD_WORKTREE_BRANCH: 'test-branch',
-				CACD_GIT_ROOT: '/some/other/path',
-				CACD_TEST_OUTPUT_FILE: outputFile,
+				ARGUSDEV_WORKTREE_PATH: tmpDir,
+				ARGUSDEV_WORKTREE_BRANCH: 'test-branch',
+				ARGUSDEV_GIT_ROOT: '/some/other/path',
+				ARGUSDEV_TEST_OUTPUT_FILE: outputFile,
 			};
 
 			try {
@@ -213,7 +213,7 @@ describe('hookExecutor Integration Tests', () => {
 				await Effect.runPromise(
 					executeHook(
 						toNodeCommand(
-							"require('node:fs').writeFileSync(process.env.CACD_TEST_OUTPUT_FILE, process.cwd());",
+							"require('node:fs').writeFileSync(process.env.ARGUSDEV_TEST_OUTPUT_FILE, process.cwd());",
 						),
 						tmpDir,
 						environment,
@@ -321,7 +321,7 @@ describe('hookExecutor Integration Tests', () => {
 				await Effect.runPromise(
 					executeWorktreePostCreationHook(
 						toNodeCommand(
-							"require('node:fs').writeFileSync('gitroot.txt', process.env.CACD_GIT_ROOT || '');",
+							"require('node:fs').writeFileSync('gitroot.txt', process.env.ARGUSDEV_GIT_ROOT || '');",
 						),
 						worktree,
 						tmpGitRootDir,
@@ -610,7 +610,7 @@ describe('hookExecutor Integration Tests', () => {
 				busy: {
 					enabled: true,
 					command: toNodeCommand(
-						"require('node:fs').writeFileSync('hook-output.txt', 'Hook ran with branch: ' + (process.env.CACD_WORKTREE_BRANCH || ''));",
+						"require('node:fs').writeFileSync('hook-output.txt', 'Hook ran with branch: ' + (process.env.ARGUSDEV_WORKTREE_BRANCH || ''));",
 					),
 				},
 				idle: {enabled: false, command: ''},

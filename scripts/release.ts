@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Interactive release script for CACD
+ * Interactive release script for ArgusDev
  *
  * Usage:
  *   bun run release              # Interactive mode - prompts for version
@@ -118,7 +118,7 @@ function isValidSemver(version: string): boolean {
 }
 
 async function main() {
-  log(`\n${colors.bold}${colors.cyan}CACD Release${colors.reset}\n`);
+  log(`\n${colors.bold}${colors.cyan}ArgusDev Release${colors.reset}\n`);
   log(`${colors.dim}Current version: ${colors.reset}${colors.yellow}${currentVersion}${colors.reset}`);
 
   if (dryRun) {

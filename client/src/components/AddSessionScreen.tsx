@@ -47,7 +47,7 @@ import type {
 type QuickStartIntent = 'work' | 'review' | 'fix';
 
 const AUTO_SESSION_NAME_PATTERN = /^[A-Za-z]+-[a-z0-9]{4}$/;
-const REVIEW_AGENT_KEY_PREFIX = 'cacd_review_default_agent:';
+const REVIEW_AGENT_KEY_PREFIX = 'argusdev_review_default_agent:';
 
 function toRecord(value: unknown): Record<string, unknown> | null {
 	return value && typeof value === 'object' && !Array.isArray(value)

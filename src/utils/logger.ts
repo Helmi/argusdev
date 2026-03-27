@@ -59,38 +59,38 @@ class Logger {
 	 * and respecting environment overrides for testing.
 	 *
 	 * Platform paths:
-	 * - Windows: %LOCALAPPDATA%\cacd\logs\cacd.log
-	 * - macOS: ~/Library/Logs/cacd/cacd.log
-	 * - Linux: XDG_STATE_HOME/cacd/cacd.log or ~/.local/state/cacd/cacd.log
+	 * - Windows: %LOCALAPPDATA%\argusdev\logs\argusdev.log
+	 * - macOS: ~/Library/Logs/argusdev/argusdev.log
+	 * - Linux: XDG_STATE_HOME/argusdev/argusdev.log or ~/.local/state/argusdev/argusdev.log
 	 */
 	private resolveLogPath(): string {
 		// Allow environment override for testing
-		if (process.env['CACD_LOG_FILE']) {
-			return process.env['CACD_LOG_FILE'];
+		if (process.env['ARGUSDEV_LOG_FILE']) {
+			return process.env['ARGUSDEV_LOG_FILE'];
 		}
 
 		const homeDir = os.homedir();
 
-		// Windows: %LOCALAPPDATA%\cacd\logs\cacd.log
+		// Windows: %LOCALAPPDATA%\argusdev\logs\argusdev.log
 		if (process.platform === 'win32') {
 			const localAppData =
 				process.env['LOCALAPPDATA'] || path.join(homeDir, 'AppData', 'Local');
-			return path.join(localAppData, 'cacd', 'logs', 'cacd.log');
+			return path.join(localAppData, 'argusdev', 'logs', 'argusdev.log');
 		}
 
-		// macOS: ~/Library/Logs/cacd/cacd.log
+		// macOS: ~/Library/Logs/argusdev/argusdev.log
 		if (process.platform === 'darwin') {
-			return path.join(homeDir, 'Library', 'Logs', 'cacd', 'cacd.log');
+			return path.join(homeDir, 'Library', 'Logs', 'argusdev', 'argusdev.log');
 		}
 
 		// Linux: Use XDG_STATE_HOME if available
 		const xdgStateHome = process.env['XDG_STATE_HOME'];
 		if (xdgStateHome) {
-			return path.join(xdgStateHome, 'cacd', 'cacd.log');
+			return path.join(xdgStateHome, 'argusdev', 'argusdev.log');
 		}
 
-		// Linux fallback: ~/.local/state/cacd/cacd.log
-		return path.join(homeDir, '.local', 'state', 'cacd', 'cacd.log');
+		// Linux fallback: ~/.local/state/argusdev/argusdev.log
+		return path.join(homeDir, '.local', 'state', 'argusdev', 'argusdev.log');
 	}
 
 	/**
@@ -123,7 +123,7 @@ class Logger {
 				return; // No rotation needed
 			}
 
-			// Rotate old logs: cacd.log.3 -> removed, .2 -> .3, .1 -> .2, .log -> .1
+			// Rotate old logs: argusdev.log.3 -> removed, .2 -> .3, .1 -> .2, .log -> .1
 			for (let i = this.config.maxRotatedFiles; i > 0; i--) {
 				const oldName = i === 1 ? this.logFile : `${this.logFile}.${i - 1}`;
 				const newName = `${this.logFile}.${i}`;

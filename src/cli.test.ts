@@ -33,10 +33,10 @@ describe('CLI', () => {
 
 	describe('--multi-project flag', () => {
 		it.skipIf(!isNodePtyAvailable())(
-			'should exit with error when CACD_PROJECTS_DIR is not set',
+			'should exit with error when ARGUSDEV_PROJECTS_DIR is not set',
 			async () => {
 				// Ensure the env var is not set
-				delete process.env['CACD_PROJECTS_DIR'];
+				delete process.env['ARGUSDEV_PROJECTS_DIR'];
 
 				// Create a wrapper script that mocks TTY
 				const wrapperScript = `
@@ -72,10 +72,10 @@ describe('CLI', () => {
 
 				expect(result.code).toBe(1);
 				expect(result.stderr).toContain(
-					'CACD_PROJECTS_DIR environment variable must be set',
+					'ARGUSDEV_PROJECTS_DIR environment variable must be set',
 				);
 				expect(result.stderr).toContain(
-					'export CACD_PROJECTS_DIR=/path/to/projects',
+					'export ARGUSDEV_PROJECTS_DIR=/path/to/projects',
 				);
 			},
 		);
@@ -84,7 +84,7 @@ describe('CLI', () => {
 			'should not check for env var when --multi-project is not used',
 			async () => {
 				// Ensure the env var is not set
-				delete process.env['CACD_PROJECTS_DIR'];
+				delete process.env['ARGUSDEV_PROJECTS_DIR'];
 
 				const result = await new Promise<{code: number; stderr: string}>(
 					resolve => {
@@ -106,7 +106,7 @@ describe('CLI', () => {
 				);
 
 				expect(result.code).toBe(0);
-				expect(result.stderr).not.toContain('CACD_PROJECTS_DIR');
+				expect(result.stderr).not.toContain('ARGUSDEV_PROJECTS_DIR');
 			},
 		);
 	});
@@ -167,14 +167,14 @@ describe('CLI', () => {
 
 			vi.doMock('os', () => ({
 				default: {
-					hostname: vi.fn(() => 'cacd-host'),
+					hostname: vi.fn(() => 'argusdev-host'),
 					homedir: vi.fn(() => '/home/user'),
 				},
 			}));
 
 			vi.doMock('./utils/configDir.js', () => ({
 				initializeConfigDir: vi.fn(),
-				getConfigDir: vi.fn(() => '/tmp/cacd-test'),
+				getConfigDir: vi.fn(() => '/tmp/argusdev-test'),
 				isCustomConfigDir: vi.fn(() => false),
 				isDevModeConfig: vi.fn(() => false),
 			}));
@@ -182,7 +182,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile,
 				cleanupDaemonPidFile,
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile: vi.fn(async () => undefined),
 				isProcessRunning: vi.fn(() => false),
 			}));
@@ -233,7 +233,7 @@ describe('CLI', () => {
 			}));
 
 			vi.doMock('./constants/env.js', () => ({
-				ENV_VARS: {PORT: 'CACD_PORT'},
+				ENV_VARS: {PORT: 'ARGUSDEV_PORT'},
 				generateRandomPort: vi.fn(() => 3010),
 			}));
 
@@ -262,7 +262,7 @@ describe('CLI', () => {
 					expect.any(Boolean),
 				);
 				expect(prepareDaemonPidFile).toHaveBeenCalledWith(
-					'/tmp/cacd-test/daemon.pid',
+					'/tmp/argusdev-test/daemon.pid',
 					process.pid,
 				);
 				expect(signalHandlers.get('SIGTERM')).toBeTypeOf('function');
@@ -274,7 +274,7 @@ describe('CLI', () => {
 
 				expect(destroyAllSessions).not.toHaveBeenCalled();
 				expect(cleanupDaemonPidFile).toHaveBeenCalledWith(
-					'/tmp/cacd-test/daemon.pid',
+					'/tmp/argusdev-test/daemon.pid',
 					process.pid,
 				);
 				expect(processExitSpy).toHaveBeenCalledWith(0);
@@ -342,13 +342,13 @@ describe('CLI', () => {
 			}));
 			vi.doMock('os', () => ({
 				default: {
-					hostname: vi.fn(() => 'cacd-host'),
+					hostname: vi.fn(() => 'argusdev-host'),
 					homedir: vi.fn(() => '/home/user'),
 				},
 			}));
 			vi.doMock('./utils/configDir.js', () => ({
 				initializeConfigDir: vi.fn(),
-				getConfigDir: vi.fn(() => '/tmp/cacd-test'),
+				getConfigDir: vi.fn(() => '/tmp/argusdev-test'),
 				isCustomConfigDir: vi.fn(() => false),
 				isDevModeConfig: vi.fn(() => false),
 			}));
@@ -388,7 +388,7 @@ describe('CLI', () => {
 				},
 			}));
 			vi.doMock('./constants/env.js', () => ({
-				ENV_VARS: {PORT: 'CACD_PORT'},
+				ENV_VARS: {PORT: 'ARGUSDEV_PORT'},
 				generateRandomPort: vi.fn(() => 3010),
 			}));
 		};
@@ -408,7 +408,7 @@ describe('CLI', () => {
 			vi.resetModules();
 		});
 
-		it('treats bare `cacd` as `cacd start`', async () => {
+		it('treats bare `argusdev` as `argusdev start`', async () => {
 			process.argv = ['node', '/tmp/unified-entry.tsx'];
 			setupCommonMocks();
 
@@ -422,7 +422,7 @@ describe('CLI', () => {
 			const buildDaemonWebConfig = vi.fn(() => ({
 				url: 'http://127.0.0.1:3000/token',
 				port: 3000,
-				configDir: '/tmp/cacd-test',
+				configDir: '/tmp/argusdev-test',
 				isCustomConfigDir: false,
 				isDevMode: false,
 			}));
@@ -430,7 +430,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile,
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile,
 				isProcessRunning,
 			}));
@@ -453,7 +453,7 @@ describe('CLI', () => {
 				expect(spawnDetachedDaemon).toHaveBeenCalledWith(
 					'/tmp/unified-entry.tsx',
 					3000,
-					{logFilePath: path.join('/tmp/cacd-test', 'daemon.log')},
+					{logFilePath: path.join('/tmp/argusdev-test', 'daemon.log')},
 				);
 				expect(waitForDaemonPid).toHaveBeenCalled();
 				expect(waitForDaemonApiReady).toHaveBeenCalledWith({
@@ -468,7 +468,7 @@ describe('CLI', () => {
 			}
 		});
 
-		it('starts daemon for explicit `cacd start`', async () => {
+		it('starts daemon for explicit `argusdev start`', async () => {
 			process.argv = ['node', '/tmp/unified-entry.tsx', 'start'];
 			setupCommonMocks();
 
@@ -481,7 +481,7 @@ describe('CLI', () => {
 			const buildDaemonWebConfig = vi.fn(() => ({
 				url: 'http://127.0.0.1:3000/token',
 				port: 3000,
-				configDir: '/tmp/cacd-test',
+				configDir: '/tmp/argusdev-test',
 				isCustomConfigDir: false,
 				isDevMode: false,
 			}));
@@ -489,7 +489,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile,
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile,
 				isProcessRunning,
 			}));
@@ -513,7 +513,7 @@ describe('CLI', () => {
 				expect(spawnDetachedDaemon).toHaveBeenCalledWith(
 					'/tmp/unified-entry.tsx',
 					3000,
-					{logFilePath: path.join('/tmp/cacd-test', 'daemon.log')},
+					{logFilePath: path.join('/tmp/argusdev-test', 'daemon.log')},
 				);
 			} finally {
 				processExitSpy.mockRestore();
@@ -534,7 +534,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile,
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile,
 				isProcessRunning,
 			}));
@@ -559,7 +559,7 @@ describe('CLI', () => {
 				await expect(import('./cli.js')).rejects.toThrow('exit:0');
 				expect(processKillSpy).toHaveBeenCalledWith(4242, 'SIGTERM');
 				expect(cleanupDaemonPidFile).toHaveBeenCalledWith(
-					'/tmp/cacd-test/daemon.pid',
+					'/tmp/argusdev-test/daemon.pid',
 					4242,
 				);
 			} finally {
@@ -606,7 +606,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile,
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile,
 				isProcessRunning,
 			}));
@@ -632,7 +632,7 @@ describe('CLI', () => {
 				expect(fetchSpy).toHaveBeenCalledTimes(3);
 				expect(processKillSpy).toHaveBeenCalledWith(4242, 'SIGTERM');
 				expect(cleanupDaemonPidFile).toHaveBeenCalledWith(
-					'/tmp/cacd-test/daemon.pid',
+					'/tmp/argusdev-test/daemon.pid',
 					4242,
 				);
 			} finally {
@@ -650,7 +650,7 @@ describe('CLI', () => {
 			const buildDaemonWebConfig = vi.fn(() => ({
 				url: 'http://127.0.0.1:3000/token',
 				port: 3000,
-				configDir: '/tmp/cacd-test',
+				configDir: '/tmp/argusdev-test',
 				isCustomConfigDir: false,
 				isDevMode: false,
 			}));
@@ -658,7 +658,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile,
 				isProcessRunning,
 			}));
@@ -684,7 +684,7 @@ describe('CLI', () => {
 				expect(
 					consoleLogSpy,
 				).toHaveBeenCalledWith(
-					expect.stringMatching(/CA⚡CD v.* — Running/),
+					expect.stringMatching(/ArgusDev v.* — Running/),
 				);
 				expect(consoleLogSpy).toHaveBeenCalledWith('PID:          5151');
 				expect(consoleLogSpy).toHaveBeenCalledWith('Uptime:       00:02:00');
@@ -703,7 +703,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile,
 				isProcessRunning: vi.fn(() => false),
 			}));
@@ -727,7 +727,7 @@ describe('CLI', () => {
 			try {
 				await expect(import('./cli.js')).rejects.toThrow('exit:0');
 				expect(consoleLogSpy).toHaveBeenCalledWith(
-					expect.stringMatching(/CA⚡CD v.* — Stopped/),
+					expect.stringMatching(/ArgusDev v.* — Stopped/),
 				);
 			} finally {
 				processExitSpy.mockRestore();
@@ -755,7 +755,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile,
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile,
 				isProcessRunning,
 			}));
@@ -763,7 +763,7 @@ describe('CLI', () => {
 				buildDaemonWebConfig: vi.fn(() => ({
 					url: 'http://127.0.0.1:3000/token',
 					port: 3000,
-					configDir: '/tmp/cacd-test',
+					configDir: '/tmp/argusdev-test',
 					isCustomConfigDir: false,
 					isDevMode: false,
 				})),
@@ -788,7 +788,7 @@ describe('CLI', () => {
 				expect(spawnDetachedDaemon).toHaveBeenCalledWith(
 					'/tmp/unified-entry.tsx',
 					3000,
-					{logFilePath: path.join('/tmp/cacd-test', 'daemon.log')},
+					{logFilePath: path.join('/tmp/argusdev-test', 'daemon.log')},
 				);
 			} finally {
 				processKillSpy.mockRestore();
@@ -837,7 +837,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile,
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile,
 				isProcessRunning,
 			}));
@@ -845,7 +845,7 @@ describe('CLI', () => {
 				buildDaemonWebConfig: vi.fn(() => ({
 					url: 'http://127.0.0.1:3000/token',
 					port: 3000,
-					configDir: '/tmp/cacd-test',
+					configDir: '/tmp/argusdev-test',
 					isCustomConfigDir: false,
 					isDevMode: false,
 				})),
@@ -871,7 +871,7 @@ describe('CLI', () => {
 				expect(spawnDetachedDaemon).toHaveBeenCalledWith(
 					'/tmp/unified-entry.tsx',
 					3000,
-					{logFilePath: path.join('/tmp/cacd-test', 'daemon.log')},
+					{logFilePath: path.join('/tmp/argusdev-test', 'daemon.log')},
 				);
 			} finally {
 				processKillSpy.mockRestore();
@@ -879,7 +879,7 @@ describe('CLI', () => {
 			}
 		});
 
-		it('keeps `cacd tui` daemon-required behavior', async () => {
+		it('keeps `argusdev tui` daemon-required behavior', async () => {
 			process.argv = ['node', '/tmp/unified-entry.tsx', 'tui'];
 			Object.defineProperty(process.stdin, 'isTTY', {
 				value: true,
@@ -892,13 +892,13 @@ describe('CLI', () => {
 			setupCommonMocks();
 
 			const ensureDaemonForTui = vi.fn(async () => {
-				throw new Error('No running CA⚡CD daemon found');
+				throw new Error('No running ArgusDev daemon found');
 			});
 
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile: vi.fn(),
 				isProcessRunning: vi.fn(),
 			}));
@@ -922,7 +922,7 @@ describe('CLI', () => {
 			try {
 				await expect(import('./cli.js')).rejects.toThrow('exit:1');
 				expect(ensureDaemonForTui).toHaveBeenCalledWith({
-					configDir: '/tmp/cacd-test',
+					configDir: '/tmp/argusdev-test',
 					port: 3000,
 					accessToken: 'token',
 					isCustomConfigDir: false,
@@ -930,7 +930,7 @@ describe('CLI', () => {
 					autoStart: false,
 				});
 				expect(consoleErrorSpy).toHaveBeenCalledWith(
-					'Failed to connect TUI to daemon: No running CA⚡CD daemon found',
+					'Failed to connect TUI to daemon: No running ArgusDev daemon found',
 				);
 			} finally {
 				consoleErrorSpy.mockRestore();
@@ -938,7 +938,7 @@ describe('CLI', () => {
 			}
 		});
 
-		it('supports `cacd status --sessions --json`', async () => {
+		it('supports `argusdev status --sessions --json`', async () => {
 			process.argv = [
 				'node',
 				'/tmp/unified-entry.tsx',
@@ -951,7 +951,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile: vi.fn(async () => 5151),
 				isProcessRunning: vi.fn(() => true),
 			}));
@@ -959,7 +959,7 @@ describe('CLI', () => {
 				buildDaemonWebConfig: vi.fn(() => ({
 					url: 'http://127.0.0.1:3000/token',
 					port: 3000,
-					configDir: '/tmp/cacd-test',
+					configDir: '/tmp/argusdev-test',
 					isCustomConfigDir: false,
 					isDevMode: false,
 				})),
@@ -1033,7 +1033,7 @@ describe('CLI', () => {
 			}
 		});
 
-		it('supports `cacd sessions show <id>`', async () => {
+		it('supports `argusdev sessions show <id>`', async () => {
 			process.argv = [
 				'node',
 				'/tmp/unified-entry.tsx',
@@ -1046,7 +1046,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile: vi.fn(),
 				isProcessRunning: vi.fn(),
 			}));
@@ -1121,7 +1121,7 @@ describe('CLI', () => {
 			}
 		});
 
-		it('supports `cacd session create --agent <id>`', async () => {
+		it('supports `argusdev session create --agent <id>`', async () => {
 			process.argv = [
 				'node',
 				'/tmp/unified-entry.tsx',
@@ -1148,7 +1148,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile: vi.fn(),
 				isProcessRunning: vi.fn(),
 			}));
@@ -1217,7 +1217,7 @@ describe('CLI', () => {
 			}
 		});
 
-		it('supports `cacd session status <id>`', async () => {
+		it('supports `argusdev session status <id>`', async () => {
 			process.argv = [
 				'node',
 				'/tmp/unified-entry.tsx',
@@ -1230,7 +1230,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile: vi.fn(),
 				isProcessRunning: vi.fn(),
 			}));
@@ -1303,7 +1303,7 @@ describe('CLI', () => {
 			}
 		});
 
-		it('supports `cacd session stop <id> --json`', async () => {
+		it('supports `argusdev session stop <id> --json`', async () => {
 			process.argv = [
 				'node',
 				'/tmp/unified-entry.tsx',
@@ -1317,7 +1317,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile: vi.fn(),
 				isProcessRunning: vi.fn(),
 			}));
@@ -1366,7 +1366,7 @@ describe('CLI', () => {
 			}
 		});
 
-		it('supports `cacd agents list --json`', async () => {
+		it('supports `argusdev agents list --json`', async () => {
 			process.argv = [
 				'node',
 				'/tmp/unified-entry.tsx',
@@ -1379,7 +1379,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile: vi.fn(),
 				isProcessRunning: vi.fn(),
 			}));
@@ -1457,7 +1457,7 @@ describe('CLI', () => {
 			vi.doMock('./utils/daemonLifecycle.js', () => ({
 				prepareDaemonPidFile: vi.fn(),
 				cleanupDaemonPidFile: vi.fn(),
-				getDaemonPidFilePath: vi.fn(() => '/tmp/cacd-test/daemon.pid'),
+				getDaemonPidFilePath: vi.fn(() => '/tmp/argusdev-test/daemon.pid'),
 				readDaemonPidFile: vi.fn(),
 				isProcessRunning: vi.fn(),
 			}));
@@ -1490,7 +1490,7 @@ describe('CLI', () => {
 			try {
 				await expect(import('./cli.js')).rejects.toThrow('exit:1');
 				expect(consoleErrorSpy).toHaveBeenCalledWith(
-					'Failed to query sessions: No running CA⚡CD daemon found. Start it with `cacd start`.',
+					'Failed to query sessions: No running ArgusDev daemon found. Start it with `argusdev start`.',
 				);
 			} finally {
 				processExitSpy.mockRestore();

@@ -16,7 +16,7 @@ vi.mock('../utils/logger.js', () => ({
 
 const TEST_DB_PATH = path.join(
 	tmpdir(),
-	`cacd-tdreader-test-${process.pid}.db`,
+	`argusdev-tdreader-test-${process.pid}.db`,
 );
 
 function createTestDb(): void {

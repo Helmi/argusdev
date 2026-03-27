@@ -22,7 +22,7 @@ export function Footer() {
   const isApple = useIsApplePlatform()
 
   const handleLock = () => {
-    window.dispatchEvent(new CustomEvent('cacd-lock'))
+    window.dispatchEvent(new CustomEvent('argusdev-lock'))
   }
 
   const statusColors = {

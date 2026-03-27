@@ -1,12 +1,12 @@
 {
-	"name": "ca-cd",
+	"name": "argusdev",
 	"version": "0.5.0-dev",
-	"description": "CA⚡CD - Web-based control desk for managing multiple AI coding agent sessions (Claude, Gemini, Codex, Cursor)",
+	"description": "ArgusDev — Web-based control desk for managing multiple AI coding agent sessions (Claude, Gemini, Codex, Cursor)",
 	"license": "AGPL-3.0-or-later",
 	"author": "Helmi",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Helmi/cacd.git"
+		"url": "https://github.com/Helmi/argusdev.git"
 	},
 	"keywords": [
 		"ai",
@@ -19,10 +19,10 @@
 		"cursor",
 		"webui",
 		"cli",
-		"cacd"
+		"argusdev"
 	],
 	"bin": {
-		"cacd": "dist/cli.js"
+		"argusdev": "dist/cli.js"
 	},
 	"type": "module",
 	"engines": {
@@ -31,9 +31,9 @@
 	"scripts": {
 		"build": "tsc && cd client && npm install && npm run build",
 		"dev": "concurrently -n \"API,WEB\" -c \"blue,magenta\" \"bun run dev:server\" \"bun run dev:client\"",
-		"dev:server": "CACD_DEV=1 tsx watch --clear-screen=false src/cli.tsx --headless",
+		"dev:server": "ARGUSDEV_DEV=1 tsx watch --clear-screen=false src/cli.tsx --headless",
 		"dev:client": "cd client && bun run dev",
-		"dev:tui": "CACD_DEV=1 tsx watch src/cli.tsx",
+		"dev:tui": "ARGUSDEV_DEV=1 tsx watch src/cli.tsx",
 		"dev:build": "tsc --watch",
 		"start": "node dist/cli.js",
 		"install:global": "bun run build && npm install -g . --install-strategy=nested",

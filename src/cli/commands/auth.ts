@@ -42,7 +42,7 @@ export async function runAuthCommand(
 				context.formatter.write({
 					text: [
 						'Web interface is not enabled.',
-						'Run `cacd setup` to enable it.',
+						'Run `argusdev setup` to enable it.',
 					],
 					data: {
 						ok: true,
@@ -57,7 +57,7 @@ export async function runAuthCommand(
 				context.formatter.write({
 					text: [
 						'No access token configured.',
-						'Run `cacd auth regenerate-token` to generate one.',
+						'Run `argusdev auth regenerate-token` to generate one.',
 					],
 					data: {
 						ok: true,
@@ -77,7 +77,7 @@ export async function runAuthCommand(
 			];
 			if (!config.passcodeHash) {
 				lines.push(
-					'⚠️  No passcode set. Run `cacd auth reset-passcode` to set one.',
+					'⚠️  No passcode set. Run `argusdev auth reset-passcode` to set one.',
 				);
 			} else {
 				lines.push('✓ Passcode is configured');
@@ -247,9 +247,9 @@ export async function runAuthCommand(
 						: 'Missing auth command',
 					'',
 					'Available auth commands:',
-					'  cacd auth show              Display access URL',
-					'  cacd auth reset-passcode    Reset your passcode',
-					'  cacd auth regenerate-token  Generate new access token',
+					'  argusdev auth show              Display access URL',
+					'  argusdev auth reset-passcode    Reset your passcode',
+					'  argusdev auth regenerate-token  Generate new access token',
 				],
 				data: {
 					ok: false,

@@ -56,7 +56,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	private activeIntervals: Map<string, NodeJS.Timeout> = new Map();
 
 	// Dev mode detection
-	private readonly isDevMode = process.env['CACD_DEV'] === '1';
+	private readonly isDevMode = process.env['ARGUSDEV_DEV'] === '1';
 
 	public destroy(): void {
 		// Clean up all sessions first
@@ -233,8 +233,8 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 	): Promise<string> {
 		const normalizedPromptArg = this.normalizePromptArg(promptArg);
 		const scriptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-		const scriptPath = join(worktreePath, `.cacd-startup-${scriptId}.sh`);
-		const delimiter = `CACD_PROMPT_${scriptId.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}_EOF`;
+		const scriptPath = join(worktreePath, `.argusdev-startup-${scriptId}.sh`);
+		const delimiter = `ARGUSDEV_PROMPT_${scriptId.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}_EOF`;
 
 		const commandTokens = [
 			this.formatPosixToken(command),
@@ -244,13 +244,13 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		if (normalizedPromptArg && normalizedPromptArg.toLowerCase() !== 'none') {
 			commandTokens.push(this.formatPosixToken(normalizedPromptArg));
 		}
-		commandTokens.push('"$CACD_PROMPT"');
+		commandTokens.push('"$ARGUSDEV_PROMPT"');
 
 		const scriptContent = `#!/usr/bin/env bash
 SCRIPT_PATH="$0"
 cleanup() { rm -f "$SCRIPT_PATH"; }
 trap cleanup EXIT
-CACD_PROMPT=$(cat <<'${delimiter}'
+ARGUSDEV_PROMPT=$(cat <<'${delimiter}'
 ${initialPrompt}
 ${delimiter}
 )

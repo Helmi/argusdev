@@ -131,7 +131,7 @@ function NoTokenView() {
               <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]/80" />
             </div>
             <span className="flex-1 text-center text-[10px] text-[#3a6a3a] uppercase tracking-[0.2em] font-mono">
-              cacd://restricted
+              argusdev://restricted
             </span>
           </div>
 
@@ -169,7 +169,7 @@ function NoTokenView() {
                   Get your access URL from the terminal:
                 </p>
                 <code className="block bg-[#0d120d] px-3 py-2 rounded-sm text-sm font-mono text-[#00ff41]">
-                  cacd auth show
+                  argusdev auth show
                 </code>
               </div>
 
@@ -227,7 +227,7 @@ function InvalidTokenView() {
               <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]/80" />
             </div>
             <span className="flex-1 text-center text-[10px] text-[#6a3a3a] uppercase tracking-[0.2em] font-mono">
-              cacd://error
+              argusdev://error
             </span>
           </div>
 
@@ -265,7 +265,7 @@ function InvalidTokenView() {
                   Get the correct URL from your terminal:
                 </p>
                 <code className="block bg-[#0d120d] px-3 py-2 rounded-sm text-sm font-mono text-[#ff6b6b]">
-                  cacd auth show
+                  argusdev auth show
                 </code>
               </div>
             </div>
@@ -339,8 +339,8 @@ function AppContent() {
     if (authState !== 'authenticated') return
 
     const handleLockEvent = () => lockScreen()
-    window.addEventListener('cacd-lock', handleLockEvent)
-    return () => window.removeEventListener('cacd-lock', handleLockEvent)
+    window.addEventListener('argusdev-lock', handleLockEvent)
+    return () => window.removeEventListener('argusdev-lock', handleLockEvent)
   }, [authState, lockScreen])
 
   // Circuit breaker: redirect to passcode on 401 from any API call
@@ -348,8 +348,8 @@ function AppContent() {
     if (authState !== 'authenticated') return
 
     const handleAuthExpired = () => setAuthState('needs-passcode')
-    window.addEventListener('cacd-auth-expired', handleAuthExpired)
-    return () => window.removeEventListener('cacd-auth-expired', handleAuthExpired)
+    window.addEventListener('argusdev-auth-expired', handleAuthExpired)
+    return () => window.removeEventListener('argusdev-auth-expired', handleAuthExpired)
   }, [authState])
 
   const checkAuthStatus = async () => {

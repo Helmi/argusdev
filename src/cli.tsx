@@ -53,50 +53,50 @@ const {default: meow} = await import('meow');
 const cli = meow(
 	`
   Usage
-    $ cacd                      Start daemon in background
-    $ cacd start                Start daemon in background
-    $ cacd stop [--force]       Stop daemon (preserve sessions by default)
-    $ cacd status               Show daemon status
-    $ cacd status --sessions    Show daemon status and active sessions
-    $ cacd sessions list        List active sessions (legacy)
-    $ cacd sessions show <id>   Show one active session (legacy)
-    $ cacd session create --agent <id> [--worktree <path>] [--model <name>]
-    $ cacd session list         List active sessions
-    $ cacd session status <id>  Show one active session
-    $ cacd session stop <id>    Stop a running session
-    $ cacd agents list          List agents and their active sessions
-    $ cacd ui focus <id>        Set active/focused session in WebUI state
-    $ cacd ui send <id> <msg>   UI hook stub (not yet supported by daemon API)
-    $ cacd ui approve <id>      UI hook stub (not yet supported by daemon API)
-    $ cacd ui notify <msg>      UI hook stub (not yet supported by daemon API)
-    $ cacd focus <id>           Alias for cacd ui focus <id>
-    $ cacd send <id> <msg>      Alias for cacd ui send ... (stub)
-    $ cacd approve <id>         Alias for cacd ui approve ... (stub)
-    $ cacd notify <msg>         Alias for cacd ui notify ... (stub)
-    $ cacd restart [--force]    Restart daemon (preserve sessions by default)
-    $ cacd tui                  Launch TUI (daemon must already be running)
-    $ cacd daemon               Run daemon in foreground (for service managers)
-    $ cacd setup                Run first-time setup wizard
-    $ cacd add [path]           Add a project (alias for 'cacd project add')
-    $ cacd remove <path>        Remove a project (alias for 'cacd project remove')
-    $ cacd list                 List projects (alias for 'cacd project list')
-    $ cacd project add [path]   Add a project
-    $ cacd project list         List tracked projects
-    $ cacd project remove <path> Remove a project
-    $ cacd project configure <path> [--name <name>] [--description <desc>]
-    $ cacd worktree <command>   Manage worktrees through daemon API
-    $ cacd auth <command>       Manage WebUI authentication
+    $ argusdev                      Start daemon in background
+    $ argusdev start                Start daemon in background
+    $ argusdev stop [--force]       Stop daemon (preserve sessions by default)
+    $ argusdev status               Show daemon status
+    $ argusdev status --sessions    Show daemon status and active sessions
+    $ argusdev sessions list        List active sessions (legacy)
+    $ argusdev sessions show <id>   Show one active session (legacy)
+    $ argusdev session create --agent <id> [--worktree <path>] [--model <name>]
+    $ argusdev session list         List active sessions
+    $ argusdev session status <id>  Show one active session
+    $ argusdev session stop <id>    Stop a running session
+    $ argusdev agents list          List agents and their active sessions
+    $ argusdev ui focus <id>        Set active/focused session in WebUI state
+    $ argusdev ui send <id> <msg>   UI hook stub (not yet supported by daemon API)
+    $ argusdev ui approve <id>      UI hook stub (not yet supported by daemon API)
+    $ argusdev ui notify <msg>      UI hook stub (not yet supported by daemon API)
+    $ argusdev focus <id>           Alias for argusdev ui focus <id>
+    $ argusdev send <id> <msg>      Alias for argusdev ui send ... (stub)
+    $ argusdev approve <id>         Alias for argusdev ui approve ... (stub)
+    $ argusdev notify <msg>         Alias for argusdev ui notify ... (stub)
+    $ argusdev restart [--force]    Restart daemon (preserve sessions by default)
+    $ argusdev tui                  Launch TUI (daemon must already be running)
+    $ argusdev daemon               Run daemon in foreground (for service managers)
+    $ argusdev setup                Run first-time setup wizard
+    $ argusdev add [path]           Add a project (alias for 'argusdev project add')
+    $ argusdev remove <path>        Remove a project (alias for 'argusdev project remove')
+    $ argusdev list                 List projects (alias for 'argusdev project list')
+    $ argusdev project add [path]   Add a project
+    $ argusdev project list         List tracked projects
+    $ argusdev project remove <path> Remove a project
+    $ argusdev project configure <path> [--name <name>] [--description <desc>]
+    $ argusdev worktree <command>   Manage worktrees through daemon API
+    $ argusdev auth <command>       Manage WebUI authentication
 
   Auth Commands
-    $ cacd auth show              Display access URL
-    $ cacd auth reset-passcode    Reset your passcode
-    $ cacd auth regenerate-token  Generate new access token (careful!)
+    $ argusdev auth show              Display access URL
+    $ argusdev auth reset-passcode    Reset your passcode
+    $ argusdev auth regenerate-token  Generate new access token (careful!)
 
   Worktree Commands
-    $ cacd worktree create [--branch <name>] [--project <path>] [--task <td-task-id>]
-    $ cacd worktree list [--project <path>]
-    $ cacd worktree delete <path>
-    $ cacd worktree merge <path> [--target <branch>]
+    $ argusdev worktree create [--branch <name>] [--project <path>] [--task <td-task-id>]
+    $ argusdev worktree list [--project <path>]
+    $ argusdev worktree delete <path>
+    $ argusdev worktree merge <path> [--target <branch>]
 
   Options
     --help                  Show help
@@ -110,10 +110,10 @@ const cli = meow(
     --branch <name>         Branch name for worktree create
     --task <td-task-id>     Task id used as branch fallback for worktree create
     --target <branch>       Target branch for worktree merge
-    --name <name>           Project name (for 'cacd project configure')
-    --description <desc>    Project description (for 'cacd project configure')
+    --name <name>           Project name (for 'argusdev project configure')
+    --description <desc>    Project description (for 'argusdev project configure')
 
-  Session Create Options (for 'cacd session create')
+  Session Create Options (for 'argusdev session create')
     --agent <id>            Agent profile ID (required)
     --worktree <path>       Worktree path (defaults to current directory)
     --model <name>          Convenience alias for option "model"
@@ -124,44 +124,44 @@ const cli = meow(
     --intent <intent>       Session intent: work | review | manual
     --option <key[=value]>  Agent option (repeatable, e.g. --option yolo --option model=gpt-5)
 
-  Setup Options (for 'cacd setup')
+  Setup Options (for 'argusdev setup')
     --no-web               Disable web interface
     --project <path>       Add specified path as first project
     --skip-project         Don't add any project
     --force                Setup: overwrite config. Daemon stop/restart: destructive session shutdown.
 
   Environment Variables
-    CACD_CONFIG_DIR        Custom config directory (highest priority, overrides CACD_DEV)
-    CACD_PORT              Port for web interface
-    CACD_DEV               Set to 1 for dev mode (uses local .cacd-dev/ config)
+    ARGUSDEV_CONFIG_DIR        Custom config directory (highest priority, overrides ARGUSDEV_DEV)
+    ARGUSDEV_PORT              Port for web interface
+    ARGUSDEV_DEV               Set to 1 for dev mode (uses local .argusdev-dev/ config)
 
   Examples
-    $ cacd                        # Start daemon in background
-    $ cacd start                  # Start daemon in background
-    $ cacd status                 # Check daemon status
-    $ cacd status --sessions      # Show daemon + active sessions
-    $ cacd sessions list          # List active sessions (legacy)
-    $ cacd sessions show session-123
-    $ cacd session create --agent codex --worktree . --model gpt-5
-    $ cacd session list
-    $ cacd session status session-123
-    $ cacd session stop session-123
-    $ cacd agents list --json
-    $ cacd ui focus session-123   # Set focused session in UI/daemon state
-    $ cacd focus session-123      # Alias for ui focus
-    $ cacd stop                   # Stop daemon and preserve sessions for recovery
-    $ cacd stop --force           # Stop daemon and terminate active sessions
-    $ cacd tui                    # Launch TUI (requires running daemon)
-    $ cacd daemon                 # Foreground daemon mode for systemd/launchd
-    $ cacd setup --port 8080      # Setup with custom port
-    $ cacd add                    # Add current directory as project
-    $ cacd add /path/to/project   # Add specific project
-    $ cacd list                   # Show tracked projects
-    $ cacd project list           # Show tracked projects
-    $ cacd project configure /path/to/project --name "My Project"
-    $ cacd worktree list          # List registered worktrees
-    $ cacd worktree merge /path/to/worktree --target main
-    $ cacd auth show              # Show WebUI access URL
+    $ argusdev                        # Start daemon in background
+    $ argusdev start                  # Start daemon in background
+    $ argusdev status                 # Check daemon status
+    $ argusdev status --sessions      # Show daemon + active sessions
+    $ argusdev sessions list          # List active sessions (legacy)
+    $ argusdev sessions show session-123
+    $ argusdev session create --agent codex --worktree . --model gpt-5
+    $ argusdev session list
+    $ argusdev session status session-123
+    $ argusdev session stop session-123
+    $ argusdev agents list --json
+    $ argusdev ui focus session-123   # Set focused session in UI/daemon state
+    $ argusdev focus session-123      # Alias for ui focus
+    $ argusdev stop                   # Stop daemon and preserve sessions for recovery
+    $ argusdev stop --force           # Stop daemon and terminate active sessions
+    $ argusdev tui                    # Launch TUI (requires running daemon)
+    $ argusdev daemon                 # Foreground daemon mode for systemd/launchd
+    $ argusdev setup --port 8080      # Setup with custom port
+    $ argusdev add                    # Add current directory as project
+    $ argusdev add /path/to/project   # Add specific project
+    $ argusdev list                   # Show tracked projects
+    $ argusdev project list           # Show tracked projects
+    $ argusdev project configure /path/to/project --name "My Project"
+    $ argusdev worktree list          # List registered worktrees
+    $ argusdev worktree merge /path/to/worktree --target main
+    $ argusdev auth show              # Show WebUI access URL
 	`,
 	{
 		importMeta: import.meta,
@@ -339,29 +339,29 @@ if (subcommand && !knownCommands.has(subcommand)) {
 			`Unknown command: ${subcommand}`,
 			'',
 			'Available commands:',
-			'  cacd start         Start daemon in background',
-			'  cacd stop          Stop daemon',
-			'  cacd status        Show daemon status',
-			'  cacd sessions      Query active sessions (legacy)',
-			'  cacd session       Manage sessions (create/list/status/stop)',
-			'  cacd agents        Query configured agents',
-			'  cacd ui            Trigger UI workflow hooks (focus/send/approve/notify)',
-			'  cacd trigger       Alias for `cacd ui`',
-			'  cacd focus         Alias for `cacd ui focus`',
-			'  cacd send          Alias for `cacd ui send` (stub)',
-			'  cacd approve       Alias for `cacd ui approve` (stub)',
-			'  cacd notify        Alias for `cacd ui notify` (stub)',
-			'  cacd restart       Restart daemon',
-			'  cacd setup         Run first-time setup',
-			'  cacd add [path]    Add a project',
-			'  cacd remove <path> Remove a project',
-			'  cacd list          List projects',
-			'  cacd project ...   Project subcommands',
-			'  cacd auth <cmd>    Manage WebUI auth',
-			'  cacd worktree <cmd> Manage worktrees via daemon API',
-			'  cacd tui           Launch TUI (daemon required)',
-			'  cacd daemon        Run API server in foreground',
-			'  cacd               Start daemon in background',
+			'  argusdev start         Start daemon in background',
+			'  argusdev stop          Stop daemon',
+			'  argusdev status        Show daemon status',
+			'  argusdev sessions      Query active sessions (legacy)',
+			'  argusdev session       Manage sessions (create/list/status/stop)',
+			'  argusdev agents        Query configured agents',
+			'  argusdev ui            Trigger UI workflow hooks (focus/send/approve/notify)',
+			'  argusdev trigger       Alias for `argusdev ui`',
+			'  argusdev focus         Alias for `argusdev ui focus`',
+			'  argusdev send          Alias for `argusdev ui send` (stub)',
+			'  argusdev approve       Alias for `argusdev ui approve` (stub)',
+			'  argusdev notify        Alias for `argusdev ui notify` (stub)',
+			'  argusdev restart       Restart daemon',
+			'  argusdev setup         Run first-time setup',
+			'  argusdev add [path]    Add a project',
+			'  argusdev remove <path> Remove a project',
+			'  argusdev list          List projects',
+			'  argusdev project ...   Project subcommands',
+			'  argusdev auth <cmd>    Manage WebUI auth',
+			'  argusdev worktree <cmd> Manage worktrees via daemon API',
+			'  argusdev tui           Launch TUI (daemon required)',
+			'  argusdev daemon        Run API server in foreground',
+			'  argusdev              Start daemon in background',
 		],
 		data: {
 			ok: false,
@@ -548,13 +548,13 @@ if (commandResult !== undefined) {
 if (!isDaemonMode && (!process.stdin.isTTY || !process.stdout.isTTY)) {
 	formatter.writeError({
 		text: [
-			'Error: cacd must be run in an interactive terminal (TTY)',
-			'Use `cacd start` to run daemon in background',
+			'Error: argusdev must be run in an interactive terminal (TTY)',
+			'Use `argusdev start` to run daemon in background',
 		],
 		data: {
 			ok: false,
 			error: {
-				message: 'cacd must be run in an interactive terminal (TTY)',
+				message: 'argusdev must be run in an interactive terminal (TTY)',
 			},
 		},
 	});
@@ -670,7 +670,7 @@ if (isDaemonMode) {
 
 	formatter.write({
 		text: [
-			'CA⚡CD daemon started',
+			'ArgusDev daemon started',
 			`Local URL:    ${webConfig?.url || `http://localhost:${port}`}`,
 			`Token:        ${accessToken || '(none configured)'}`,
 			`External URL: ${webConfig?.externalUrl || '(unavailable)'}`,

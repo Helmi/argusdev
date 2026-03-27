@@ -19,9 +19,9 @@ function normalizeApiError(error: unknown): Error {
 			);
 		}
 
-		if (error.message.includes('Unable to connect to CACD daemon at')) {
+		if (error.message.includes('Unable to connect to ArgusDev daemon at')) {
 			return new Error(
-				'No running CA⚡CD daemon found. Start it with `cacd start`.',
+				'No running ArgusDev daemon found. Start it with `argusdev start`.',
 			);
 		}
 
@@ -130,7 +130,7 @@ async function runFocusCommand(
 		return writeUsageError(
 			context,
 			commandLabel,
-			'cacd focus <session-id>',
+			'argusdev focus <session-id>',
 			'Missing session id',
 		);
 	}
@@ -180,7 +180,7 @@ function runUnsupportedSendCommand(
 		return writeUsageError(
 			context,
 			commandLabel,
-			'cacd send <session-id> <message>',
+			'argusdev send <session-id> <message>',
 			'Missing session id or message',
 		);
 	}
@@ -202,7 +202,7 @@ function runUnsupportedApproveCommand(
 		return writeUsageError(
 			context,
 			commandLabel,
-			'cacd approve <session-id>',
+			'argusdev approve <session-id>',
 			'Missing session id',
 		);
 	}
@@ -224,7 +224,7 @@ function runUnsupportedNotifyCommand(
 		return writeUsageError(
 			context,
 			commandLabel,
-			'cacd notify <message>',
+			'argusdev notify <message>',
 			'Missing notification message',
 		);
 	}
@@ -241,13 +241,13 @@ function writeUiCommandHelp(context: CliCommandContext): number {
 		text: [
 			'Missing or unsupported UI action.',
 			'Available commands:',
-			'  cacd ui send <session-id> <message>     (stub: not yet supported)',
-			'  cacd ui approve <session-id>            (stub: not yet supported)',
-			'  cacd ui focus <session-id>              (supported)',
-			'  cacd ui notify <message>                (stub: not yet supported)',
+			'  argusdev ui send <session-id> <message>     (stub: not yet supported)',
+			'  argusdev ui approve <session-id>            (stub: not yet supported)',
+			'  argusdev ui focus <session-id>              (supported)',
+			'  argusdev ui notify <message>                (stub: not yet supported)',
 			'',
 			'Aliases:',
-			'  cacd send ... | cacd approve ... | cacd focus ... | cacd notify ...',
+			'  argusdev send ... | argusdev approve ... | argusdev focus ... | argusdev notify ...',
 		],
 		data: {
 			ok: false,

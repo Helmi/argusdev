@@ -297,7 +297,7 @@ export async function runSetup(
 		console.log(`\nBackup created: ${actualBackupPath}`);
 	}
 
-	console.log('\nCreating CACD configuration...\n');
+	console.log('\nCreating ArgusDev configuration...\n');
 
 	// Detect installed agents
 	console.log('Detecting installed agents...');
@@ -422,7 +422,7 @@ export async function runSetup(
 		console.log(
 			`\nWeb interface enabled but passcode not set (non-interactive mode).`,
 		);
-		console.log(`Run 'cacd auth set-passcode' to set a passcode.`);
+		console.log(`Run 'argusdev auth set-passcode' to set a passcode.`);
 		console.log(`Access token: ${accessToken}`);
 	}
 
@@ -515,7 +515,7 @@ export async function runSetup(
 	writeFileSync(configPath, JSON.stringify(config, null, 2));
 
 	console.log(`\nConfiguration saved to ${configPath}`);
-	console.log('\nSetup complete! Starting CACD...');
+	console.log('\nSetup complete! Starting ArgusDev...');
 
 	return {
 		configPath,

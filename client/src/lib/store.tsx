@@ -349,7 +349,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		Set<string>
 	>(() => {
 		try {
-			const saved = localStorage.getItem('cacd_sessionsWithSidebarOpen');
+			const saved = localStorage.getItem('argusdev_sessionsWithSidebarOpen');
 			return saved ? new Set(JSON.parse(saved)) : new Set();
 		} catch {
 			return new Set();
@@ -362,7 +362,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 			setSessionsWithSidebarOpenState(prev => {
 				const newValue = typeof value === 'function' ? value(prev) : value;
 				localStorage.setItem(
-					'cacd_sessionsWithSidebarOpen',
+					'argusdev_sessionsWithSidebarOpen',
 					JSON.stringify([...newValue]),
 				);
 				return newValue;
@@ -376,7 +376,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		Record<string, 'changes' | 'files'>
 	>(() => {
 		try {
-			const saved = localStorage.getItem('cacd_sessionContextTabs');
+			const saved = localStorage.getItem('argusdev_sessionContextTabs');
 			return saved ? JSON.parse(saved) : {};
 		} catch {
 			return {};
@@ -387,7 +387,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		(sessionId: string, tab: 'changes' | 'files') => {
 			setSessionContextTabsState(prev => {
 				const next = {...prev, [sessionId]: tab};
-				localStorage.setItem('cacd_sessionContextTabs', JSON.stringify(next));
+				localStorage.setItem('argusdev_sessionContextTabs', JSON.stringify(next));
 				return next;
 			});
 		},
@@ -430,7 +430,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const [settingsSection, setSettingsSection] = useState<
 		'general' | 'agents' | 'status-hooks' | 'worktree-hooks' | 'td' | 'project'
 	>(() => {
-		const saved = localStorage.getItem('cacd_settings_section');
+		const saved = localStorage.getItem('argusdev_settings_section');
 		if (
 			saved === 'general' ||
 			saved === 'agents' ||
@@ -450,13 +450,13 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	// Theme state - load from localStorage
 	const [theme, setThemeState] = useState<ThemeType>(() => {
-		return (localStorage.getItem('cacd_theme') as ThemeType) || 'default';
+		return (localStorage.getItem('argusdev_theme') as ThemeType) || 'default';
 	});
 	const [font, setFontState] = useState<FontType>(() => {
-		return (localStorage.getItem('cacd_font') as FontType) || 'jetbrains';
+		return (localStorage.getItem('argusdev_font') as FontType) || 'jetbrains';
 	});
 	const [fontScale, setFontScaleState] = useState(() => {
-		return parseInt(localStorage.getItem('cacd_fontScale') || '100', 10);
+		return parseInt(localStorage.getItem('argusdev_fontScale') || '100', 10);
 	});
 
 	// Connection state
@@ -505,7 +505,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		if (theme !== 'default') {
 			root.classList.add(`theme-${theme}`);
 		}
-		localStorage.setItem('cacd_theme', theme);
+		localStorage.setItem('argusdev_theme', theme);
 	}, [theme]);
 
 	// Apply font to body
@@ -513,13 +513,13 @@ export function AppProvider({children}: {children: ReactNode}) {
 		const body = document.body;
 		body.className = body.className.replace(/font-\w+/g, '');
 		body.classList.add(`font-${font}`);
-		localStorage.setItem('cacd_font', font);
+		localStorage.setItem('argusdev_font', font);
 	}, [font]);
 
 	// Apply font scale
 	useEffect(() => {
 		document.documentElement.style.fontSize = `${fontScale}%`;
-		localStorage.setItem('cacd_fontScale', String(fontScale));
+		localStorage.setItem('argusdev_fontScale', String(fontScale));
 	}, [fontScale]);
 
 	// Fetch session-related data only (frequent updates)
@@ -1155,7 +1155,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 				setSessionContextTabsState(prev => {
 					const next = {...prev};
 					staleTabIds.forEach(id => delete next[id]);
-					localStorage.setItem('cacd_sessionContextTabs', JSON.stringify(next));
+					localStorage.setItem('argusdev_sessionContextTabs', JSON.stringify(next));
 					return next;
 				});
 			}
@@ -1533,7 +1533,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		if (settingsSection !== targetSection) {
 			setSettingsSection(targetSection);
 		}
-		localStorage.setItem('cacd_settings_section', targetSection);
+		localStorage.setItem('argusdev_settings_section', targetSection);
 		setSettingsOpen(true);
 	};
 	const closeSettings = () => setSettingsOpen(false);
@@ -1547,7 +1547,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 			| 'project',
 	) => {
 		setSettingsSection(section);
-		localStorage.setItem('cacd_settings_section', section);
+		localStorage.setItem('argusdev_settings_section', section);
 	};
 
 	const openFileDiff = (

@@ -96,9 +96,9 @@ function normalizeApiError(error: unknown): Error {
 			);
 		}
 
-		if (error.message.includes('Unable to connect to CACD daemon at')) {
+		if (error.message.includes('Unable to connect to ArgusDev daemon at')) {
 			return new Error(
-				'No running CA⚡CD daemon found. Start it with `cacd start`.',
+				'No running ArgusDev daemon found. Start it with `argusdev start`.',
 			);
 		}
 
@@ -593,7 +593,7 @@ async function runSessionCreateCommand(
 		context.formatter.writeError({
 			text: [
 				'Error: Missing required --agent flag',
-				'Usage: cacd session create --agent <agent-id> [--model <model>] [--worktree <path>] [--task <td-task-id>] [--name <name>]',
+				'Usage: argusdev session create --agent <agent-id> [--model <model>] [--worktree <path>] [--task <td-task-id>] [--name <name>]',
 			],
 			data: {
 				ok: false,
@@ -601,7 +601,7 @@ async function runSessionCreateCommand(
 				error: {
 					message: 'Missing required --agent flag',
 					usage:
-						'cacd session create --agent <agent-id> [--model <model>] [--worktree <path>] [--task <td-task-id>] [--name <name>]',
+						'argusdev session create --agent <agent-id> [--model <model>] [--worktree <path>] [--task <td-task-id>] [--name <name>]',
 				},
 			},
 		});
@@ -762,13 +762,13 @@ async function runSessionsCommand(context: CliCommandContext): Promise<number> {
 		const sessionId = context.parsedArgs.input[2];
 		if (!sessionId) {
 			context.formatter.writeError({
-				text: ['Error: Missing session id', 'Usage: cacd sessions show <id>'],
+				text: ['Error: Missing session id', 'Usage: argusdev sessions show <id>'],
 				data: {
 					ok: false,
 					command: 'sessions show',
 					error: {
 						message: 'Missing session id',
-						usage: 'cacd sessions show <id>',
+						usage: 'argusdev sessions show <id>',
 					},
 				},
 			});
@@ -782,8 +782,8 @@ async function runSessionsCommand(context: CliCommandContext): Promise<number> {
 		text: [
 			`Unknown sessions command: ${action}`,
 			'Available sessions commands:',
-			'  cacd sessions list',
-			'  cacd sessions show <id>',
+			'  argusdev sessions list',
+			'  argusdev sessions show <id>',
 		],
 		data: {
 			ok: false,
@@ -814,14 +814,14 @@ async function runSessionCommand(context: CliCommandContext): Promise<number> {
 			context.formatter.writeError({
 				text: [
 					'Error: Missing session id',
-					`Usage: cacd session ${action} <id>`,
+					`Usage: argusdev session ${action} <id>`,
 				],
 				data: {
 					ok: false,
 					command: `session ${action}`,
 					error: {
 						message: 'Missing session id',
-						usage: `cacd session ${action} <id>`,
+						usage: `argusdev session ${action} <id>`,
 					},
 				},
 			});
@@ -840,13 +840,13 @@ async function runSessionCommand(context: CliCommandContext): Promise<number> {
 		const sessionId = context.parsedArgs.input[2];
 		if (!sessionId) {
 			context.formatter.writeError({
-				text: ['Error: Missing session id', 'Usage: cacd session stop <id>'],
+				text: ['Error: Missing session id', 'Usage: argusdev session stop <id>'],
 				data: {
 					ok: false,
 					command: 'session stop',
 					error: {
 						message: 'Missing session id',
-						usage: 'cacd session stop <id>',
+						usage: 'argusdev session stop <id>',
 					},
 				},
 			});
@@ -860,10 +860,10 @@ async function runSessionCommand(context: CliCommandContext): Promise<number> {
 		text: [
 			`Unknown session command: ${action}`,
 			'Available session commands:',
-			'  cacd session create --agent <agent-id> [--model <model>] [--worktree <path>] [--task <td-task-id>] [--name <name>]',
-			'  cacd session list',
-			'  cacd session status <id>',
-			'  cacd session stop <id>',
+			'  argusdev session create --agent <agent-id> [--model <model>] [--worktree <path>] [--task <td-task-id>] [--name <name>]',
+			'  argusdev session list',
+			'  argusdev session status <id>',
+			'  argusdev session stop <id>',
 		],
 		data: {
 			ok: false,
@@ -884,7 +884,7 @@ async function runAgentsCommand(context: CliCommandContext): Promise<number> {
 			text: [
 				`Unknown agents command: ${action}`,
 				'Available agents commands:',
-				'  cacd agents list',
+				'  argusdev agents list',
 			],
 			data: {
 				ok: false,

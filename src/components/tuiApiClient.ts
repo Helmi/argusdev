@@ -71,12 +71,12 @@ function parseUrlAndToken(input: string): {baseUrl: string; token?: string} {
 }
 
 function buildDefaultBaseUrl(): string {
-	const daemonUrl = process.env['CACD_DAEMON_URL'];
+	const daemonUrl = process.env['ARGUSDEV_DAEMON_URL'];
 	if (daemonUrl) {
 		return parseUrlAndToken(daemonUrl).baseUrl;
 	}
 
-	const envPort = process.env['CACD_PORT'];
+	const envPort = process.env['ARGUSDEV_PORT'];
 	const port = envPort ? Number.parseInt(envPort, 10) : 3000;
 	const resolvedPort = Number.isFinite(port) ? port : 3000;
 	return `http://127.0.0.1:${resolvedPort}`;
@@ -100,7 +100,7 @@ export function worktreeBelongsToProject(
 
 class TuiApiClient extends EventEmitter {
 	private baseUrl = buildDefaultBaseUrl();
-	private accessToken = process.env['CACD_ACCESS_TOKEN'];
+	private accessToken = process.env['ARGUSDEV_ACCESS_TOKEN'];
 	private socket: Socket | null = null;
 
 	configure(config: TuiApiClientConfig) {

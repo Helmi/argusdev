@@ -177,7 +177,7 @@ export class ApiClient {
 		} catch (error) {
 			if (isConnectionError(error)) {
 				throw new ApiClientError(
-					`Unable to connect to CACD daemon at ${this.options.baseUrl}. Is the daemon running? Try \`cacd start\`.`,
+					`Unable to connect to ArgusDev daemon at ${this.options.baseUrl}. Is the daemon running? Try \`argusdev start\`.`,
 					{cause: error},
 				);
 			}
@@ -189,7 +189,7 @@ export class ApiClient {
 			rawBody.length === 0 ? undefined : parseJsonResponse(rawBody, requestUrl);
 
 		if (!response.ok) {
-			const defaultMessage = `CACD daemon API request failed: ${method} ${normalizedPath} returned ${response.status}.`;
+			const defaultMessage = `ArgusDev daemon API request failed: ${method} ${normalizedPath} returned ${response.status}.`;
 			const detailMessage =
 				typeof parsedBody === 'object' &&
 				parsedBody !== null &&

@@ -77,7 +77,7 @@ const ALLOWED_MIME_TYPES = [
 	'image/webp',
 	'image/gif',
 ];
-const TEMP_IMAGE_DIR = path.join(tmpdir(), 'cacd-images');
+const TEMP_IMAGE_DIR = path.join(tmpdir(), 'argusdev-images');
 const STARTUP_SCRIPT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 const STARTUP_SCRIPT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -612,7 +612,7 @@ export class APIServer {
 
 	private buildRestartFallbackPrompt(record: SessionRecord): string {
 		const lines = [
-			`This session (${record.id}) was restarted by CA⚡CD.`,
+			`This session (${record.id}) was restarted by ArgusDev.`,
 			'',
 			'Resume context safely:',
 			`1) Review recent session history${record.agentSessionPath ? ` in ${record.agentSessionPath}` : ''}.`,
@@ -796,7 +796,7 @@ export class APIServer {
 				recoveryMode,
 				notice:
 					recoveryMode === 'fallback'
-						? 'Session restarted without deterministic resume. CACD started a fresh session with a recovery prompt.'
+						? 'Session restarted without deterministic resume. ArgusDev started a fresh session with a recovery prompt.'
 						: undefined,
 			};
 		} catch (error) {
@@ -955,7 +955,7 @@ export class APIServer {
 
 		// Check auth status - returns whether user has valid session
 		this.app.get('/api/auth/status', async request => {
-			const sessionId = request.cookies['cacd_session'];
+			const sessionId = request.cookies['argusdev_session'];
 			if (!sessionId) {
 				return {authenticated: false};
 			}
@@ -1016,7 +1016,7 @@ export class APIServer {
 
 				// Create session and set cookie
 				const session = authService.createSession();
-				reply.setCookie('cacd_session', session.id, {
+				reply.setCookie('argusdev_session', session.id, {
 					path: '/',
 					httpOnly: true,
 					sameSite: 'strict',
@@ -1030,12 +1030,12 @@ export class APIServer {
 
 		// Logout - invalidate session
 		this.app.post('/api/auth/logout', async (request, reply) => {
-			const sessionId = request.cookies['cacd_session'];
+			const sessionId = request.cookies['argusdev_session'];
 			if (sessionId) {
 				authService.invalidateSession(sessionId);
 			}
 
-			reply.clearCookie('cacd_session', {path: '/'});
+			reply.clearCookie('argusdev_session', {path: '/'});
 			return {success: true};
 		});
 
@@ -1085,14 +1085,14 @@ export class APIServer {
 			}
 
 			// Check for valid session
-			const sessionId = request.cookies['cacd_session'];
+			const sessionId = request.cookies['argusdev_session'];
 			if (!sessionId) {
 				return reply.status(401).send({error: 'Authentication required'});
 			}
 
 			const session = authService.validateSession(sessionId);
 			if (!session) {
-				reply.clearCookie('cacd_session', {path: '/'});
+				reply.clearCookie('argusdev_session', {path: '/'});
 				return reply.status(401).send({error: 'Session expired'});
 			}
 
@@ -3233,7 +3233,7 @@ export class APIServer {
 					// Reject the task (moves from in_review back to in_progress)
 					execFileSync(
 						'td',
-						['reject', id, '--reason', 'Changes requested via CACD'],
+						['reject', id, '--reason', 'Changes requested via ArgusDev'],
 						{
 							encoding: 'utf-8',
 							timeout: 5000,
@@ -3468,7 +3468,7 @@ export class APIServer {
 					}
 				});
 
-				const sessionId = cookies['cacd_session'];
+				const sessionId = cookies['argusdev_session'];
 				if (!sessionId) {
 					return next(new Error('Authentication required'));
 				}

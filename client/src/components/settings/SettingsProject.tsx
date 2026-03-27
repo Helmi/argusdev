@@ -420,7 +420,7 @@ export function SettingsProject() {
             placeholder="npm install && npm run build"
           />
           <p className="text-xs text-muted-foreground">
-            Runs after worktree creation. Env: <code className="bg-muted px-1 rounded">$CACD_WORKTREE_PATH</code>, <code className="bg-muted px-1 rounded">$CACD_WORKTREE_BRANCH</code>
+            Runs after worktree creation. Env: <code className="bg-muted px-1 rounded">$ARGUSDEV_WORKTREE_PATH</code>, <code className="bg-muted px-1 rounded">$ARGUSDEV_WORKTREE_BRANCH</code>
           </p>
         </div>
 

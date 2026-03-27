@@ -35,7 +35,7 @@ export function SettingsWorktreeHooks({ localConfig, setLocalConfig }: SettingsW
             placeholder="npm install && git pull"
           />
           <p className="text-xs text-muted-foreground">
-            Runs after a worktree is created. Environment variables: <code className="bg-muted px-1 rounded">$CACD_WORKTREE_PATH</code>, <code className="bg-muted px-1 rounded">$CACD_WORKTREE_BRANCH</code>, <code className="bg-muted px-1 rounded">$CACD_GIT_ROOT</code>
+            Runs after a worktree is created. Environment variables: <code className="bg-muted px-1 rounded">$ARGUSDEV_WORKTREE_PATH</code>, <code className="bg-muted px-1 rounded">$ARGUSDEV_WORKTREE_BRANCH</code>, <code className="bg-muted px-1 rounded">$ARGUSDEV_GIT_ROOT</code>
           </p>
         </div>
       </div>

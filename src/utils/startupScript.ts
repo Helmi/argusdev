@@ -4,7 +4,7 @@ import type {Dirent} from 'fs';
 
 const GITDIR_PREFIX = 'gitdir:';
 
-const STARTUP_SCRIPT_PREFIX = '.cacd-startup-';
+const STARTUP_SCRIPT_PREFIX = '.argusdev-startup-';
 const STARTUP_SCRIPT_SUFFIX = '.sh';
 
 export const STARTUP_SCRIPT_NAME_PATTERN = new RegExp(

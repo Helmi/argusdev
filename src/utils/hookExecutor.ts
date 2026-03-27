@@ -6,10 +6,10 @@ import {WorktreeService} from '../services/worktreeService.js';
 import {configurationManager} from '../services/configurationManager.js';
 
 export interface HookEnvironment {
-	CACD_WORKTREE_PATH: string;
-	CACD_WORKTREE_BRANCH: string;
-	CACD_GIT_ROOT: string;
-	CACD_BASE_BRANCH?: string;
+	ARGUSDEV_WORKTREE_PATH: string;
+	ARGUSDEV_WORKTREE_BRANCH: string;
+	ARGUSDEV_GIT_ROOT: string;
+	ARGUSDEV_BASE_BRANCH?: string;
 	[key: string]: string | undefined;
 }
 
@@ -30,9 +30,9 @@ export interface HookEnvironment {
  * import {executeHook} from './utils/hookExecutor.js';
  *
  * const env = {
- *   CACD_WORKTREE_PATH: '/path/to/worktree',
- *   CACD_WORKTREE_BRANCH: 'feature-branch',
- *   CACD_GIT_ROOT: '/path/to/repo'
+ *   ARGUSDEV_WORKTREE_PATH: '/path/to/worktree',
+ *   ARGUSDEV_WORKTREE_BRANCH: 'feature-branch',
+ *   ARGUSDEV_GIT_ROOT: '/path/to/repo'
  * };
  *
  * // Execute hook with error recovery
@@ -125,13 +125,13 @@ export function executeWorktreePostCreationHook(
 	baseBranch?: string,
 ): Effect.Effect<void, never> {
 	const environment: HookEnvironment = {
-		CACD_WORKTREE_PATH: worktree.path,
-		CACD_WORKTREE_BRANCH: worktree.branch || 'unknown',
-		CACD_GIT_ROOT: gitRoot,
+		ARGUSDEV_WORKTREE_PATH: worktree.path,
+		ARGUSDEV_WORKTREE_BRANCH: worktree.branch || 'unknown',
+		ARGUSDEV_GIT_ROOT: gitRoot,
 	};
 
 	if (baseBranch) {
-		environment.CACD_BASE_BRANCH = baseBranch;
+		environment.ARGUSDEV_BASE_BRANCH = baseBranch;
 	}
 
 	return Effect.catchAll(
@@ -180,12 +180,12 @@ export function executeStatusHook(
 
 		// Build environment for status hook
 		const environment: HookEnvironment = {
-			CACD_WORKTREE_PATH: session.worktreePath,
-			CACD_WORKTREE_BRANCH: branch,
-			CACD_GIT_ROOT: session.worktreePath, // For status hooks, we use worktree path as cwd
-			CACD_OLD_STATE: oldState,
-			CACD_NEW_STATE: newState,
-			CACD_SESSION_ID: session.id,
+			ARGUSDEV_WORKTREE_PATH: session.worktreePath,
+			ARGUSDEV_WORKTREE_BRANCH: branch,
+			ARGUSDEV_GIT_ROOT: session.worktreePath, // For status hooks, we use worktree path as cwd
+			ARGUSDEV_OLD_STATE: oldState,
+			ARGUSDEV_NEW_STATE: newState,
+			ARGUSDEV_SESSION_ID: session.id,
 		};
 
 		yield* Effect.catchAll(
@@ -209,9 +209,9 @@ export function executeProjectSetupHook(
 	env: Record<string, string>,
 ): Effect.Effect<string | null, never> {
 	const environment: HookEnvironment = {
-		CACD_WORKTREE_PATH: worktreePath,
-		CACD_WORKTREE_BRANCH: env['CACD_BRANCH'] || 'unknown',
-		CACD_GIT_ROOT: env['CACD_ROOT_PATH'] || worktreePath,
+		ARGUSDEV_WORKTREE_PATH: worktreePath,
+		ARGUSDEV_WORKTREE_BRANCH: env['ARGUSDEV_BRANCH'] || 'unknown',
+		ARGUSDEV_GIT_ROOT: env['ARGUSDEV_ROOT_PATH'] || worktreePath,
 		...env,
 	};
 
@@ -238,9 +238,9 @@ export function executeProjectTeardownHook(
 	env: Record<string, string>,
 ): Effect.Effect<string | null, never> {
 	const environment: HookEnvironment = {
-		CACD_WORKTREE_PATH: worktreePath,
-		CACD_WORKTREE_BRANCH: env['CACD_BRANCH'] || 'unknown',
-		CACD_GIT_ROOT: env['CACD_ROOT_PATH'] || worktreePath,
+		ARGUSDEV_WORKTREE_PATH: worktreePath,
+		ARGUSDEV_WORKTREE_BRANCH: env['ARGUSDEV_BRANCH'] || 'unknown',
+		ARGUSDEV_GIT_ROOT: env['ARGUSDEV_ROOT_PATH'] || worktreePath,
 		...env,
 	};
 

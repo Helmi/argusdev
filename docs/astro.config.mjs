@@ -5,17 +5,17 @@ import starlight from '@astrojs/starlight';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://helmi.github.io',
-	base: '/cacd',
+	base: '/argusdev',
 	integrations: [
 		starlight({
-			title: 'CACD',
-			tagline: 'Coding Agent Control Desk',
+			title: 'ArgusDev',
+			tagline: 'The All-Seeing Dashboard for Coding Agents',
 			logo: {
 				src: './public/logo.svg',
-				alt: 'CACD Logo',
+				alt: 'ArgusDev Logo',
 			},
 			favicon: '/favicon.svg',
-			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/Helmi/cacd' }],
+			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/Helmi/argusdev' }],
 			customCss: ['./src/styles/custom.css'],
 			sidebar: [
 				{
@@ -59,7 +59,7 @@ export default defineConfig({
 				},
 			],
 			editLink: {
-				baseUrl: 'https://github.com/Helmi/cacd/edit/main/docs/',
+				baseUrl: 'https://github.com/Helmi/argusdev/edit/main/docs/',
 			},
 		}),
 	],

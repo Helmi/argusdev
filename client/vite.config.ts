@@ -17,7 +17,7 @@ function getVersion(): string {
 // Read API port from dev config if available
 function getApiPort(): number {
   try {
-    const configPath = path.resolve(__dirname, '../.cacd-dev/config.json')
+    const configPath = path.resolve(__dirname, '../.argusdev-dev/config.json')
     const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
     return config.port || 3000
   } catch {

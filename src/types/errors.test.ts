@@ -87,14 +87,14 @@ describe('Error Types', () => {
 			const {ConfigError} = await import('./errors.js');
 
 			const error = new ConfigError({
-				configPath: '~/.config/cacd/config.json',
+				configPath: '~/.config/argusdev/config.json',
 				reason: 'parse',
 				details: 'Unexpected token in JSON at position 42',
 			});
 
 			expect(error).toBeInstanceOf(Error);
 			expect(error._tag).toBe('ConfigError');
-			expect(error.configPath).toBe('~/.config/cacd/config.json');
+			expect(error.configPath).toBe('~/.config/argusdev/config.json');
 			expect(error.reason).toBe('parse');
 			expect(error.details).toBe('Unexpected token in JSON at position 42');
 		});

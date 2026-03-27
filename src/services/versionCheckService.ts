@@ -153,7 +153,7 @@ export async function checkForUpdate(force = false): Promise<UpdateCheckResult> 
 		try {
 			const response = await fetch(GITHUB_RELEASES_API, {
 				headers: {
-					'User-Agent': 'cacd',
+					'User-Agent': 'argusdev',
 					Accept: 'application/vnd.github+json',
 			},
 			});

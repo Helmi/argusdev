@@ -11,7 +11,7 @@ import {getConfigDir} from './configDir.js';
 
 /**
  * Project-local configuration schema
- * Loaded from .cacd.json or .cacd/config.json in project root
+ * Loaded from .argusdev.json or .argusdev/config.json in project root
  */
 export interface ProjectConfig {
 	scripts?: {
@@ -61,7 +61,7 @@ export type PromptTemplateSource = 'project' | 'global';
 export type PromptScope = 'project' | 'global' | 'effective' | 'all';
 
 /**
- * A prompt template stored in .cacd/prompts/ or global config prompts/
+ * A prompt template stored in .argusdev/prompts/ or global config prompts/
  */
 export interface PromptTemplate {
 	/** Filename without extension */
@@ -139,7 +139,7 @@ const PROMPT_FILE_EXTENSIONS = ['.md', '.txt'];
 const GLOBAL_DEFAULTS_MARKER = '.defaults-seeded';
 
 /**
- * Load project configuration from .cacd.json or .cacd/config.json
+ * Load project configuration from .argusdev.json or .argusdev/config.json
  * @param projectRoot - Path to the project root (git root)
  * @returns ProjectConfig or null if no config found
  */
@@ -158,14 +158,14 @@ export function loadProjectConfig(projectRoot: string): ProjectConfig | null {
 }
 
 /**
- * Returns existing config path if present (.cacd/config.json first, then .cacd.json).
+ * Returns existing config path if present (.argusdev/config.json first, then .argusdev.json).
  */
 export function findExistingProjectConfigPath(
 	projectRoot: string,
 ): string | null {
 	const configPaths = [
-		path.join(projectRoot, '.cacd', 'config.json'),
-		path.join(projectRoot, '.cacd.json'),
+		path.join(projectRoot, '.argusdev', 'config.json'),
+		path.join(projectRoot, '.argusdev.json'),
 	];
 
 	for (const configPath of configPaths) {
@@ -177,53 +177,53 @@ export function findExistingProjectConfigPath(
 
 /**
  * Get path for project config. Uses existing file path if available,
- * otherwise returns .cacd/config.json.
+ * otherwise returns .argusdev/config.json.
  */
 export function getProjectConfigPath(projectRoot: string): string {
 	return (
 		findExistingProjectConfigPath(projectRoot) ||
-		path.join(projectRoot, '.cacd', 'config.json')
+		path.join(projectRoot, '.argusdev', 'config.json')
 	);
 }
 
 /**
- * Persist project config to .cacd/config.json.
- * Reading still supports legacy .cacd.json for compatibility.
+ * Persist project config to .argusdev/config.json.
+ * Reading still supports legacy .argusdev.json for compatibility.
  */
 export function saveProjectConfig(
 	projectRoot: string,
 	config: ProjectConfig,
 ): string {
-	const cacdDir = path.join(projectRoot, '.cacd');
-	if (!existsSync(cacdDir)) {
-		mkdirSync(cacdDir, {recursive: true});
+	const argusdevDir = path.join(projectRoot, '.argusdev');
+	if (!existsSync(argusdevDir)) {
+		mkdirSync(argusdevDir, {recursive: true});
 	}
 
-	const configPath = path.join(cacdDir, 'config.json');
+	const configPath = path.join(argusdevDir, 'config.json');
 	writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf-8');
 	return configPath;
 }
 
 /**
- * Get the .cacd/ directory path for a project.
+ * Get the .argusdev/ directory path for a project.
  * Returns null if it doesn't exist.
  */
-export function getCacdDir(projectRoot: string): string | null {
-	const cacdDir = path.join(projectRoot, '.cacd');
-	return existsSync(cacdDir) ? cacdDir : null;
+export function getArgusdevDir(projectRoot: string): string | null {
+	const argusdevDir = path.join(projectRoot, '.argusdev');
+	return existsSync(argusdevDir) ? argusdevDir : null;
 }
 
 /**
- * Get the prompts directory path (.cacd/prompts/).
+ * Get the prompts directory path (.argusdev/prompts/).
  * Returns null if it doesn't exist.
  */
 export function getPromptsDir(projectRoot: string): string | null {
-	const promptsDir = path.join(projectRoot, '.cacd', 'prompts');
+	const promptsDir = path.join(projectRoot, '.argusdev', 'prompts');
 	return existsSync(promptsDir) ? promptsDir : null;
 }
 
 /**
- * Get global prompt directory path (~/.config/cacd/prompts or configured equivalent).
+ * Get global prompt directory path (~/.config/argusdev/prompts or configured equivalent).
  */
 export function getGlobalPromptsDir(): string {
 	return path.join(getConfigDir(), 'prompts');
@@ -253,7 +253,7 @@ export function ensureGlobalPromptDefaults(): void {
 }
 
 /**
- * Load all project prompt templates from .cacd/prompts/ directory.
+ * Load all project prompt templates from .argusdev/prompts/ directory.
  */
 export function loadPromptTemplates(projectRoot: string): PromptTemplate[] {
 	const promptsDir = getPromptsDir(projectRoot);
@@ -380,7 +380,7 @@ export function savePromptTemplateByScope(
 	const dir =
 		scope === 'global'
 			? getGlobalPromptsDir()
-			: path.join(projectRoot, '.cacd', 'prompts');
+			: path.join(projectRoot, '.argusdev', 'prompts');
 	if (!existsSync(dir)) {
 		mkdirSync(dir, {recursive: true});
 	}
@@ -411,7 +411,7 @@ export function deletePromptTemplateByScope(
 	const dir =
 		scope === 'global'
 			? getGlobalPromptsDir()
-			: path.join(projectRoot, '.cacd', 'prompts');
+			: path.join(projectRoot, '.argusdev', 'prompts');
 	if (!existsSync(dir)) return false;
 
 	const filePath = findTemplatePathByName(dir, normalized);
@@ -431,10 +431,10 @@ export function buildHookEnvironment(opts: {
 	branch: string;
 }): Record<string, string> {
 	return {
-		CACD_ROOT_PATH: opts.rootPath,
-		CACD_WORKTREE_PATH: opts.worktreePath,
-		CACD_WORKTREE_NAME: opts.worktreeName,
-		CACD_BRANCH: opts.branch,
+		ARGUSDEV_ROOT_PATH: opts.rootPath,
+		ARGUSDEV_WORKTREE_PATH: opts.worktreePath,
+		ARGUSDEV_WORKTREE_NAME: opts.worktreeName,
+		ARGUSDEV_BRANCH: opts.branch,
 	};
 }
 

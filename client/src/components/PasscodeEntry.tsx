@@ -152,7 +152,7 @@ export function PasscodeEntry({ onSuccess, error: externalError, retryAfter: ext
               <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]/80" />
             </div>
             <span className="flex-1 text-center text-[10px] text-[#3a6a3a] uppercase tracking-[0.2em] font-mono">
-              cacd://auth
+              argusdev://auth
             </span>
           </div>
 
@@ -290,7 +290,7 @@ export function PasscodeEntry({ onSuccess, error: externalError, retryAfter: ext
                 <div className="space-y-1">
                   <p>Forgot your passcode?</p>
                   <p className="text-[#00ff41]/70">
-                    Run: <code className="bg-[#0a0f0a] px-1 py-0.5 rounded text-[#00ff41]">cacd auth reset-passcode</code>
+                    Run: <code className="bg-[#0a0f0a] px-1 py-0.5 rounded text-[#00ff41]">argusdev auth reset-passcode</code>
                   </p>
                 </div>
               </div>

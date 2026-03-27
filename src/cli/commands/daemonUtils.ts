@@ -9,11 +9,11 @@ import {
 } from '../../services/versionCheckService.js';
 
 export function formatDaemonVersionHeader(mode: string): string[] {
-	const lines: string[] = [`CA⚡CD v${getCurrentVersionString()} — ${mode}`];
+	const lines: string[] = [`ArgusDev v${getCurrentVersionString()} — ${mode}`];
 	const updateInfo = getCachedUpdateCheck();
 	if (updateInfo?.isUpdateAvailable && updateInfo.latestVersion) {
 		lines.push(
-			`✦ Update available: v${updateInfo.latestVersion} → cacd update`,
+			`✦ Update available: v${updateInfo.latestVersion} → argusdev update`,
 		);
 	}
 	return lines;

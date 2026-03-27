@@ -1,12 +1,12 @@
-/* CACD Documentation - Custom Styles
-   Matching the terminal aesthetic of the CACD application */
+/* ArgusDev Documentation - Custom Styles
+   Matching the terminal aesthetic of the ArgusDev application */
 
 /* Import fonts - JetBrains Mono for code, Inter for body text */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-/* CSS Custom Properties - CACD Dark Terminal Theme */
+/* CSS Custom Properties - ArgusDev Dark Terminal Theme */
 :root {
-  /* Accent colors - CACD's yellow lightning bolt theme */
+  /* Accent colors - ArgusDev's yellow lightning bolt theme */
   --sl-color-accent-low: #3d3510;
   --sl-color-accent: #eab308;
   --sl-color-accent-high: #fde047;
@@ -157,7 +157,7 @@ kbd {
   border-left-width: 3px;
 }
 
-/* Status indicator colors (matching CACD) */
+/* Status indicator colors (matching ArgusDev) */
 .status-idle { color: #4ade80; }
 .status-busy { color: #facc15; }
 .status-waiting { color: #f87171; }

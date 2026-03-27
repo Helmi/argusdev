@@ -265,7 +265,7 @@ export async function ensureDaemonForTui(
 
 	if (!options.autoStart) {
 		throw new Error(
-			'No running CA⚡CD daemon found. Start it with `cacd daemon`, or run `cacd` to auto-start it.',
+			'No running ArgusDev daemon found. Start it with `argusdev daemon`, or run `argusdev` to auto-start it.',
 		);
 	}
 

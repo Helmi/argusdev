@@ -309,7 +309,7 @@ export async function runDaemonLifecycleCommand(
 				: [
 						`Daemon stopped (PID ${result.pid})`,
 						'Session recovery mode: active sessions were preserved for next startup.',
-						'Use `cacd stop --force` for destructive shutdown.',
+						'Use `argusdev stop --force` for destructive shutdown.',
 					],
 			data: {
 				ok: true,
@@ -477,7 +477,7 @@ export async function runDaemonLifecycleCommand(
 					: 'Session recovery mode: active sessions were preserved and will be rehydrated.',
 				context.parsedArgs.flags.force
 					? `Sessions terminated: ${formatActiveSessionList(forceRestartSummary?.activeSessionIds || [])}`
-					: 'Use `cacd restart --force` for destructive restart.',
+					: 'Use `argusdev restart --force` for destructive restart.',
 			],
 			data: {
 				ok: true,

@@ -11,7 +11,7 @@ import {mkdtemp, mkdir, readFile, writeFile, utimes, rm} from 'fs/promises';
 
 describe('startupScript utilities', () => {
 	it('should resolve a regular .git directory', async () => {
-		const worktreePath = await mkdtemp(join(tmpdir(), 'cacd-startup-test-'));
+		const worktreePath = await mkdtemp(join(tmpdir(), 'argusdev-startup-test-'));
 		await mkdir(join(worktreePath, '.git'), {recursive: true});
 
 		const gitDir = await resolveGitDirectoryPath(worktreePath);
@@ -21,7 +21,7 @@ describe('startupScript utilities', () => {
 	});
 
 	it('should resolve a relative gitdir pointer', async () => {
-		const root = await mkdtemp(join(tmpdir(), 'cacd-startup-pointer-'));
+		const root = await mkdtemp(join(tmpdir(), 'argusdev-startup-pointer-'));
 		const worktreePath = join(root, 'worktree');
 		const realGitDir = join(root, 'real-git');
 
@@ -40,35 +40,35 @@ describe('startupScript utilities', () => {
 	});
 
 	it('should add startup script path to .git/info/exclude', async () => {
-		const worktreePath = await mkdtemp(join(tmpdir(), 'cacd-startup-ignore-'));
+		const worktreePath = await mkdtemp(join(tmpdir(), 'argusdev-startup-ignore-'));
 		const excludePath = join(worktreePath, '.git', 'info', 'exclude');
 		await mkdir(join(worktreePath, '.git', 'info'), {recursive: true});
 		await writeFile(excludePath, '# managed\n', 'utf-8');
 
 		await ensureStartupScriptInGitExclude(
 			worktreePath,
-			'.cacd-startup-demo.sh',
+			'.argusdev-startup-demo.sh',
 		);
 		const afterFirst = await readFile(excludePath, 'utf-8');
-		expect(afterFirst).toContain('.cacd-startup-demo.sh');
+		expect(afterFirst).toContain('.argusdev-startup-demo.sh');
 
 		await ensureStartupScriptInGitExclude(
 			worktreePath,
-			'.cacd-startup-demo.sh',
+			'.argusdev-startup-demo.sh',
 		);
 		const afterSecond = await readFile(excludePath, 'utf-8');
-		expect(afterSecond).toContain('.cacd-startup-demo.sh');
+		expect(afterSecond).toContain('.argusdev-startup-demo.sh');
 		expect(
 			afterSecond
 				.split('\n')
-				.filter(line => line.trim() === '.cacd-startup-demo.sh').length,
+				.filter(line => line.trim() === '.argusdev-startup-demo.sh').length,
 		).toBe(1);
 
 		await rm(worktreePath, {recursive: true, force: true});
 	});
 
 	it('should add launcher entries even when using a gitdir pointer', async () => {
-		const root = await mkdtemp(join(tmpdir(), 'cacd-startup-pointer-exclude-'));
+		const root = await mkdtemp(join(tmpdir(), 'argusdev-startup-pointer-exclude-'));
 		const worktreePath = join(root, 'worktree');
 		const realGitDir = join(root, 'real-git');
 
@@ -82,24 +82,24 @@ describe('startupScript utilities', () => {
 
 		const added = await ensureStartupScriptInGitExclude(
 			worktreePath,
-			'.cacd-startup-pointer.sh',
+			'.argusdev-startup-pointer.sh',
 		);
 		expect(added).toBe(true);
 		const excludeContents = await readFile(
 			join(realGitDir, 'info', 'exclude'),
 			'utf-8',
 		);
-		expect(excludeContents).toContain('.cacd-startup-pointer.sh');
+		expect(excludeContents).toContain('.argusdev-startup-pointer.sh');
 
 		await rm(root, {recursive: true, force: true});
 	});
 
 	it('should clean up stale startup scripts and keep fresh ones', async () => {
-		const worktreePath = await mkdtemp(join(tmpdir(), 'cacd-startup-cleanup-'));
+		const worktreePath = await mkdtemp(join(tmpdir(), 'argusdev-startup-cleanup-'));
 		const now = Date.now();
-		const staleScript = join(worktreePath, '.cacd-startup-stale.sh');
-		const freshScript = join(worktreePath, '.cacd-startup-fresh.sh');
-		const otherScript = join(worktreePath, '.cacd-not-a-launcher.sh');
+		const staleScript = join(worktreePath, '.argusdev-startup-stale.sh');
+		const freshScript = join(worktreePath, '.argusdev-startup-fresh.sh');
+		const otherScript = join(worktreePath, '.argusdev-not-a-launcher.sh');
 
 		await writeFile(staleScript, 'echo stale\n', 'utf-8');
 		await writeFile(freshScript, 'echo fresh\n', 'utf-8');
@@ -132,7 +132,7 @@ describe('startupScript utilities', () => {
 	});
 
 	it('should expose a launcher filename pattern', () => {
-		expect(STARTUP_SCRIPT_NAME_PATTERN.test('.cacd-startup-123.sh')).toBe(true);
+		expect(STARTUP_SCRIPT_NAME_PATTERN.test('.argusdev-startup-123.sh')).toBe(true);
 		expect(STARTUP_SCRIPT_NAME_PATTERN.test('other.sh')).toBe(false);
 	});
 });

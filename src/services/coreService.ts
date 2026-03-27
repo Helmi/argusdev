@@ -20,7 +20,7 @@ export class CoreService extends EventEmitter {
 	private static instance: CoreService;
 
 	// Dev mode detection for hot reload cleanup
-	private static readonly isDevMode = process.env['CACD_DEV'] === '1';
+	private static readonly isDevMode = process.env['ARGUSDEV_DEV'] === '1';
 
 	// Services
 	public sessionManager: SessionManager;

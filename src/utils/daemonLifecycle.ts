@@ -57,7 +57,7 @@ export async function prepareDaemonPidFile(
 		processRunningChecker(existingPid)
 	) {
 		throw new Error(
-			`Another cacd daemon is already running with PID ${existingPid}.`,
+			`Another argusdev daemon is already running with PID ${existingPid}.`,
 		);
 	}
 

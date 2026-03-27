@@ -506,7 +506,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 						)}
 					</Box>
 					<Text dimColor>Enter to add, Escape to cancel</Text>
-					<Text dimColor>Tip: Run `cacd add .` from any project directory</Text>
+					<Text dimColor>Tip: Run `argusdev add .` from any project directory</Text>
 				</Box>
 			) : isSearchMode ? (
 				<Box marginBottom={1}>
@@ -535,7 +535,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 									<Text color="yellow">No projects tracked yet.</Text>
 								</Box>
 								<Text dimColor>
-									Select an option below or run: cacd add /path/to/project
+									Select an option below or run: argusdev add /path/to/project
 								</Text>
 							</Box>
 						)}

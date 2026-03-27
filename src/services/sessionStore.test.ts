@@ -16,7 +16,7 @@ vi.mock('../utils/logger.js', () => ({
 describe('SessionStore', () => {
 	const dbPath = path.join(
 		tmpdir(),
-		`cacd-session-store-test-${process.pid}-${Date.now()}.db`,
+		`argusdev-session-store-test-${process.pid}-${Date.now()}.db`,
 	);
 	let store: SessionStore;
 

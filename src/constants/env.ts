@@ -1,14 +1,14 @@
 // Environment variable names
 export const ENV_VARS = {
-	MULTI_PROJECT_ROOT: 'CACD_PROJECTS_DIR',
-	CONFIG_DIR: 'CACD_CONFIG_DIR',
-	PORT: 'CACD_PORT',
-	DEV_MODE: 'CACD_DEV', // Set automatically by `npm run dev`
+	MULTI_PROJECT_ROOT: 'ARGUSDEV_PROJECTS_DIR',
+	CONFIG_DIR: 'ARGUSDEV_CONFIG_DIR',
+	PORT: 'ARGUSDEV_PORT',
+	DEV_MODE: 'ARGUSDEV_DEV', // Set automatically by `npm run dev`
 } as const;
 
 /**
  * Check if running in dev mode.
- * Dev mode uses local .cacd-dev/ config directory instead of global config.
+ * Dev mode uses local .argusdev-dev/ config directory instead of global config.
  */
 export function isDevMode(): boolean {
 	return process.env[ENV_VARS.DEV_MODE] === '1';
@@ -33,7 +33,7 @@ export function generateRandomPort(): number {
 
 // GitHub release check configuration
 export const GITHUB_REPO_OWNER = 'Helmi';
-export const GITHUB_REPO_NAME = 'cacd';
+export const GITHUB_REPO_NAME = 'argusdev';
 export const GITHUB_RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/latest`;
 export const UPDATE_CHECK_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 

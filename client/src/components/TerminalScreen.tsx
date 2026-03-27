@@ -20,7 +20,7 @@ interface TerminalScreenProps {
   showLogo?: boolean
 }
 
-export function TerminalScreen({ title = 'cacd://auth', status, children, showLogo = true }: TerminalScreenProps) {
+export function TerminalScreen({ title = 'argusdev://auth', status, children, showLogo = true }: TerminalScreenProps) {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#0a0f0a] relative overflow-hidden">
       {/* CRT scanlines overlay */}

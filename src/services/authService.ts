@@ -1,5 +1,5 @@
 /**
- * Authentication Service for CACD WebUI
+ * Authentication Service for ArgusDev WebUI
  *
  * Two-tier authentication:
  * 1. Access Token - 3 memorable words used as URL path

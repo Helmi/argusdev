@@ -303,7 +303,7 @@ export function Sidebar() {
 	// Tree expansion state - persisted to localStorage
 	const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => {
 		try {
-			const saved = localStorage.getItem('cacd-expanded-projects');
+			const saved = localStorage.getItem('argusdev-expanded-projects');
 			if (saved) {
 				return new Set(JSON.parse(saved) as string[]);
 			}
@@ -316,7 +316,7 @@ export function Sidebar() {
 	const [expandedWorktrees, setExpandedWorktrees] = useState<Set<string>>(
 		() => {
 			try {
-				const saved = localStorage.getItem('cacd-expanded-worktrees');
+				const saved = localStorage.getItem('argusdev-expanded-worktrees');
 				if (saved) {
 					return new Set(JSON.parse(saved) as string[]);
 				}
@@ -344,14 +344,14 @@ export function Sidebar() {
 	// Persist expanded state to localStorage
 	useEffect(() => {
 		localStorage.setItem(
-			'cacd-expanded-projects',
+			'argusdev-expanded-projects',
 			JSON.stringify([...expandedProjects]),
 		);
 	}, [expandedProjects]);
 
 	useEffect(() => {
 		localStorage.setItem(
-			'cacd-expanded-worktrees',
+			'argusdev-expanded-worktrees',
 			JSON.stringify([...expandedWorktrees]),
 		);
 	}, [expandedWorktrees]);
@@ -370,7 +370,7 @@ export function Sidebar() {
 			const currentProjectPaths = new Set(projects.map(p => p.path));
 			const newProjects = projects.filter(p => !knownProjectPaths.has(p.path));
 			const hasSavedProjectState =
-				localStorage.getItem('cacd-expanded-projects') !== null;
+				localStorage.getItem('argusdev-expanded-projects') !== null;
 
 			if (
 				!hasSavedProjectState &&
@@ -392,7 +392,7 @@ export function Sidebar() {
 				w => !knownWorktreePaths.has(w.path),
 			);
 			const hasSavedWorktreeState =
-				localStorage.getItem('cacd-expanded-worktrees') !== null;
+				localStorage.getItem('argusdev-expanded-worktrees') !== null;
 
 			if (
 				!hasSavedWorktreeState &&
@@ -1193,7 +1193,7 @@ export function Sidebar() {
 				open={removeProjectDialog.open}
 				onOpenChange={open => setRemoveProjectDialog(prev => ({...prev, open}))}
 				title="Remove Project"
-				description={`Remove "${removeProjectDialog.project?.name}" from CACD? This doesn't delete any files.`}
+				description={`Remove "${removeProjectDialog.project?.name}" from ArgusDev? This doesn't delete any files.`}
 				confirmLabel="Remove"
 				variant="destructive"
 				onConfirm={() => {

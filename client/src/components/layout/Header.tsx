@@ -36,7 +36,7 @@ export function Header() {
 
         {hasUpdate && (
           <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300">
-            Update available: v{updateInfo?.latestVersion || 'new'} → cacd update
+            Update available: v{updateInfo?.latestVersion || 'new'} → argusdev update
           </span>
         )}
       </div>

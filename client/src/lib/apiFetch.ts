@@ -1,7 +1,7 @@
 // Authenticated fetch wrapper.
 // Sends the access token as x-access-token header (reliable through Vite proxy)
 // alongside credentials: 'include' (cookie fallback for production).
-// Emits 'cacd-auth-expired' on 401 so the app can redirect to login.
+// Emits 'argusdev-auth-expired' on 401 so the app can redirect to login.
 
 function getAccessToken(): string | null {
 	const match = window.location.pathname.match(
@@ -35,7 +35,7 @@ export function apiFetch(
 		headers,
 	}).then(res => {
 		if (res.status === 401 && !String(input).includes('/api/auth/')) {
-			window.dispatchEvent(new CustomEvent('cacd-auth-expired'));
+			window.dispatchEvent(new CustomEvent('argusdev-auth-expired'));
 		}
 		return res;
 	});
