@@ -82,6 +82,7 @@ export interface ApiClientOptions {
 }
 
 export class ApiClientError extends Error {
+	cause?: unknown;
 	status?: number;
 	responseBody?: unknown;
 
@@ -93,8 +94,9 @@ export class ApiClientError extends Error {
 			cause?: unknown;
 		} = {},
 	) {
-		super(message, {cause: options.cause});
+		super(message);
 		this.name = 'ApiClientError';
+		this.cause = options.cause;
 		this.status = options.status;
 		this.responseBody = options.responseBody;
 	}
