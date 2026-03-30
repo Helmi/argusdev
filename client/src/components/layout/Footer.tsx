@@ -1,5 +1,8 @@
 import { useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
+import { ThemeSelector } from '@/components/ThemeSelector'
+import { FontSelector } from '@/components/FontSelector'
+import { FontScaleControl } from '@/components/FontScaleControl'
 import { Circle, Wifi, Cpu, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -18,7 +21,7 @@ function useIsApplePlatform() {
 }
 
 export function Footer() {
-  const { selectedSessions, theme, font, fontScale, connectionStatus } = useAppStore()
+  const { selectedSessions, connectionStatus } = useAppStore()
   const isApple = useIsApplePlatform()
 
   const handleLock = () => {
@@ -55,7 +58,7 @@ export function Footer() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Lock button - icon only on mobile */}
+        {/* Lock button */}
         <button
           onClick={handleLock}
           className="flex items-center gap-1 text-muted-foreground/70 hover:text-foreground transition-colors"
@@ -72,16 +75,20 @@ export function Footer() {
         </span>
         <span className="hidden sm:block text-border">│</span>
 
-        {/* Theme - hidden on mobile */}
-        <span className="hidden md:block capitalize">{theme}</span>
+        {/* Theme/font/scale controls - interactive, hidden on mobile */}
+        <div className="hidden md:flex items-center gap-1">
+          <ThemeSelector />
+        </div>
         <span className="hidden md:block text-border">│</span>
 
-        {/* Font - hidden on smaller screens */}
-        <span className="hidden lg:block capitalize">{font}</span>
+        <div className="hidden lg:flex items-center gap-1">
+          <FontSelector />
+        </div>
         <span className="hidden lg:block text-border">│</span>
 
-        {/* Font scale - hidden on smaller screens */}
-        <span className="hidden lg:block">{fontScale}%</span>
+        <div className="hidden lg:flex items-center gap-1">
+          <FontScaleControl />
+        </div>
         <span className="hidden lg:block text-border">│</span>
 
         {/* Version */}

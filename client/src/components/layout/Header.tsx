@@ -1,8 +1,5 @@
 import { useAppStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
-import { ThemeSelector } from '@/components/ThemeSelector'
-import { FontSelector } from '@/components/FontSelector'
-import { FontScaleControl } from '@/components/FontScaleControl'
 import { PanelLeft, Settings } from 'lucide-react'
 
 export function Header() {
@@ -51,13 +48,6 @@ export function Header() {
         >
           <Settings className="h-3.5 w-3.5" />
         </Button>
-
-        {/* Theme/font controls - hidden on mobile, accessible via Settings */}
-        <div className="hidden md:flex items-center gap-1">
-          <ThemeSelector />
-          <FontSelector />
-          <FontScaleControl />
-        </div>
       </div>
     </header>
   )

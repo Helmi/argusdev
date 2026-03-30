@@ -560,12 +560,18 @@ export function AddSessionScreen() {
 		}
 	}, [selectableAgents, preferredAgentId, selectedAgentId]);
 
-	// Reset options when agent changes
+	// Reset options when agent changes (enforce mutual exclusion for grouped defaults)
 	useEffect(() => {
 		if (selectedAgentId && selectedAgent) {
 			const defaults: Record<string, boolean | string> = {};
+			const seenGroups = new Set<string>();
 			for (const opt of selectedAgent.options) {
 				if (opt.default !== undefined) {
+					// For grouped options, only accept the first default in each group
+					if (opt.group) {
+						if (seenGroups.has(opt.group)) continue;
+						seenGroups.add(opt.group);
+					}
 					defaults[opt.id] = opt.default;
 				}
 			}

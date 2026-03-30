@@ -1,6 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- Dark background with rounded corners -->
   <rect width="512" height="512" rx="64" fill="#0f1419"/>
-  <!-- Yellow lightning bolt (based on Lucide Zap) -->
-  <path d="M280 56L136 280h104l-24 176 144-224H256l24-176z" fill="#eab308" stroke="#eab308" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Eye icon (Argus Panoptes) — thick strokes for 16px legibility -->
+  <g transform="translate(256,256)" fill="none" stroke="#a0aec0" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Outer eye shape -->
+    <path d="M-160,0 C-100,-90 -40,-130 0,-130 C40,-130 100,-90 160,0 C100,90 40,130 0,130 C-40,130 -100,90 -160,0Z" stroke-width="28"/>
+    <!-- Iris circle -->
+    <circle cx="0" cy="0" r="56" stroke-width="28"/>
+    <!-- Pupil (filled) -->
+    <circle cx="0" cy="0" r="22" fill="#a0aec0" stroke="none"/>
+  </g>
 </svg>

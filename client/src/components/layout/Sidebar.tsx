@@ -56,31 +56,6 @@ const areSetsEqual = (a: Set<string>, b: Set<string>) => {
 	return true;
 };
 
-function formatSessionDuration(
-	createdAtSeconds?: number,
-	endedAtSeconds?: number | null,
-	nowMs = Date.now(),
-) {
-	if (
-		typeof createdAtSeconds !== 'number' ||
-		!Number.isFinite(createdAtSeconds)
-	) {
-		return '--';
-	}
-
-	const end =
-		typeof endedAtSeconds === 'number' && Number.isFinite(endedAtSeconds)
-			? endedAtSeconds
-			: Math.floor(nowMs / 1000);
-	const minutes = Math.max(0, Math.floor((end - createdAtSeconds) / 60));
-
-	if (minutes < 1) return '<1m';
-	if (minutes < 60) return `${minutes}m`;
-
-	const hours = Math.floor(minutes / 60);
-	const remainingMinutes = minutes % 60;
-	return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
-}
 
 export function Sidebar() {
 	const {
@@ -131,7 +106,6 @@ export function Sidebar() {
 		return agents.find(a => a.id === agentId);
 	};
 
-	const [nowMs, setNowMs] = useState(() => Date.now());
 
 	// Separate dialog states for different actions
 	const [removeProjectDialog, setRemoveProjectDialog] = useState<{
@@ -267,14 +241,6 @@ export function Sidebar() {
 		}
 	}, [renamingSession]);
 
-	// Update elapsed session durations in the sidebar list
-	useEffect(() => {
-		const timer = setInterval(() => {
-			setNowMs(Date.now());
-		}, 60_000);
-
-		return () => clearInterval(timer);
-	}, []);
 
 	// Confirm remove project
 	const confirmRemoveProject = (project: Project) => {
@@ -584,8 +550,8 @@ export function Sidebar() {
 	// Expanded sidebar
 	return (
 		<aside className="flex h-full w-56 flex-col border-r border-border bg-sidebar lg:w-64 overflow-hidden">
-			{/* Pattern separator bar with actions */}
-			<div className="flex items-center gap-1 px-2 py-1.5 pattern-dots border-b border-border">
+			{/* Action bar */}
+			<div className="flex h-9 items-center gap-1 px-2 border-b border-border">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
@@ -1041,25 +1007,16 @@ export function Sidebar() {
 																							aria-label={`Rename session ${session.name || formatName(session.path)}`}
 																						/>
 																					) : (
-																						<span className="flex min-w-0 flex-1 flex-col truncate">
-																							<span
-																								className={cn(
-																									'truncate text-sm',
-																									isSelected
-																										? 'text-primary font-medium'
-																										: 'text-foreground',
-																								)}
-																							>
-																								{session.name ||
-																									formatName(session.path)}
-																							</span>
-																							<span className="text-xs text-muted-foreground whitespace-nowrap">
-																								{formatSessionDuration(
-																									session.createdAt,
-																									session.endedAt,
-																									nowMs,
-																								)}
-																							</span>
+																						<span
+																							className={cn(
+																								'min-w-0 flex-1 truncate text-sm',
+																								isSelected
+																									? 'text-primary font-medium'
+																									: 'text-foreground',
+																							)}
+																						>
+																							{session.name ||
+																								formatName(session.path)}
 																						</span>
 																					)}
 																					{/* Visible menu button */}

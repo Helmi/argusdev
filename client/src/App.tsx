@@ -12,8 +12,9 @@ import { AddWorktreeScreen } from '@/components/AddWorktreeScreen'
 import { AddSessionScreen } from '@/components/AddSessionScreen'
 import { SettingsScreen } from '@/components/SettingsScreen'
 import { PasscodeEntry } from '@/components/PasscodeEntry'
+import { AuthErrorScreen } from '@/components/AuthErrorScreen'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { Terminal, Loader2 } from 'lucide-react'
+import { Loader2, Terminal } from 'lucide-react'
 
 type AuthState = 'loading' | 'no-token' | 'invalid-token' | 'needs-passcode' | 'authenticated'
 
@@ -87,197 +88,6 @@ function AuthenticatedApp() {
     <AppProvider>
       <AuthenticatedAppContent />
     </AppProvider>
-  )
-}
-
-// No token in URL - show terminal access message
-function NoTokenView() {
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#0a0f0a] relative overflow-hidden">
-      {/* CRT scanlines overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none z-10"
-        style={{
-          background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px)',
-        }}
-      />
-
-      {/* Subtle vignette */}
-      <div
-        className="absolute inset-0 pointer-events-none z-10"
-        style={{
-          background: 'radial-gradient(ellipse at center, transparent 0%, transparent 50%, rgba(0,0,0,0.4) 100%)',
-        }}
-      />
-
-      {/* Ambient glow */}
-      <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse at center, rgba(0,255,65,0.06) 0%, transparent 70%)',
-          filter: 'blur(40px)',
-        }}
-      />
-
-      {/* Main container */}
-      <div className="relative z-20 w-full max-w-md mx-4">
-        {/* Terminal window */}
-        <div className="bg-[#0d120d] border border-[#1a3a1a] rounded-sm shadow-2xl overflow-hidden">
-          {/* Terminal header */}
-          <div className="flex items-center gap-2 px-4 py-2 bg-[#0a0f0a] border-b border-[#1a3a1a]">
-            <div className="flex gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]/80" />
-              <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]/80" />
-              <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]/80" />
-            </div>
-            <span className="flex-1 text-center text-[10px] text-[#3a6a3a] uppercase tracking-[0.2em] font-mono">
-              argusdev://restricted
-            </span>
-          </div>
-
-          {/* Terminal body */}
-          <div className="p-6 space-y-6">
-            {/* ASCII art header */}
-            <pre className="text-[#00ff41] text-[10px] leading-tight font-mono text-center select-none opacity-80">
-{`   ██████╗ █████╗  ██████╗██████╗
-  ██╔════╝██╔══██╗██╔════╝██╔══██╗
-  ██║     ███████║██║     ██║  ██║
-  ██║     ██╔══██║██║     ██║  ██║
-  ╚██████╗██║  ██║╚██████╗██████╔╝
-   ╚═════╝╚═╝  ╚═╝ ╚═════╝╚═════╝`}
-            </pre>
-
-            {/* System message */}
-            <div className="space-y-1 font-mono text-xs">
-              <div className="text-[#3a6a3a]">
-                <span className="text-[#00ff41]">[SYSTEM]</span> Access restricted
-              </div>
-              <div className="text-[#3a6a3a]">
-                <span className="text-[#00ff41]">[STATUS]</span>{' '}
-                <span className="text-[#febc2e]">TOKEN REQUIRED</span>
-              </div>
-            </div>
-
-            {/* Message */}
-            <div className="space-y-4">
-              <p className="text-[#3a6a3a] text-xs font-mono">
-                This interface requires a valid access token in the URL.
-              </p>
-
-              <div className="bg-[#0a0f0a] border border-[#1a3a1a] rounded-sm p-3">
-                <p className="text-[10px] text-[#3a6a3a] font-mono mb-2">
-                  Get your access URL from the terminal:
-                </p>
-                <code className="block bg-[#0d120d] px-3 py-2 rounded-sm text-sm font-mono text-[#00ff41]">
-                  argusdev auth show
-                </code>
-              </div>
-
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-4 text-center text-[10px] text-[#2a4a2a] font-mono">
-          ArgusDev v{import.meta.env.VITE_APP_VERSION || '0.0.0'}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Invalid token - show error message
-function InvalidTokenView() {
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#0a0f0a] relative overflow-hidden">
-      {/* CRT scanlines overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none z-10"
-        style={{
-          background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px)',
-        }}
-      />
-
-      {/* Subtle vignette */}
-      <div
-        className="absolute inset-0 pointer-events-none z-10"
-        style={{
-          background: 'radial-gradient(ellipse at center, transparent 0%, transparent 50%, rgba(0,0,0,0.4) 100%)',
-        }}
-      />
-
-      {/* Ambient glow - red tint for error */}
-      <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse at center, rgba(255,107,107,0.06) 0%, transparent 70%)',
-          filter: 'blur(40px)',
-        }}
-      />
-
-      {/* Main container */}
-      <div className="relative z-20 w-full max-w-md mx-4">
-        {/* Terminal window */}
-        <div className="bg-[#0d120d] border border-[#3a1a1a] rounded-sm shadow-2xl overflow-hidden">
-          {/* Terminal header */}
-          <div className="flex items-center gap-2 px-4 py-2 bg-[#0a0f0a] border-b border-[#3a1a1a]">
-            <div className="flex gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]/80" />
-              <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]/80" />
-              <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]/80" />
-            </div>
-            <span className="flex-1 text-center text-[10px] text-[#6a3a3a] uppercase tracking-[0.2em] font-mono">
-              argusdev://error
-            </span>
-          </div>
-
-          {/* Terminal body */}
-          <div className="p-6 space-y-6">
-            {/* ASCII art header */}
-            <pre className="text-[#ff6b6b] text-[10px] leading-tight font-mono text-center select-none opacity-80">
-{`   ██████╗ █████╗  ██████╗██████╗
-  ██╔════╝██╔══██╗██╔════╝██╔══██╗
-  ██║     ███████║██║     ██║  ██║
-  ██║     ██╔══██║██║     ██║  ██║
-  ╚██████╗██║  ██║╚██████╗██████╔╝
-   ╚═════╝╚═╝  ╚═╝ ╚═════╝╚═════╝`}
-            </pre>
-
-            {/* System message */}
-            <div className="space-y-1 font-mono text-xs">
-              <div className="text-[#6a3a3a]">
-                <span className="text-[#ff6b6b]">[ERROR]</span> Invalid access token
-              </div>
-              <div className="text-[#6a3a3a]">
-                <span className="text-[#ff6b6b]">[STATUS]</span>{' '}
-                <span className="text-[#ff6b6b]">ACCESS DENIED</span>
-              </div>
-            </div>
-
-            {/* Message */}
-            <div className="space-y-4">
-              <p className="text-[#6a3a3a] text-xs font-mono">
-                This access token is not recognized.
-              </p>
-
-              <div className="bg-[#0a0f0a] border border-[#3a1a1a] rounded-sm p-3">
-                <p className="text-[10px] text-[#6a3a3a] font-mono mb-2">
-                  Get the correct URL from your terminal:
-                </p>
-                <code className="block bg-[#0d120d] px-3 py-2 rounded-sm text-sm font-mono text-[#ff6b6b]">
-                  argusdev auth show
-                </code>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-4 text-center text-[10px] text-[#4a2a2a] font-mono">
-          ArgusDev v{import.meta.env.VITE_APP_VERSION || '0.0.0'}
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -399,9 +209,9 @@ function AppContent() {
     case 'loading':
       return <LoadingView />
     case 'no-token':
-      return <NoTokenView />
+      return <AuthErrorScreen type="no-token" />
     case 'invalid-token':
-      return <InvalidTokenView />
+      return <AuthErrorScreen type="invalid-token" />
     case 'needs-passcode':
       return (
         <PasscodeEntry

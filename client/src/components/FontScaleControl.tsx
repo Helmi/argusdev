@@ -1,5 +1,5 @@
 import { useAppStore } from '@/lib/store'
-import { Minus, Plus } from 'lucide-react'
+import { Minus, Plus, ZoomIn } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -12,8 +12,8 @@ export function FontScaleControl() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-6 px-1.5 text-sm gap-1">
-          <span className="text-xs text-muted-foreground">{fontScale}%</span>
+        <Button variant="ghost" size="icon" className="h-6 w-6" title={`Font scale: ${fontScale}%`}>
+          <ZoomIn className="h-3.5 w-3.5" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2" align="end">
@@ -49,7 +49,7 @@ export function FontScaleControl() {
             onChange={(e) => setFontScale(Number(e.target.value))}
             className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
           />
-          <div className="flex justify-between text-[9px] text-muted-foreground">
+          <div className="flex justify-between text-xs text-muted-foreground">
             <span>50%</span>
             <button className="hover:text-foreground" onClick={() => setFontScale(100)}>
               Reset

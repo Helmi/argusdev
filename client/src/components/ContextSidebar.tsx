@@ -209,9 +209,16 @@ export function ContextSidebar() {
 							aria-label={`Rename session ${session.name || formatName(session.path)}`}
 						/>
 					) : (
-						<span className="font-medium text-sm truncate">
-							{session.name || formatName(session.path)}
-						</span>
+						<button
+							onClick={startRenameSession}
+							className="group/rename flex items-center gap-1 min-w-0 text-left"
+							title="Click to rename"
+						>
+							<span className="font-medium text-sm truncate">
+								{session.name || formatName(session.path)}
+							</span>
+							<Pencil className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 group-hover/rename:opacity-100 transition-opacity" />
+						</button>
 					)}
 				</div>
 
@@ -467,15 +474,6 @@ export function ContextSidebar() {
 					Session Details
 				</span>
 				<div className="flex items-center gap-0.5">
-					<Button
-						variant="ghost"
-						size="icon"
-						className="h-5 w-5"
-						onClick={startRenameSession}
-						title="Rename session"
-					>
-						<Pencil className="h-3 w-3" />
-					</Button>
 					<Button
 						variant="ghost"
 						size="icon"

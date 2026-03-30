@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react'
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -82,7 +86,27 @@ export function AgentConfigEditor({ agent, onChange, onDelete, isNew }: AgentCon
   const updateOption = (index: number, updates: Partial<AgentOption>) => {
     onChange((current) => {
       const newOptions = [...current.options]
-      newOptions[index] = { ...newOptions[index], ...updates }
+      const option = newOptions[index]
+      newOptions[index] = { ...option, ...updates }
+
+      // Mutual exclusion: if setting a default on a grouped option, un-default siblings
+      if ('default' in updates && updates.default && option.group) {
+        for (let i = 0; i < newOptions.length; i++) {
+          if (i !== index && newOptions[i].group === option.group) {
+            newOptions[i] = { ...newOptions[i], default: undefined }
+          }
+        }
+      }
+
+      return { ...current, options: newOptions }
+    })
+  }
+
+  const moveOption = (fromIndex: number, toIndex: number) => {
+    onChange((current) => {
+      const newOptions = [...current.options]
+      const [moved] = newOptions.splice(fromIndex, 1)
+      newOptions.splice(toIndex, 0, moved)
       return { ...current, options: newOptions }
     })
   }
@@ -181,29 +205,15 @@ export function AgentConfigEditor({ agent, onChange, onDelete, isNew }: AgentCon
         </button>
 
         {optionsExpanded && (
-          <div className="mt-2 space-y-2">
-            {agent.options.map((option, index) => (
-              <OptionEditor
-                key={option.id || index}
-                option={option}
-                isExpanded={editingOptionIndex === index}
-                onToggle={() => setEditingOptionIndex(editingOptionIndex === index ? null : index)}
-                onChange={(updates) => updateOption(index, updates)}
-                onRemove={() => removeOption(index)}
-              />
-            ))}
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-6 text-xs w-full"
-              onClick={addOption}
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Add Option
-            </Button>
-          </div>
+          <OptionsList
+            options={agent.options}
+            editingOptionIndex={editingOptionIndex}
+            onToggle={(index) => setEditingOptionIndex(editingOptionIndex === index ? null : index)}
+            onUpdate={updateOption}
+            onRemove={removeOption}
+            onMove={moveOption}
+            onAdd={addOption}
+          />
         )}
       </div>
 
@@ -226,6 +236,63 @@ export function AgentConfigEditor({ agent, onChange, onDelete, isNew }: AgentCon
   )
 }
 
+interface OptionsListProps {
+  options: AgentOption[]
+  editingOptionIndex: number | null
+  onToggle: (index: number) => void
+  onUpdate: (index: number, updates: Partial<AgentOption>) => void
+  onRemove: (index: number) => void
+  onMove: (fromIndex: number, toIndex: number) => void
+  onAdd: () => void
+}
+
+function OptionsList({ options, editingOptionIndex, onToggle, onUpdate, onRemove, onMove, onAdd }: OptionsListProps) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = options.findIndex(o => o.id === active.id)
+    const newIndex = options.findIndex(o => o.id === over.id)
+    if (oldIndex !== -1 && newIndex !== -1) onMove(oldIndex, newIndex)
+  }
+
+  const ids = options.map(o => o.id)
+
+  return (
+    <div className="mt-2 space-y-2">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+          {options.map((option, index) => (
+            <SortableOptionEditor
+              key={option.id}
+              option={option}
+              isExpanded={editingOptionIndex === index}
+              onToggle={() => onToggle(index)}
+              onChange={(updates) => onUpdate(index, updates)}
+              onRemove={() => onRemove(index)}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-6 text-xs w-full"
+        onClick={onAdd}
+      >
+        <Plus className="h-3 w-3 mr-1" />
+        Add Option
+      </Button>
+    </div>
+  )
+}
+
 interface OptionEditorProps {
   option: AgentOption
   isExpanded: boolean
@@ -234,7 +301,23 @@ interface OptionEditorProps {
   onRemove: () => void
 }
 
-function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove }: OptionEditorProps) {
+function SortableOptionEditor(props: OptionEditorProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.option.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <OptionEditor {...props} dragHandleProps={{ ...attributes, ...listeners }} />
+    </div>
+  )
+}
+
+function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHandleProps }: OptionEditorProps & { dragHandleProps?: Record<string, unknown> }) {
   const formatChoices = (choices?: { value: string; label?: string }[]) =>
     choices?.map(c => c.label ? `${c.value}:${c.label}` : c.value).join(', ') || ''
 
@@ -259,7 +342,7 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove }: Opti
       isExpanded ? 'bg-muted/30' : ''
     )}>
       <div className="flex items-center gap-2">
-        <GripVertical className="h-3 w-3 text-muted-foreground cursor-grab" />
+        <GripVertical className="h-3 w-3 text-muted-foreground cursor-grab" {...dragHandleProps} />
         <button
           type="button"
           className="flex-1 text-left flex items-center gap-2"
