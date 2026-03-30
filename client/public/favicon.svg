@@ -1,13 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Dark background with rounded corners -->
   <rect width="512" height="512" rx="64" fill="#0f1419"/>
-  <!-- Eye icon (Argus Panoptes) — thick strokes for 16px legibility -->
-  <g transform="translate(256,256)" fill="none" stroke="#a0aec0" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Outer eye shape -->
-    <path d="M-160,0 C-100,-90 -40,-130 0,-130 C40,-130 100,-90 160,0 C100,90 40,130 0,130 C-40,130 -100,90 -160,0Z" stroke-width="28"/>
-    <!-- Iris circle -->
-    <circle cx="0" cy="0" r="56" stroke-width="28"/>
-    <!-- Pupil (filled) -->
-    <circle cx="0" cy="0" r="22" fill="#a0aec0" stroke="none"/>
-  </g>
+  <!-- Left eye -->
+  <ellipse cx="180" cy="260" rx="80" ry="90" fill="#e2e8f0" stroke="#94a3b8" stroke-width="6"/>
+  <circle cx="205" cy="255" r="38" fill="#1e293b"/>
+  <circle cx="215" cy="245" r="12" fill="#e2e8f0"/>
+  <!-- Right eye -->
+  <ellipse cx="355" cy="260" rx="80" ry="90" fill="#e2e8f0" stroke="#94a3b8" stroke-width="6"/>
+  <circle cx="380" cy="255" r="38" fill="#1e293b"/>
+  <circle cx="390" cy="245" r="12" fill="#e2e8f0"/>
 </svg>
