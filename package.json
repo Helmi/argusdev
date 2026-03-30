@@ -1,6 +1,6 @@
 {
 	"name": "argusdev",
-	"version": "0.5.0-dev",
+	"version": "0.6.0",
 	"description": "ArgusDev — Web-based control desk for managing multiple AI coding agent sessions (Claude, Gemini, Codex, Cursor)",
 	"license": "AGPL-3.0-or-later",
 	"author": "Helmi",
