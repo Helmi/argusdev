@@ -1,11 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="64" fill="#0f1419"/>
-  <!-- Left eye -->
-  <ellipse cx="180" cy="260" rx="80" ry="90" fill="#e2e8f0" stroke="#94a3b8" stroke-width="6"/>
-  <circle cx="205" cy="255" r="38" fill="#1e293b"/>
-  <circle cx="215" cy="245" r="12" fill="#e2e8f0"/>
-  <!-- Right eye -->
-  <ellipse cx="355" cy="260" rx="80" ry="90" fill="#e2e8f0" stroke="#94a3b8" stroke-width="6"/>
-  <circle cx="380" cy="255" r="38" fill="#1e293b"/>
-  <circle cx="390" cy="245" r="12" fill="#e2e8f0"/>
+  <!-- Pill/stadium shaped dark background hugging the eyes -->
+  <rect x="16" y="96" width="480" height="320" rx="160" fill="#0f1419"/>
+  <ellipse cx="185" cy="260" rx="78" ry="88" fill="#e2e8f0" stroke="#94a3b8" stroke-width="6"/>
+  <circle cx="210" cy="255" r="36" fill="#1e293b"/>
+  <circle cx="220" cy="245" r="11" fill="#e2e8f0"/>
+  <ellipse cx="350" cy="260" rx="78" ry="88" fill="#e2e8f0" stroke="#94a3b8" stroke-width="6"/>
+  <circle cx="375" cy="255" r="36" fill="#1e293b"/>
+  <circle cx="385" cy="245" r="11" fill="#e2e8f0"/>
 </svg>
