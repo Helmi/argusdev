@@ -20,7 +20,8 @@ export function Header() {
         </Button>
 
         {/* Logo */}
-        <span className="text-lg font-bold tracking-tight text-foreground flex items-center">
+        <span className="text-lg font-bold tracking-tight text-foreground flex items-center gap-1.5">
+          <img src="/favicon.svg" alt="" className="h-5 w-auto" />
           ArgusDev
         </span>
 
