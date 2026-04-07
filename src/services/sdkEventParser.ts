@@ -36,7 +36,9 @@ export class SdkEventParser extends EventEmitter {
 		try {
 			const event = JSON.parse(line) as SdkEvent;
 			if (!event.type) {
-				logger.warn(`[SdkEventParser] JSON line missing type field: ${line.slice(0, 100)}`);
+				logger.warn(
+					`[SdkEventParser] JSON line missing type field: ${line.slice(0, 100)}`,
+				);
 				return;
 			}
 			this.emit('event', event);

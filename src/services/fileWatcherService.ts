@@ -41,9 +41,8 @@ class FileWatcherService extends EventEmitter {
 			return;
 		}
 
-		// Construct path to .git/worktrees/
+		// Construct path to .git/
 		const gitDir = path.join(normalizedPath, '.git');
-		const worktreesDir = path.join(gitDir, 'worktrees');
 
 		// Check if it's a git repo with worktrees directory
 		if (!existsSync(gitDir)) {
@@ -70,9 +69,7 @@ class FileWatcherService extends EventEmitter {
 			);
 
 			watcher.on('error', error => {
-				logger.warn(
-					`[FileWatcher] Error watching ${gitDir}: ${error.message}`,
-				);
+				logger.warn(`[FileWatcher] Error watching ${gitDir}: ${error.message}`);
 			});
 
 			this.worktreeWatchers.set(normalizedPath, watcher);
@@ -122,8 +119,6 @@ class FileWatcherService extends EventEmitter {
 			);
 			return;
 		}
-		const projectsPath = path.join(configDir, 'projects.json');
-
 		// Watch the config directory (can't watch non-existent files directly)
 		try {
 			const watcher = watch(
@@ -145,9 +140,7 @@ class FileWatcherService extends EventEmitter {
 			this.projectsWatcher = watcher;
 			logger.info(`[FileWatcher] Started watching projects.json`);
 		} catch (error) {
-			logger.warn(
-				`[FileWatcher] Failed to start projects watcher: ${error}`,
-			);
+			logger.warn(`[FileWatcher] Failed to start projects watcher: ${error}`);
 		}
 	}
 

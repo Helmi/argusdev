@@ -67,10 +67,7 @@ export function buildClaudeHookSettings(
  * Pass this path to `claude --settings <path>` instead of inline JSON
  * to avoid polluting the terminal with a huge command line.
  */
-export function writeHookSettingsFile(
-	port: number,
-	sessionId: string,
-): string {
+export function writeHookSettingsFile(port: number, sessionId: string): string {
 	const json = buildClaudeHookSettings(port, sessionId);
 	const filePath = hookSettingsPath(sessionId);
 	writeFileSync(filePath, json, 'utf-8');

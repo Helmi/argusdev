@@ -762,7 +762,10 @@ async function runSessionsCommand(context: CliCommandContext): Promise<number> {
 		const sessionId = context.parsedArgs.input[2];
 		if (!sessionId) {
 			context.formatter.writeError({
-				text: ['Error: Missing session id', 'Usage: argusdev sessions show <id>'],
+				text: [
+					'Error: Missing session id',
+					'Usage: argusdev sessions show <id>',
+				],
 				data: {
 					ok: false,
 					command: 'sessions show',
@@ -840,7 +843,10 @@ async function runSessionCommand(context: CliCommandContext): Promise<number> {
 		const sessionId = context.parsedArgs.input[2];
 		if (!sessionId) {
 			context.formatter.writeError({
-				text: ['Error: Missing session id', 'Usage: argusdev session stop <id>'],
+				text: [
+					'Error: Missing session id',
+					'Usage: argusdev session stop <id>',
+				],
 				data: {
 					ok: false,
 					command: 'session stop',

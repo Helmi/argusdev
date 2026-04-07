@@ -70,12 +70,19 @@ const PROFILES: Record<string, AgentConfig> = {
 	'claude-sdk': {
 		id: 'claude-sdk',
 		name: 'Claude (SDK)',
-		description: 'Claude Code with structured JSON streaming — reliable state detection, tool approvals, cost tracking',
+		description:
+			'Claude Code with structured JSON streaming — reliable state detection, tool approvals, cost tracking',
 		kind: 'agent',
 		command: 'claude',
 		icon: 'claude',
 		sessionType: 'sdk',
-		baseArgs: ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages'],
+		baseArgs: [
+			'-p',
+			'--output-format',
+			'stream-json',
+			'--verbose',
+			'--include-partial-messages',
+		],
 		promptArg: 'none',
 		options: [
 			{

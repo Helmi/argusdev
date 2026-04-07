@@ -437,8 +437,20 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should return no errors when no group conflicts', () => {
 			const agent = {
 				options: [
-					{id: 'a', flag: '--a', label: 'A', type: 'boolean' as const, group: 'mode'},
-					{id: 'b', flag: '--b', label: 'B', type: 'boolean' as const, group: 'mode'},
+					{
+						id: 'a',
+						flag: '--a',
+						label: 'A',
+						type: 'boolean' as const,
+						group: 'mode',
+					},
+					{
+						id: 'b',
+						flag: '--b',
+						label: 'B',
+						type: 'boolean' as const,
+						group: 'mode',
+					},
 				],
 			} as import('../types/index.js').AgentConfig;
 
@@ -450,13 +462,28 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should return error when two options in same group are active', () => {
 			const agent = {
 				options: [
-					{id: 'a', flag: '--a', label: 'Option A', type: 'boolean' as const, group: 'mode'},
-					{id: 'b', flag: '--b', label: 'Option B', type: 'boolean' as const, group: 'mode'},
+					{
+						id: 'a',
+						flag: '--a',
+						label: 'Option A',
+						type: 'boolean' as const,
+						group: 'mode',
+					},
+					{
+						id: 'b',
+						flag: '--b',
+						label: 'Option B',
+						type: 'boolean' as const,
+						group: 'mode',
+					},
 				],
 			} as import('../types/index.js').AgentConfig;
 
 			configManager = new ConfigurationManager();
-			const errors = configManager.validateAgentOptions(agent, {a: true, b: true});
+			const errors = configManager.validateAgentOptions(agent, {
+				a: true,
+				b: true,
+			});
 			expect(errors).toHaveLength(1);
 			expect(errors[0]).toContain('mutually exclusive');
 			expect(errors[0]).toContain('mode');
@@ -465,13 +492,28 @@ describe('ConfigurationManager - Command Presets', () => {
 		it('should allow multiple active options in different groups', () => {
 			const agent = {
 				options: [
-					{id: 'a', flag: '--a', label: 'A', type: 'boolean' as const, group: 'mode'},
-					{id: 'b', flag: '--b', label: 'B', type: 'boolean' as const, group: 'output'},
+					{
+						id: 'a',
+						flag: '--a',
+						label: 'A',
+						type: 'boolean' as const,
+						group: 'mode',
+					},
+					{
+						id: 'b',
+						flag: '--b',
+						label: 'B',
+						type: 'boolean' as const,
+						group: 'output',
+					},
 				],
 			} as import('../types/index.js').AgentConfig;
 
 			configManager = new ConfigurationManager();
-			const errors = configManager.validateAgentOptions(agent, {a: true, b: true});
+			const errors = configManager.validateAgentOptions(agent, {
+				a: true,
+				b: true,
+			});
 			expect(errors).toEqual([]);
 		});
 
@@ -484,20 +526,38 @@ describe('ConfigurationManager - Command Presets', () => {
 			} as import('../types/index.js').AgentConfig;
 
 			configManager = new ConfigurationManager();
-			const errors = configManager.validateAgentOptions(agent, {a: true, b: true});
+			const errors = configManager.validateAgentOptions(agent, {
+				a: true,
+				b: true,
+			});
 			expect(errors).toEqual([]);
 		});
 
 		it('should treat empty string values as inactive', () => {
 			const agent = {
 				options: [
-					{id: 'a', flag: '--a', label: 'A', type: 'string' as const, group: 'mode'},
-					{id: 'b', flag: '--b', label: 'B', type: 'string' as const, group: 'mode'},
+					{
+						id: 'a',
+						flag: '--a',
+						label: 'A',
+						type: 'string' as const,
+						group: 'mode',
+					},
+					{
+						id: 'b',
+						flag: '--b',
+						label: 'B',
+						type: 'string' as const,
+						group: 'mode',
+					},
 				],
 			} as import('../types/index.js').AgentConfig;
 
 			configManager = new ConfigurationManager();
-			const errors = configManager.validateAgentOptions(agent, {a: 'value', b: ''});
+			const errors = configManager.validateAgentOptions(agent, {
+				a: 'value',
+				b: '',
+			});
 			expect(errors).toEqual([]);
 		});
 	});

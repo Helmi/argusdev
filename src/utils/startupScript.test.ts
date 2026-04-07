@@ -11,7 +11,9 @@ import {mkdtemp, mkdir, readFile, writeFile, utimes, rm} from 'fs/promises';
 
 describe('startupScript utilities', () => {
 	it('should resolve a regular .git directory', async () => {
-		const worktreePath = await mkdtemp(join(tmpdir(), 'argusdev-startup-test-'));
+		const worktreePath = await mkdtemp(
+			join(tmpdir(), 'argusdev-startup-test-'),
+		);
 		await mkdir(join(worktreePath, '.git'), {recursive: true});
 
 		const gitDir = await resolveGitDirectoryPath(worktreePath);
@@ -40,7 +42,9 @@ describe('startupScript utilities', () => {
 	});
 
 	it('should add startup script path to .git/info/exclude', async () => {
-		const worktreePath = await mkdtemp(join(tmpdir(), 'argusdev-startup-ignore-'));
+		const worktreePath = await mkdtemp(
+			join(tmpdir(), 'argusdev-startup-ignore-'),
+		);
 		const excludePath = join(worktreePath, '.git', 'info', 'exclude');
 		await mkdir(join(worktreePath, '.git', 'info'), {recursive: true});
 		await writeFile(excludePath, '# managed\n', 'utf-8');
@@ -68,7 +72,9 @@ describe('startupScript utilities', () => {
 	});
 
 	it('should add launcher entries even when using a gitdir pointer', async () => {
-		const root = await mkdtemp(join(tmpdir(), 'argusdev-startup-pointer-exclude-'));
+		const root = await mkdtemp(
+			join(tmpdir(), 'argusdev-startup-pointer-exclude-'),
+		);
 		const worktreePath = join(root, 'worktree');
 		const realGitDir = join(root, 'real-git');
 
@@ -95,7 +101,9 @@ describe('startupScript utilities', () => {
 	});
 
 	it('should clean up stale startup scripts and keep fresh ones', async () => {
-		const worktreePath = await mkdtemp(join(tmpdir(), 'argusdev-startup-cleanup-'));
+		const worktreePath = await mkdtemp(
+			join(tmpdir(), 'argusdev-startup-cleanup-'),
+		);
 		const now = Date.now();
 		const staleScript = join(worktreePath, '.argusdev-startup-stale.sh');
 		const freshScript = join(worktreePath, '.argusdev-startup-fresh.sh');
@@ -132,7 +140,9 @@ describe('startupScript utilities', () => {
 	});
 
 	it('should expose a launcher filename pattern', () => {
-		expect(STARTUP_SCRIPT_NAME_PATTERN.test('.argusdev-startup-123.sh')).toBe(true);
+		expect(STARTUP_SCRIPT_NAME_PATTERN.test('.argusdev-startup-123.sh')).toBe(
+			true,
+		);
 		expect(STARTUP_SCRIPT_NAME_PATTERN.test('other.sh')).toBe(false);
 	});
 });

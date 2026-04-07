@@ -193,7 +193,13 @@ export interface AgentConfig {
 // ============================================================================
 
 /** State of an SDK session, derived from structured JSON events */
-export type SdkSessionState = 'connecting' | 'idle' | 'busy' | 'waiting_input' | 'closed' | 'error';
+export type SdkSessionState =
+	| 'connecting'
+	| 'idle'
+	| 'busy'
+	| 'waiting_input'
+	| 'closed'
+	| 'error';
 
 /** A tool call pending user approval */
 export interface SdkPendingApproval {
@@ -247,10 +253,21 @@ export interface SdkStreamEvent {
 	session_id: string;
 	parent_tool_use_id: string | null;
 	event: {
-		type: 'message_start' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'message_delta' | 'message_stop';
+		type:
+			| 'message_start'
+			| 'content_block_start'
+			| 'content_block_delta'
+			| 'content_block_stop'
+			| 'message_delta'
+			| 'message_stop';
 		index?: number;
 		content_block?: {type: string; text?: string; id?: string; name?: string};
-		delta?: {type: string; text?: string; stop_reason?: string; partial_json?: string};
+		delta?: {
+			type: string;
+			text?: string;
+			stop_reason?: string;
+			partial_json?: string;
+		};
 		message?: Record<string, unknown>;
 		usage?: Record<string, unknown>;
 	};
@@ -261,7 +278,13 @@ export interface SdkAssistantEvent {
 	session_id: string;
 	message: {
 		role: 'assistant';
-		content: Array<{type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown>}>;
+		content: Array<{
+			type: string;
+			text?: string;
+			id?: string;
+			name?: string;
+			input?: Record<string, unknown>;
+		}>;
 		stop_reason: string | null;
 		usage?: Record<string, unknown>;
 	};
@@ -280,7 +303,11 @@ export interface SdkResultEvent {
 	stop_reason?: string;
 }
 
-export type SdkEvent = SdkSystemEvent | SdkStreamEvent | SdkAssistantEvent | SdkResultEvent;
+export type SdkEvent =
+	| SdkSystemEvent
+	| SdkStreamEvent
+	| SdkAssistantEvent
+	| SdkResultEvent;
 
 /** SDK session — parallel to Session (PTY) */
 export interface SdkSession {

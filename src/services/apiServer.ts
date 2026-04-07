@@ -1139,9 +1139,7 @@ export class APIServer {
 					request.params.id,
 				);
 				if (!session) {
-					logger.warn(
-						`[HookState] Session not found: ${request.params.id}`,
-					);
+					logger.warn(`[HookState] Session not found: ${request.params.id}`);
 					return reply.code(404).send({error: 'Session not found'});
 				}
 
@@ -1152,9 +1150,7 @@ export class APIServer {
 				};
 				const newState = validStates[request.params.state];
 				if (!newState) {
-					logger.warn(
-						`[HookState] Invalid state: ${request.params.state}`,
-					);
+					logger.warn(`[HookState] Invalid state: ${request.params.state}`);
 					return reply.code(400).send({error: 'Invalid state'});
 				}
 
@@ -1861,17 +1857,25 @@ export class APIServer {
 
 		// --- Sessions ---
 		this.app.get('/api/sessions', async () => {
-			const ptySessions = globalSessionOrchestrator.getAllActiveSessions().map(s => ({
-				...toApiSessionPayload(s),
-				type: 'pty' as const,
-			}));
-			const sdkSessions = sdkSessionManager.getAllSessions()
+			const ptySessions = globalSessionOrchestrator
+				.getAllActiveSessions()
+				.map(s => ({
+					...toApiSessionPayload(s),
+					type: 'pty' as const,
+				}));
+			const sdkSessions = sdkSessionManager
+				.getAllSessions()
 				.filter(s => s.state !== 'closed')
 				.map(s => ({
 					id: s.id,
 					name: s.name,
 					path: s.worktreePath,
-					state: s.state === 'connecting' ? 'busy' as const : s.state === 'closed' ? 'idle' as const : s.state as SessionState,
+					state:
+						s.state === 'connecting'
+							? ('busy' as const)
+							: s.state === 'closed'
+								? ('idle' as const)
+								: (s.state as SessionState),
 					createdAt: Math.floor(s.createdAt.getTime() / 1000),
 					isActive: s.state !== 'closed' && s.state !== 'error',
 					agentId: s.agentId,
@@ -3436,39 +3440,57 @@ export class APIServer {
 
 		// --- SDK Sessions ---
 
-		this.app.post<{Body: {worktreePath: string; agentId: string; options?: Record<string, boolean | string>; sessionName?: string; initialPrompt?: string}}>(
-			'/api/sdk-session/create',
-			async (request, reply) => {
-				const {worktreePath, agentId, options, sessionName, initialPrompt} = request.body;
-				if (!worktreePath || !agentId) {
-					return reply.code(400).send({error: 'worktreePath and agentId required'});
-				}
+		this.app.post<{
+			Body: {
+				worktreePath: string;
+				agentId: string;
+				options?: Record<string, boolean | string>;
+				sessionName?: string;
+				initialPrompt?: string;
+			};
+		}>('/api/sdk-session/create', async (request, reply) => {
+			const {worktreePath, agentId, options, sessionName, initialPrompt} =
+				request.body;
+			if (!worktreePath || !agentId) {
+				return reply
+					.code(400)
+					.send({error: 'worktreePath and agentId required'});
+			}
 
-				const agent = configurationManager.getAgentById(agentId);
-				if (!agent || agent.sessionType !== 'sdk') {
-					return reply.code(400).send({error: 'Agent is not an SDK session type'});
-				}
+			const agent = configurationManager.getAgentById(agentId);
+			if (!agent || agent.sessionType !== 'sdk') {
+				return reply
+					.code(400)
+					.send({error: 'Agent is not an SDK session type'});
+			}
 
-				const args = configurationManager.buildAgentArgs(agent, options || {});
-				logger.info(`API: Creating SDK session for ${worktreePath} with agent ${agentId}, args: [${args.join(', ')}]`);
+			const args = configurationManager.buildAgentArgs(agent, options || {});
+			logger.info(
+				`API: Creating SDK session for ${worktreePath} with agent ${agentId}, args: [${args.join(', ')}]`,
+			);
 
-				const session = sdkSessionManager.createSession(
-					worktreePath,
-					args,
-					undefined,
-					initialPrompt,
-					sessionName,
-				);
+			const session = sdkSessionManager.createSession(
+				worktreePath,
+				args,
+				undefined,
+				initialPrompt,
+				sessionName,
+			);
 
-				return {success: true, id: session.id, agentId};
-			},
-		);
+			return {success: true, id: session.id, agentId};
+		});
 
 		this.app.post<{Body: {content: string}; Params: {id: string}}>(
 			'/api/sdk-session/:id/message',
 			async (request, reply) => {
-				const sent = sdkSessionManager.sendMessage(request.params.id, request.body.content);
-				if (!sent) return reply.code(404).send({error: 'SDK session not found or not writable'});
+				const sent = sdkSessionManager.sendMessage(
+					request.params.id,
+					request.body.content,
+				);
+				if (!sent)
+					return reply
+						.code(404)
+						.send({error: 'SDK session not found or not writable'});
 				return {success: true};
 			},
 		);
@@ -3493,7 +3515,7 @@ export class APIServer {
 
 		this.app.post<{Params: {id: string}}>(
 			'/api/sdk-session/:id/stop',
-			async (request, reply) => {
+			async (request, _reply) => {
 				sdkSessionManager.stopSession(request.params.id);
 				return {success: true};
 			},
@@ -3503,18 +3525,24 @@ export class APIServer {
 			'/api/sdk-session/:id/messages',
 			async (request, reply) => {
 				const session = sdkSessionManager.getSession(request.params.id);
-				if (!session) return reply.code(404).send({error: 'SDK session not found'});
+				if (!session)
+					return reply.code(404).send({error: 'SDK session not found'});
 				return session.messages;
 			},
 		);
 
 		// Include SDK sessions in the main sessions listing
-		const originalSessionsRoute = this.app.get('/api/sdk-sessions', async () => {
+		this.app.get('/api/sdk-sessions', async () => {
 			return sdkSessionManager.getAllSessions().map(s => ({
 				id: s.id,
 				name: s.name,
 				path: s.worktreePath,
-				state: s.state === 'connecting' ? 'busy' : s.state === 'closed' ? 'idle' : s.state,
+				state:
+					s.state === 'connecting'
+						? 'busy'
+						: s.state === 'closed'
+							? 'idle'
+							: s.state,
 				createdAt: Math.floor(s.createdAt.getTime() / 1000),
 				isActive: s.state !== 'closed' && s.state !== 'error',
 				agentId: s.agentId,
@@ -3642,9 +3670,9 @@ export class APIServer {
 					const ptySession =
 						globalSessionOrchestrator.findSession(sessionId)?.session;
 					if (ptySession) {
-						const fullHistory = Buffer.concat(ptySession.outputHistory).toString(
-							'utf8',
-						);
+						const fullHistory = Buffer.concat(
+							ptySession.outputHistory,
+						).toString('utf8');
 						socket.emit('terminal_data', {
 							sessionId: ptySession.id,
 							data: fullHistory,
@@ -3790,58 +3818,66 @@ export class APIServer {
 	}
 
 	private setupSdkListeners() {
-		sdkSessionManager.on('sdkSessionData', (session: SdkSession, event: SdkEvent) => {
-			const room = `session:${session.id}`;
+		sdkSessionManager.on(
+			'sdkSessionData',
+			(session: SdkSession, event: SdkEvent) => {
+				const room = `session:${session.id}`;
 
-			// Transform raw Claude events into frontend-expected format
-			if (event.type === 'system') {
-				this.io?.to(room).emit('sdk_session_event', {
-					sessionId: session.id,
-					type: 'model_info',
-					model: (event as SdkEvent & {model?: string}).model,
-				});
-			}
-
-			if (event.type === 'assistant') {
-				// Send the complete assistant message
-				const lastMsg = session.messages[session.messages.length - 1];
-				if (lastMsg) {
+				// Transform raw Claude events into frontend-expected format
+				if (event.type === 'system') {
 					this.io?.to(room).emit('sdk_session_event', {
 						sessionId: session.id,
-						type: 'message',
-						message: lastMsg,
+						type: 'model_info',
+						model: (event as SdkEvent & {model?: string}).model,
 					});
 				}
-			}
 
-			if (event.type === 'result') {
-				const lastMsg = session.messages[session.messages.length - 1];
-				if (lastMsg) {
+				if (event.type === 'assistant') {
+					// Send the complete assistant message
+					const lastMsg = session.messages[session.messages.length - 1];
+					if (lastMsg) {
+						this.io?.to(room).emit('sdk_session_event', {
+							sessionId: session.id,
+							type: 'message',
+							message: lastMsg,
+						});
+					}
+				}
+
+				if (event.type === 'result') {
+					const lastMsg = session.messages[session.messages.length - 1];
+					if (lastMsg) {
+						this.io?.to(room).emit('sdk_session_event', {
+							sessionId: session.id,
+							type: 'message',
+							message: lastMsg,
+						});
+					}
 					this.io?.to(room).emit('sdk_session_event', {
 						sessionId: session.id,
-						type: 'message',
-						message: lastMsg,
+						type: 'usage_update',
+						usage: session.usage,
 					});
 				}
-				this.io?.to(room).emit('sdk_session_event', {
-					sessionId: session.id,
-					type: 'usage_update',
-					usage: session.usage,
-				});
-			}
 
-			// User messages (from sendMessage)
-			if ((event as unknown as Record<string, unknown>)['type'] === 'user_message') {
-				const lastUserMsg = [...session.messages].reverse().find(m => m.role === 'user');
-				if (lastUserMsg) {
-					this.io?.to(room).emit('sdk_session_event', {
-						sessionId: session.id,
-						type: 'message',
-						message: lastUserMsg,
-					});
+				// User messages (from sendMessage)
+				if (
+					(event as unknown as Record<string, unknown>)['type'] ===
+					'user_message'
+				) {
+					const lastUserMsg = [...session.messages]
+						.reverse()
+						.find(m => m.role === 'user');
+					if (lastUserMsg) {
+						this.io?.to(room).emit('sdk_session_event', {
+							sessionId: session.id,
+							type: 'message',
+							message: lastUserMsg,
+						});
+					}
 				}
-			}
-		});
+			},
+		);
 
 		sdkSessionManager.on('sdkSessionStateChanged', (session: SdkSession) => {
 			// Send state change to subscribed clients
@@ -3852,7 +3888,12 @@ export class APIServer {
 			});
 			this.io?.emit('session_update', {
 				id: session.id,
-				state: session.state === 'connecting' ? 'busy' : session.state === 'closed' ? 'idle' : session.state,
+				state:
+					session.state === 'connecting'
+						? 'busy'
+						: session.state === 'closed'
+							? 'idle'
+							: session.state,
 				autoApprovalFailed: false,
 				autoApprovalReason: undefined,
 			});

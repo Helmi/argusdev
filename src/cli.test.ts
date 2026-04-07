@@ -681,9 +681,7 @@ describe('CLI', () => {
 
 			try {
 				await expect(import('./cli.js')).rejects.toThrow('exit:0');
-				expect(
-					consoleLogSpy,
-				).toHaveBeenCalledWith(
+				expect(consoleLogSpy).toHaveBeenCalledWith(
 					expect.stringMatching(/ArgusDev v.* — Running/),
 				);
 				expect(consoleLogSpy).toHaveBeenCalledWith('PID:          5151');

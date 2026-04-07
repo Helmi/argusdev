@@ -323,11 +323,7 @@ const {apiServer} = await import('./services/apiServer.js');
 const {fileWatcherService} = await import('./services/fileWatcherService.js');
 const {ENV_VARS, generateRandomPort} = await import('./constants/env.js');
 
-const knownCommands = new Set([
-	...getRegisteredCommands(),
-	'setup',
-	'daemon',
-]);
+const knownCommands = new Set([...getRegisteredCommands(), 'setup', 'daemon']);
 
 if (subcommand && !knownCommands.has(subcommand)) {
 	formatter.writeError({

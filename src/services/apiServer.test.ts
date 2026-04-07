@@ -245,7 +245,10 @@ describe('APIServer td create-with-agent validation ordering', () => {
 	let apiServer: {setupPromise: Promise<void>; app: TestApp};
 	let sessionProcessWriteMock: ReturnType<typeof vi.fn>;
 
-	const getPendingTdPromptInjections = (): Map<string, PendingTdPromptInjection> => {
+	const getPendingTdPromptInjections = (): Map<
+		string,
+		PendingTdPromptInjection
+	> => {
 		const serverWithQueue = apiServer as unknown as {
 			pendingTdPromptInjections?: Map<string, PendingTdPromptInjection>;
 		};
@@ -268,9 +271,7 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		promptArg?: string;
 		enabled: boolean;
 	}) => {
-		const {
-			configurationManager,
-		} = await import('./configurationManager.js');
+		const {configurationManager} = await import('./configurationManager.js');
 		vi.mocked(configurationManager.getAgentById).mockReturnValue(agent);
 	};
 
@@ -1519,7 +1520,6 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		expect(options?.initialPrompt).not.toContain('undefined');
 	});
 
-	
 	it('uses CLI arg startup prompt delivery and skips PTY queue for Codex', async () => {
 		const mockedSessionManager = (
 			coreService as unknown as {
@@ -1582,8 +1582,11 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		});
 
 		expect(response.statusCode).toBe(200);
-		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
-		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		expect(
+			mockedSessionManager.createSessionWithAgentEffect,
+		).toHaveBeenCalled();
+		const call =
+			mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
 		const options = call?.[8] as {
 			initialPrompt?: string;
 			promptArg?: string;
@@ -1659,8 +1662,11 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		});
 
 		expect(response.statusCode).toBe(200);
-		expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
-		const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		expect(
+			mockedSessionManager.createSessionWithAgentEffect,
+		).toHaveBeenCalled();
+		const call =
+			mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
 		const options = call?.[8] as {
 			initialPrompt?: string;
 			promptArg?: string;
@@ -1738,8 +1744,11 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			});
 
 			expect(response.statusCode).toBe(200);
-			expect(mockedSessionManager.createSessionWithAgentEffect).toHaveBeenCalled();
-			const call = mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+			expect(
+				mockedSessionManager.createSessionWithAgentEffect,
+			).toHaveBeenCalled();
+			const call =
+				mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
 			const options = call?.[8] as {
 				initialPrompt?: string;
 				promptArg?: string;
@@ -1748,7 +1757,9 @@ describe('APIServer td create-with-agent validation ordering', () => {
 			expect(options?.initialPrompt).toContain('td-abc123');
 			expect(options?.promptArg).toBeUndefined();
 			expect(sessionProcessWriteMock).not.toHaveBeenCalled();
-			expect(getPendingTdPromptInjections().has('session-restored')).toBe(false);
+			expect(getPendingTdPromptInjections().has('session-restored')).toBe(
+				false,
+			);
 		},
 	);
 

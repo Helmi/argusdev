@@ -33,9 +33,7 @@ describe('buildClaudeHookSettings', () => {
 		);
 
 		expect(permissionHook).toBeDefined();
-		expect(permissionHook.hooks[0].url).toContain(
-			'/hook-state/waiting_input',
-		);
+		expect(permissionHook.hooks[0].url).toContain('/hook-state/waiting_input');
 	});
 
 	it('maps Notification(idle_prompt) to idle', () => {
@@ -50,9 +48,7 @@ describe('buildClaudeHookSettings', () => {
 
 	it('maps Stop to idle', () => {
 		const settings = JSON.parse(buildClaudeHookSettings(8080, 'ses-x'));
-		expect(settings.hooks.Stop[0].hooks[0].url).toContain(
-			'/hook-state/idle',
-		);
+		expect(settings.hooks.Stop[0].hooks[0].url).toContain('/hook-state/idle');
 	});
 
 	it('maps UserPromptSubmit to busy', () => {

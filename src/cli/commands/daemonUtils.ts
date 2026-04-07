@@ -67,7 +67,12 @@ export function getLocalHostname(
 }
 
 export function openBrowser(url: string): void {
-	const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+	const cmd =
+		process.platform === 'darwin'
+			? 'open'
+			: process.platform === 'win32'
+				? 'start'
+				: 'xdg-open';
 	spawn(cmd, [url], {stdio: 'ignore', detached: true}).unref();
 }
 

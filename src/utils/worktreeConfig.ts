@@ -64,11 +64,15 @@ export function getWorktreeParentBranch(
 	return Effect.catchAll(
 		Effect.tryPromise({
 			try: signal =>
-				execFileAsync('git', ['config', '--worktree', 'argusdev.parentBranch'], {
-					cwd: worktreePath,
-					encoding: 'utf8',
-					signal,
-				}).then(result => result.stdout.trim() || null),
+				execFileAsync(
+					'git',
+					['config', '--worktree', 'argusdev.parentBranch'],
+					{
+						cwd: worktreePath,
+						encoding: 'utf8',
+						signal,
+					},
+				).then(result => result.stdout.trim() || null),
 			catch: error => error,
 		}),
 		error => {

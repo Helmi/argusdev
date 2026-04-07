@@ -186,7 +186,9 @@ describe('daemonControl', () => {
 
 		expect(result.started).toBe(true);
 		expect(result.pid).toBe(8888);
-		expect(removePidFile).toHaveBeenCalledWith(join('/tmp/argusdev', 'daemon.pid'));
+		expect(removePidFile).toHaveBeenCalledWith(
+			join('/tmp/argusdev', 'daemon.pid'),
+		);
 		expect(removePidFile.mock.invocationCallOrder[0]).toBeLessThan(
 			spawnDaemon.mock.invocationCallOrder[0]!,
 		);

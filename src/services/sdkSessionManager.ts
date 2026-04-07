@@ -16,7 +16,14 @@ import type {
 } from '../types/index.js';
 
 function createEmptyUsage(): SdkUsage {
-	return {totalCostUsd: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, turns: 0};
+	return {
+		totalCostUsd: 0,
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheReadTokens: 0,
+		cacheCreationTokens: 0,
+		turns: 0,
+	};
 }
 
 /**
@@ -32,7 +39,10 @@ export class SdkSessionManager extends EventEmitter {
 	/** Base args from the agent profile (stream-json flags etc.) */
 	private sessionArgs = new Map<string, string[]>();
 	private sessionEnv = new Map<string, Record<string, string>>();
-	private streamingMessages = new Map<string, {blocks: Map<number, SdkContentBlock>; parentToolUseId: string | null}>();
+	private streamingMessages = new Map<
+		string,
+		{blocks: Map<number, SdkContentBlock>; parentToolUseId: string | null}
+	>();
 
 	getAllSessions(): SdkSession[] {
 		return [...this.sessions.values()];
@@ -69,7 +79,8 @@ export class SdkSessionManager extends EventEmitter {
 		this.emit('sdkSessionCreated', session);
 
 		// Spawn the first turn — if initialPrompt provided, use it; otherwise just init
-		const prompt = initialPrompt || 'You are ready. The user will send a message.';
+		const prompt =
+			initialPrompt || 'You are ready. The user will send a message.';
 		this.spawnTurn(id, prompt);
 
 		return session;
@@ -77,7 +88,8 @@ export class SdkSessionManager extends EventEmitter {
 
 	sendMessage(sessionId: string, content: string): boolean {
 		const session = this.sessions.get(sessionId);
-		if (!session || session.state === 'busy' || session.state === 'closed') return false;
+		if (!session || session.state === 'busy' || session.state === 'closed')
+			return false;
 
 		session.messages.push({
 			id: randomUUID(),
@@ -94,7 +106,9 @@ export class SdkSessionManager extends EventEmitter {
 	approveToolCall(sessionId: string): boolean {
 		const session = this.sessions.get(sessionId);
 		if (!session?.pendingApproval) return false;
-		logger.info(`[SdkSessionManager] Approving tool call ${session.pendingApproval.id} in ${sessionId}`);
+		logger.info(
+			`[SdkSessionManager] Approving tool call ${session.pendingApproval.id} in ${sessionId}`,
+		);
 		session.pendingApproval = undefined;
 		return true;
 	}
@@ -102,7 +116,9 @@ export class SdkSessionManager extends EventEmitter {
 	rejectToolCall(sessionId: string): boolean {
 		const session = this.sessions.get(sessionId);
 		if (!session?.pendingApproval) return false;
-		logger.info(`[SdkSessionManager] Rejecting tool call ${session.pendingApproval.id} in ${sessionId}`);
+		logger.info(
+			`[SdkSessionManager] Rejecting tool call ${session.pendingApproval.id} in ${sessionId}`,
+		);
 		session.pendingApproval = undefined;
 		return true;
 	}
@@ -147,7 +163,9 @@ export class SdkSessionManager extends EventEmitter {
 		turnArgs.push(prompt);
 
 		const env = this.sessionEnv.get(sessionId);
-		logger.info(`[SdkSessionManager] Spawning turn for ${sessionId}: claude ${turnArgs.join(' ').slice(0, 200)}`);
+		logger.info(
+			`[SdkSessionManager] Spawning turn for ${sessionId}: claude ${turnArgs.join(' ').slice(0, 200)}`,
+		);
 
 		const child = spawn('claude', turnArgs, {
 			cwd: session.worktreePath,
@@ -172,11 +190,16 @@ export class SdkSessionManager extends EventEmitter {
 
 		child.stderr?.on('data', (data: Buffer) => {
 			const text = data.toString().trim();
-			if (text) logger.warn(`[SdkSessionManager] stderr (${sessionId}): ${text.slice(0, 500)}`);
+			if (text)
+				logger.warn(
+					`[SdkSessionManager] stderr (${sessionId}): ${text.slice(0, 500)}`,
+				);
 		});
 
 		child.on('exit', (code, signal) => {
-			logger.info(`[SdkSessionManager] Turn for ${sessionId} exited (code=${code}, signal=${signal})`);
+			logger.info(
+				`[SdkSessionManager] Turn for ${sessionId} exited (code=${code}, signal=${signal})`,
+			);
 			parser.flush();
 			this.activeProcesses.delete(sessionId);
 			this.streamingMessages.delete(sessionId);
@@ -222,30 +245,53 @@ export class SdkSessionManager extends EventEmitter {
 		this.emit('sdkSessionData', session, event);
 	}
 
-	private handleSystemEvent(sessionId: string, session: SdkSession, event: SdkSystemEvent): void {
+	private handleSystemEvent(
+		sessionId: string,
+		session: SdkSession,
+		event: SdkSystemEvent,
+	): void {
 		session.claudeSessionId = event.session_id;
 		session.model = event.model;
 		session.tools = event.tools;
 
 		// Only add init message on first turn
-		if (session.messages.length === 0 || session.messages[0]?.role !== 'system') {
+		if (
+			session.messages.length === 0 ||
+			session.messages[0]?.role !== 'system'
+		) {
 			session.messages.unshift({
 				id: randomUUID(),
 				role: 'system',
-				content: [{type: 'system_info', text: 'Session started', model: event.model, sessionId: event.session_id}],
+				content: [
+					{
+						type: 'system_info',
+						text: 'Session started',
+						model: event.model,
+						sessionId: event.session_id,
+					},
+				],
 				timestamp: Date.now(),
 			});
 		}
 
-		logger.info(`[SdkSessionManager] Session ${sessionId} initialized (model=${event.model}, claudeSession=${event.session_id})`);
+		logger.info(
+			`[SdkSessionManager] Session ${sessionId} initialized (model=${event.model}, claudeSession=${event.session_id})`,
+		);
 	}
 
-	private handleStreamEvent(sessionId: string, session: SdkSession, event: SdkStreamEvent): void {
+	private handleStreamEvent(
+		sessionId: string,
+		session: SdkSession,
+		event: SdkStreamEvent,
+	): void {
 		const eventType = event.event.type;
 
 		if (eventType === 'message_start') {
 			this.updateState(sessionId, 'busy');
-			this.streamingMessages.set(sessionId, {blocks: new Map(), parentToolUseId: event.parent_tool_use_id});
+			this.streamingMessages.set(sessionId, {
+				blocks: new Map(),
+				parentToolUseId: event.parent_tool_use_id,
+			});
 		}
 
 		if (eventType === 'content_block_start' && event.event.content_block) {
@@ -258,7 +304,12 @@ export class SdkSessionManager extends EventEmitter {
 			} else if (block.type === 'thinking') {
 				streaming?.blocks.set(idx, {type: 'thinking', text: ''});
 			} else if (block.type === 'tool_use' && block.id && block.name) {
-				streaming?.blocks.set(idx, {type: 'tool_use', id: block.id, name: block.name, input: {}});
+				streaming?.blocks.set(idx, {
+					type: 'tool_use',
+					id: block.id,
+					name: block.name,
+					input: {},
+				});
 			}
 		}
 
@@ -268,13 +319,22 @@ export class SdkSessionManager extends EventEmitter {
 			const idx = event.event.index ?? 0;
 			const block = streaming?.blocks.get(idx);
 
-			if (block && delta.type === 'text_delta' && delta.text && (block.type === 'text' || block.type === 'thinking')) {
+			if (
+				block &&
+				delta.type === 'text_delta' &&
+				delta.text &&
+				(block.type === 'text' || block.type === 'thinking')
+			) {
 				block.text += delta.text;
 			}
 		}
 	}
 
-	private handleAssistantEvent(sessionId: string, session: SdkSession, event: SdkAssistantEvent): void {
+	private handleAssistantEvent(
+		sessionId: string,
+		session: SdkSession,
+		event: SdkAssistantEvent,
+	): void {
 		const blocks: SdkContentBlock[] = event.message.content.map(block => {
 			if (block.type === 'text' && block.text !== undefined) {
 				return {type: 'text' as const, text: block.text};
@@ -283,7 +343,12 @@ export class SdkSessionManager extends EventEmitter {
 				return {type: 'thinking' as const, text: block.text};
 			}
 			if (block.type === 'tool_use' && block.id && block.name) {
-				return {type: 'tool_use' as const, id: block.id, name: block.name, input: block.input ?? {}};
+				return {
+					type: 'tool_use' as const,
+					id: block.id,
+					name: block.name,
+					input: block.input ?? {},
+				};
 			}
 			return {type: 'text' as const, text: `[${block.type}]`};
 		});
@@ -298,7 +363,11 @@ export class SdkSessionManager extends EventEmitter {
 		this.streamingMessages.delete(sessionId);
 	}
 
-	private handleResultEvent(sessionId: string, session: SdkSession, event: SdkResultEvent): void {
+	private handleResultEvent(
+		sessionId: string,
+		session: SdkSession,
+		event: SdkResultEvent,
+	): void {
 		session.usage.totalCostUsd += event.total_cost_usd;
 		session.usage.turns = event.num_turns;
 
@@ -306,7 +375,8 @@ export class SdkSessionManager extends EventEmitter {
 		session.usage.inputTokens += usage['input_tokens'] ?? 0;
 		session.usage.outputTokens += usage['output_tokens'] ?? 0;
 		session.usage.cacheReadTokens += usage['cache_read_input_tokens'] ?? 0;
-		session.usage.cacheCreationTokens += usage['cache_creation_input_tokens'] ?? 0;
+		session.usage.cacheCreationTokens +=
+			usage['cache_creation_input_tokens'] ?? 0;
 
 		session.messages.push({
 			id: randomUUID(),

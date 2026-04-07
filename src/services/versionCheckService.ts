@@ -1,3 +1,4 @@
+/* global fetch */
 import {createRequire} from 'node:module';
 import type {configurationManager as ConfigManagerType} from './configurationManager.js';
 import {
@@ -60,7 +61,10 @@ const CURRENT_VERSION = getCurrentVersion();
 let inFlight: Promise<UpdateCheckResult> | undefined;
 
 function toComparableVersion(version: string): number[] {
-	const normalized = version.toLowerCase().replace(/^v/, '').replace(/-.+$/, '');
+	const normalized = version
+		.toLowerCase()
+		.replace(/^v/, '')
+		.replace(/-.+$/, '');
 	const parts = normalized.split('.');
 	return [
 		Number.parseInt(parts[0] ?? '0', 10) || 0,
@@ -95,10 +99,7 @@ function buildResult(
 		checkedAt: cache?.checkedAt ?? Date.now(),
 		latestVersion: cache?.latestVersion,
 		latestTag: cache?.latestTag,
-		isUpdateAvailable: hasNewerVersion(
-			CURRENT_VERSION,
-			cache?.latestVersion,
-		),
+		isUpdateAvailable: hasNewerVersion(CURRENT_VERSION, cache?.latestVersion),
 		source,
 		isStale: !cache || Date.now() - cache.checkedAt > UPDATE_CHECK_TTL_MS,
 		error,
@@ -135,7 +136,9 @@ export function getCachedUpdateCheck(): UpdateCheckResult | undefined {
 	);
 }
 
-export async function checkForUpdate(force = false): Promise<UpdateCheckResult> {
+export async function checkForUpdate(
+	force = false,
+): Promise<UpdateCheckResult> {
 	const cached = getCachedUpdateCheck();
 	if (process.env['NODE_ENV'] === 'test') {
 		return cached ?? buildResult(undefined, 'cache');
@@ -155,13 +158,13 @@ export async function checkForUpdate(force = false): Promise<UpdateCheckResult> 
 				headers: {
 					'User-Agent': 'argusdev',
 					Accept: 'application/vnd.github+json',
-			},
+				},
 			});
 
 			if (!response.ok) {
 				throw new Error(
 					`GitHub release check failed (${response.status} ${response.statusText})`,
-			);
+				);
 			}
 
 			const release = (await response.json()) as GitHubRelease;
