@@ -44,6 +44,7 @@ interface AgentBootstrapOptions {
 	promptArg?: string;
 	prependCwd?: boolean;
 	sessionIdOverride?: string;
+	hookBasedDetection?: boolean;
 }
 
 export class SessionManager extends EventEmitter implements ISessionManager {
@@ -344,6 +345,29 @@ ${commandTokens.join(' ')}
 		return detectedState;
 	}
 
+	/**
+	 * Apply a state change from a Claude Code HTTP hook event.
+	 * Bypasses the pending/persistence delay — hook events are authoritative.
+	 */
+	applyHookStateEvent(sessionId: string, newState: SessionState): void {
+		const session = this.sessions.get(sessionId);
+		if (!session || !session.hookBasedDetection) return;
+
+		// Auto-approval integration: convert waiting_input to pending_auto_approval
+		let resolvedState = newState;
+		if (
+			resolvedState === 'waiting_input' &&
+			configurationManager.isAutoApprovalEnabled()
+		) {
+			const stateData = session.stateMutex.getSnapshot();
+			if (!stateData.autoApprovalFailed) {
+				resolvedState = 'pending_auto_approval';
+			}
+		}
+
+		void this.updateSessionState(session, resolvedState);
+	}
+
 	private getTerminalContent(session: Session): string {
 		const buffer = session.terminal.buffer.active;
 		const lines: string[] = [];
@@ -524,7 +548,7 @@ ${commandTokens.join(' ')}
 		this.sessions = new Map();
 	}
 
-	private createSessionId(): string {
+	createSessionId(): string {
 		return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 	}
 
@@ -550,6 +574,7 @@ ${commandTokens.join(' ')}
 		options: {
 			isPrimaryCommand?: boolean;
 			detectionStrategy?: StateDetectionStrategy;
+			hookBasedDetection?: boolean;
 			devcontainerConfig?: DevcontainerConfig;
 			sessionName?: string;
 			agentId?: string;
@@ -578,6 +603,7 @@ ${commandTokens.join(' ')}
 			isPrimaryCommand: options.isPrimaryCommand ?? true,
 			commandConfig,
 			detectionStrategy: options.detectionStrategy ?? 'claude',
+			hookBasedDetection: options.hookBasedDetection ?? false,
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			stateMutex: new Mutex(createInitialSessionStateData()),
 		};
@@ -737,6 +763,7 @@ ${commandTokens.join(' ')}
 					{
 						isPrimaryCommand: true,
 						detectionStrategy: detectionStrategy,
+						hookBasedDetection: bootstrapOptions?.hookBasedDetection,
 						sessionName: sessionName,
 						agentId: agentId,
 						sessionId: bootstrapOptions?.sessionIdOverride,
@@ -932,6 +959,15 @@ ${commandTokens.join(' ')}
 	private setupBackgroundHandler(session: Session): void {
 		// Setup data handler
 		this.setupDataHandler(session);
+
+		if (session.hookBasedDetection) {
+			// Hook-based sessions receive state from HTTP events — no polling needed.
+			logger.info(
+				`[SessionManager] Session ${session.id} using hook-based state detection, skipping polling`,
+			);
+			this.setupExitHandler(session);
+			return;
+		}
 
 		// Hot reload protection: Clear existing interval if any
 		if (session.stateCheckInterval) {

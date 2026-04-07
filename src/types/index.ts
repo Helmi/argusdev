@@ -46,6 +46,7 @@ export interface Session {
 	isPrimaryCommand: boolean; // Track if process was started with main command args
 	commandConfig: CommandConfig | undefined; // Store command config for fallback
 	detectionStrategy: StateDetectionStrategy | undefined; // State detection strategy for this session
+	hookBasedDetection?: boolean; // When true, state updates arrive via HTTP hooks, not buffer polling
 	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
 	/**
 	 * Mutex-protected session state data.
@@ -176,6 +177,7 @@ export interface AgentConfig {
 	kind: 'agent' | 'terminal';
 	command: string; // Executable (e.g., 'claude', '$SHELL')
 	baseArgs?: string[]; // Fixed args always passed (for migration/advanced use)
+	baseEnv?: Record<string, string>; // Extra env vars always set for this agent
 	options: AgentOption[];
 	enabled?: boolean; // Whether this agent is available for new session selection (defaults to true)
 	promptArg?: string; // Startup prompt passing mode: positional (empty), flag (e.g. '--prompt'), or 'none'

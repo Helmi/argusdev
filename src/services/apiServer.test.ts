@@ -93,6 +93,8 @@ vi.mock('./configurationManager.js', () => ({
 		})),
 		validateAgentOptions: vi.fn(() => []),
 		buildAgentArgs: vi.fn(() => []),
+		getPort: vi.fn(() => undefined),
+		isAutoApprovalEnabled: vi.fn(() => false),
 	},
 }));
 
@@ -150,6 +152,7 @@ vi.mock('./coreService.js', () => ({
 			renameSession: vi.fn(),
 			getAllSessions: vi.fn(() => []),
 			createSessionWithAgentEffect: vi.fn(),
+			createSessionId: vi.fn(() => 'session-mock-id'),
 			setSessionActive: vi.fn(),
 		},
 	},

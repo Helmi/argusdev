@@ -52,6 +52,7 @@ import {globalSessionOrchestrator} from './globalSessionOrchestrator.js';
 import {fileWatcherService} from './fileWatcherService.js';
 import type {SessionManager} from './sessionManager.js';
 import {cleanupStartupScriptsInWorktree} from '../utils/startupScript.js';
+import {buildClaudeHookSettings} from '../utils/hookSettings.js';
 import type {
 	AgentConfig,
 	Session,
@@ -732,7 +733,9 @@ export class APIServer {
 					: 'fallback';
 			const command =
 				agent.command === '$SHELL' ? getDefaultShell() : agent.command;
-			const extraEnv: Record<string, string> = {};
+			const extraEnv: Record<string, string> = {
+				...(agent.baseEnv ?? {}),
+			};
 			if (record.tdTaskId) {
 				extraEnv['TD_TASK_ID'] = record.tdTaskId;
 			}
@@ -747,10 +750,30 @@ export class APIServer {
 				promptArg?.toLowerCase() !== 'none';
 			const fallbackPrompt = this.buildRestartFallbackPrompt(record);
 
+			// Hook-based state detection for Claude Code recovery sessions
+			const recoveryArgs = [...codexArgsPlan.args];
+			let recoveryHookBased = false;
+			const isRecoveryClaudeAgent =
+				agent.id === 'claude' ||
+				agent.command === 'claude' ||
+				agent.detectionStrategy === 'claude';
+			if (
+				isRecoveryClaudeAgent &&
+				agent.kind !== 'terminal' &&
+				agent.sessionType !== 'sdk'
+			) {
+				const port = configurationManager.getPort();
+				if (port) {
+					const hookSettings = buildClaudeHookSettings(port, record.id);
+					recoveryArgs.push('--settings', hookSettings);
+					recoveryHookBased = true;
+				}
+			}
+
 			const effect = manager.createSessionWithAgentEffect(
 				record.worktreePath,
 				command,
-				codexArgsPlan.args,
+				recoveryArgs,
 				agent.detectionStrategy,
 				record.sessionName || undefined,
 				agent.id,
@@ -761,6 +784,7 @@ export class APIServer {
 					prependCwd: agent.prependCwd,
 					sessionIdOverride: record.id,
 					initialPrompt: canInjectFallbackPrompt ? fallbackPrompt : undefined,
+					hookBasedDetection: recoveryHookBased,
 				},
 			);
 			const result = await Effect.runPromise(Effect.either(effect));
@@ -1066,6 +1090,11 @@ export class APIServer {
 				return;
 			}
 
+			// Skip internal routes (hook-based state events from localhost agents)
+			if (request.url.startsWith('/api/internal/')) {
+				return;
+			}
+
 			// Skip non-API routes
 			if (!request.url.startsWith('/api/')) {
 				return;
@@ -1098,6 +1127,32 @@ export class APIServer {
 
 			// Session is valid, continue
 		});
+
+		// --- Internal: Hook-based state detection (unauthenticated, localhost only) ---
+		this.app.post<{Params: {id: string; state: string}}>(
+			'/api/internal/sessions/:id/hook-state/:state',
+			async (request, reply) => {
+				const session = coreService.sessionManager.getSession(
+					request.params.id,
+				);
+				if (!session) {
+					return reply.code(404).send({error: 'Session not found'});
+				}
+
+				const validStates: Record<string, SessionState> = {
+					idle: 'idle',
+					busy: 'busy',
+					waiting_input: 'waiting_input',
+				};
+				const newState = validStates[request.params.state];
+				if (!newState) {
+					return reply.code(400).send({error: 'Invalid state'});
+				}
+
+				coreService.sessionManager.applyHookStateEvent(session.id, newState);
+				return {ok: true};
+			},
+		);
 
 		// --- State ---
 		this.app.get('/api/state', async () => {
@@ -2405,6 +2460,26 @@ export class APIServer {
 			},
 		);
 
+		this.app.post<{Body: {orderedIds: string[]}}>(
+			'/api/agents/reorder',
+			async (request, reply) => {
+				const {orderedIds} = request.body;
+				if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+					return reply
+						.code(400)
+						.send({error: 'orderedIds must be a non-empty array'});
+				}
+				const success = configurationManager.reorderAgents(orderedIds);
+				if (!success) {
+					return reply
+						.code(400)
+						.send({error: 'Invalid agent IDs in order list'});
+				}
+				logger.info('API: Reordered agents');
+				return {success: true};
+			},
+		);
+
 		this.app.post<{Body: {id: string}}>(
 			'/api/agents/default',
 			async (request, reply) => {
@@ -2490,8 +2565,10 @@ export class APIServer {
 			}
 			logger.info(`API: Spawning command: ${command} ${args.join(' ')}`);
 
-			// Build extra env for Claude task list and td integration
-			const extraEnv: Record<string, string> = {};
+			// Build extra env: agent baseEnv + Claude task list + td integration
+			const extraEnv: Record<string, string> = {
+				...(agent.baseEnv ?? {}),
+			};
 			const isClaudeAgent =
 				agentId === 'claude' ||
 				agent.command === 'claude' ||
@@ -2721,6 +2798,30 @@ export class APIServer {
 				startupPromptToInject && normalizedPromptArg?.toLowerCase() !== 'none'
 			);
 
+			// Hook-based state detection for Claude Code agents:
+			// Inject --settings with HTTP hooks that POST state transitions to ArgusDev.
+			let hookBasedDetection = false;
+			const preGeneratedSessionId =
+				coreService.sessionManager.createSessionId();
+			if (
+				isClaudeAgent &&
+				agent.kind !== 'terminal' &&
+				agent.sessionType !== 'sdk'
+			) {
+				const port = configurationManager.getPort();
+				if (port) {
+					const hookSettings = buildClaudeHookSettings(
+						port,
+						preGeneratedSessionId,
+					);
+					args.push('--settings', hookSettings);
+					hookBasedDetection = true;
+					logger.info(
+						`API: Injecting hook-based state detection for session ${preGeneratedSessionId}`,
+					);
+				}
+			}
+
 			// Create session with resolved command and args
 			const effect = coreService.sessionManager.createSessionWithAgentEffect(
 				worktreePath,
@@ -2737,6 +2838,10 @@ export class APIServer {
 						: undefined,
 					promptArg: normalizedPromptArg,
 					prependCwd: agent.prependCwd,
+					sessionIdOverride: hookBasedDetection
+						? preGeneratedSessionId
+						: undefined,
+					hookBasedDetection,
 				},
 			);
 			const result = await Effect.runPromise(Effect.either(effect));
