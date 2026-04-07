@@ -88,7 +88,7 @@ jobs:
 
       - name: Create GitHub Release
         run: |
-          gh release create "v$VERSION" --generate-notes --title "v$VERSION"
+          gh release create "v$VERSION" --generate-notes --title "ArgusDev v$VERSION"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.get_version.outputs.VERSION }}
