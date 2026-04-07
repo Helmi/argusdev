@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.0](https://github.com/Helmi/argusdev/compare/v0.6.0...v0.7.0) (2026-04-07)
+
+
+### Features
+
+* hook-based state detection for Claude Code sessions ([613f710](https://github.com/Helmi/argusdev/commit/613f710ec8fea5f099091dd1a655ff5f229f7a2e))
+* agent config editor drag-and-drop reorder and UX improvements ([c8e621d](https://github.com/Helmi/argusdev/commit/c8e621dc68e08a23ed50a10c5076f3498bb0cfc7))
+* **webui:** add 👀 logo icon next to ArgusDev text in header ([7ceaeaa](https://github.com/Helmi/argusdev/commit/7ceaeaa))
+
+
+### Bug Fixes
+
+* hook detection: add UserPromptSubmit for busy, use native http hook type, temp file settings ([1f441e8](https://github.com/Helmi/argusdev/commit/1f441e8))
+* use pill-shaped 👀 favicon ([ec451f4](https://github.com/Helmi/argusdev/commit/ec451f4))
+
+
+### Highlights
+
+**Hook-based state detection** replaces fragile terminal buffer scraping for Claude Code sessions.
+Instead of polling the xterm.js buffer for text patterns, Claude Code's own lifecycle hooks now
+POST state transitions directly to ArgusDev's API:
+
+- `UserPromptSubmit` → busy (user sent a message)
+- `PreToolUse` → busy (tool execution)
+- `Notification(permission_prompt)` → waiting_input
+- `Notification(idle_prompt)` → idle
+- `Stop` → idle (response complete)
+
+State updates are immediate — no 100ms polling or 500ms persistence delay.
+Non-Claude agents keep buffer-based detection as fallback.
+
 ## [0.6.0](https://github.com/Helmi/argusdev/compare/v0.4.2...v0.6.0) (2026-03-30)
 
 
