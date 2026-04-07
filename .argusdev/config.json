@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "setup": "bash scripts/worktree-setup.sh",
+    "teardown": ""
+  },
+  "td": {
+    "enabled": true,
+    "autoStart": true,
+    "defaultPrompt": "Begin Work on Ticket"
+  },
+  "agentDefaults": {
+    "agentId": "claude"
+  }
+}
