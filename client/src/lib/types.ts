@@ -180,6 +180,20 @@ export interface ChangedFile {
 	deletions: number;
 }
 
+export interface ChangedFilesSummary {
+	totalFiles: number;
+	totalAdditions: number;
+	totalDeletions: number;
+	byStatus: Record<ChangedFile['status'], number>;
+}
+
+export interface ChangedFilesResponse {
+	files: ChangedFile[];
+	summary: ChangedFilesSummary;
+	total: number;
+	truncated: boolean;
+}
+
 // Directory entry for file browser
 export interface DirectoryEntry {
 	name: string;

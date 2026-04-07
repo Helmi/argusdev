@@ -9,7 +9,7 @@ import {Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip';
 import {StatusIndicator} from '@/components/StatusIndicator';
 import {AgentIcon, getLegacyAgentIconProps} from '@/components/AgentIcon';
 import {FileBrowser} from '@/components/FileBrowser';
-import {mapSessionState, ChangedFile} from '@/lib/types';
+import {mapSessionState, type ChangedFilesResponse} from '@/lib/types';
 import {TaskContextCard} from '@/components/TaskContextCard';
 import {
 	X,
@@ -24,6 +24,7 @@ import {
 	GitCommit,
 	FolderTree,
 	Pencil,
+	Search,
 } from 'lucide-react';
 import {cn, formatPath, copyToClipboard} from '@/lib/utils';
 
@@ -45,9 +46,12 @@ export function ContextSidebar() {
 	const [isRenamingSession, setIsRenamingSession] = useState(false);
 	const [renameValue, setRenameValue] = useState('');
 	const renameInputRef = useRef<HTMLInputElement>(null);
-	const [changedFiles, setChangedFiles] = useState<ChangedFile[]>([]);
+	const [filesResponse, setFilesResponse] = useState<ChangedFilesResponse | null>(null);
 	const [filesLoading, setFilesLoading] = useState(false);
 	const [filesError, setFilesError] = useState<string | null>(null);
+	const [fileSearch, setFileSearch] = useState('');
+	const [debouncedSearch, setDebouncedSearch] = useState('');
+	const [showAll, setShowAll] = useState(false);
 
 	// Find the session
 	const session = contextSidebarSessionId
@@ -72,28 +76,35 @@ export function ContextSidebar() {
 	// Fetch changed files function
 	const fetchChangedFiles = useCallback(async () => {
 		if (!session?.path) {
-			setChangedFiles([]);
+			setFilesResponse(null);
 			return;
 		}
 
 		setFilesLoading(true);
 		setFilesError(null);
 		try {
-			const response = await fetch(
-				`/api/worktree/files?path=${encodeURIComponent(session.path)}`,
-			);
+			const params = new URLSearchParams({path: session.path});
+			if (debouncedSearch) {
+				params.set('search', debouncedSearch);
+				params.set('limit', '5000');
+			} else if (showAll) {
+				params.set('limit', '5000');
+			} else {
+				params.set('limit', '200');
+			}
+			const response = await fetch(`/api/worktree/files?${params}`);
 			if (!response.ok) {
 				throw new Error('Failed to fetch changed files');
 			}
-			const files = await response.json();
-			setChangedFiles(files);
+			const data: ChangedFilesResponse = await response.json();
+			setFilesResponse(data);
 		} catch (err) {
 			setFilesError(err instanceof Error ? err.message : 'Unknown error');
-			setChangedFiles([]);
+			setFilesResponse(null);
 		} finally {
 			setFilesLoading(false);
 		}
-	}, [session?.path]);
+	}, [session?.path, debouncedSearch, showAll]);
 
 	// Track previous session state to detect meaningful changes
 	const prevSessionStateRef = useRef<string | null>(null);
@@ -145,7 +156,16 @@ export function ContextSidebar() {
 	useEffect(() => {
 		setIsRenamingSession(false);
 		setRenameValue('');
+		setFileSearch('');
+		setDebouncedSearch('');
+		setShowAll(false);
 	}, [session?.id]);
+
+	// Debounce search input
+	useEffect(() => {
+		const timer = setTimeout(() => setDebouncedSearch(fileSearch), 300);
+		return () => clearTimeout(timer);
+	}, [fileSearch]);
 
 	// Fetch on session change
 	useEffect(() => {
@@ -291,9 +311,9 @@ export function ContextSidebar() {
 					>
 						<GitCommit className="h-3 w-3" />
 						<span>Changes</span>
-						{changedFiles.length > 0 && (
+						{(filesResponse?.summary.totalFiles ?? 0) > 0 && (
 							<span className="ml-0.5 px-1 py-0 text-xs rounded-full bg-current/20 min-w-[14px] text-center">
-								{changedFiles.length}
+								{filesResponse!.summary.totalFiles}
 							</span>
 						)}
 					</TabsTrigger>
@@ -315,13 +335,13 @@ export function ContextSidebar() {
 				{/* Changes tab content */}
 				<TabsContent value="changes" className="mt-0 space-y-2">
 					{/* Git status summary */}
-					{changedFiles.length > 0 && (
+					{filesResponse && filesResponse.summary.totalFiles > 0 && (
 						<div className="flex items-center gap-3 text-sm">
 							<span className="text-green-500 font-mono">
-								+{changedFiles.reduce((sum, f) => sum + f.additions, 0)}
+								+{filesResponse.summary.totalAdditions}
 							</span>
 							<span className="text-red-500 font-mono">
-								-{changedFiles.reduce((sum, f) => sum + f.deletions, 0)}
+								-{filesResponse.summary.totalDeletions}
 							</span>
 							{worktree?.gitStatus &&
 								(worktree.gitStatus.aheadCount > 0 ||
@@ -350,6 +370,22 @@ export function ContextSidebar() {
 						</div>
 					)}
 
+					{/* Search input — shown when there are many files or list is truncated */}
+					{((filesResponse?.summary.totalFiles ?? 0) > 20 || filesResponse?.truncated) && (
+						<div className="relative">
+							<Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+							<Input
+								placeholder="Filter files..."
+								value={fileSearch}
+								onChange={e => {
+									setFileSearch(e.target.value);
+									setShowAll(false);
+								}}
+								className="h-6 text-xs pl-6"
+							/>
+						</div>
+					)}
+
 					{/* Changed files list */}
 					{filesLoading ? (
 						<div className="text-xs text-muted-foreground animate-pulse">
@@ -357,9 +393,9 @@ export function ContextSidebar() {
 						</div>
 					) : filesError ? (
 						<div className="text-xs text-destructive">{filesError}</div>
-					) : changedFiles.length > 0 ? (
+					) : filesResponse && filesResponse.files.length > 0 ? (
 						<div className="space-y-1">
-							{changedFiles.map(file => (
+							{filesResponse.files.map(file => (
 								<button
 									key={file.path}
 									className="flex items-center gap-2 w-full text-left text-xs hover:bg-secondary/50 rounded px-1.5 py-1 transition-colors group"
@@ -393,6 +429,20 @@ export function ContextSidebar() {
 									)}
 								</button>
 							))}
+							{/* Truncation notice */}
+							{filesResponse.truncated && (
+								<div className="flex items-center justify-between text-xs text-muted-foreground px-1.5 py-1.5 border-t border-border mt-1">
+									<span>
+										Showing {filesResponse.files.length} of {filesResponse.total} files
+									</span>
+									<button
+										className="text-accent hover:underline"
+										onClick={() => setShowAll(true)}
+									>
+										Show all
+									</button>
+								</div>
+							)}
 						</div>
 					) : worktree?.gitStatusError ? (
 						<div className="text-xs text-destructive">

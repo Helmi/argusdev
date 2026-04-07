@@ -24,6 +24,20 @@ export interface ChangedFile {
 	deletions: number;
 }
 
+export interface ChangedFilesSummary {
+	totalFiles: number;
+	totalAdditions: number;
+	totalDeletions: number;
+	byStatus: Record<ChangedFile['status'], number>;
+}
+
+export interface ChangedFilesResponse {
+	files: ChangedFile[];
+	summary: ChangedFilesSummary;
+	total: number;
+	truncated: boolean;
+}
+
 interface ExecResult {
 	stdout: string;
 	stderr: string;
@@ -394,7 +408,7 @@ export const getChangedFiles = (
 
 		// Get file status (for rename detection)
 		const statusResult = yield* runGit(
-			['status', '--porcelain', '-uall'],
+			['status', '--porcelain', '-uno'],
 			worktreePath,
 		);
 
@@ -486,6 +500,42 @@ export const getChangedFiles = (
 
 export const getChangedFilesLimited = createEffectConcurrencyLimited(
 	(worktreePath: string) => getChangedFiles(worktreePath),
+	10,
+);
+
+export const getChangedFilesWithSummary = (
+	worktreePath: string,
+	options?: {limit?: number; search?: string},
+): Effect.Effect<ChangedFilesResponse, GitError> =>
+	Effect.map(getChangedFiles(worktreePath), allFiles => {
+		const summary: ChangedFilesSummary = {
+			totalFiles: allFiles.length,
+			totalAdditions: allFiles.reduce((s, f) => s + f.additions, 0),
+			totalDeletions: allFiles.reduce((s, f) => s + f.deletions, 0),
+			byStatus: {added: 0, modified: 0, deleted: 0, renamed: 0, untracked: 0},
+		};
+		for (const f of allFiles) summary.byStatus[f.status]++;
+
+		const filtered = options?.search
+			? allFiles.filter(f =>
+					f.path.toLowerCase().includes(options.search!.toLowerCase()),
+				)
+			: allFiles;
+
+		const limit = options?.limit ?? allFiles.length;
+		const files = filtered.slice(0, limit);
+
+		return {
+			files,
+			summary,
+			total: filtered.length,
+			truncated: files.length < filtered.length,
+		};
+	});
+
+export const getChangedFilesWithSummaryLimited = createEffectConcurrencyLimited(
+	(worktreePath: string, options?: {limit?: number; search?: string}) =>
+		getChangedFilesWithSummary(worktreePath, options),
 	10,
 );
 

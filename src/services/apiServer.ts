@@ -15,7 +15,7 @@ import path from 'path';
 import {fileURLToPath, URL} from 'url';
 import {
 	getGitStatusLimited,
-	getChangedFilesLimited,
+	getChangedFilesWithSummaryLimited,
 	getFileDiff,
 } from '../utils/gitStatus.js';
 import {randomUUID, randomBytes} from 'crypto';
@@ -1441,9 +1441,9 @@ export class APIServer {
 		// --- Git Status Endpoints ---
 		// Get list of changed files for a worktree
 		this.app.get<{
-			Querystring: {path: string};
+			Querystring: {path: string; limit?: string; search?: string};
 		}>('/api/worktree/files', async (request, reply) => {
-			const {path: worktreePath} = request.query;
+			const {path: worktreePath, limit: limitStr, search} = request.query;
 
 			if (!worktreePath) {
 				return reply.code(400).send({error: 'path query parameter required'});
@@ -1458,8 +1458,14 @@ export class APIServer {
 				return reply.code(400).send({error: 'Invalid worktree path'});
 			}
 
+			const limit = limitStr
+				? Math.max(1, Math.min(Number.parseInt(limitStr, 10) || 200, 5000))
+				: 200;
+
 			const result = await Effect.runPromise(
-				Effect.either(getChangedFilesLimited(validatedPath)),
+				Effect.either(
+					getChangedFilesWithSummaryLimited(validatedPath, {limit, search}),
+				),
 			);
 
 			if (result._tag === 'Left') {
