@@ -24,47 +24,103 @@ function getTerminalContent(terminal: Terminal, maxLines = 30): string {
 	return getTerminalLines(terminal, maxLines).join('\n');
 }
 
+/**
+ * Detect Claude Code session state from terminal buffer.
+ *
+ * Detection priority (first match wins):
+ *   1. waiting_input — permission/confirmation dialogs
+ *   2. busy         — processing indicators (interrupt hints, spinners)
+ *   3. idle         — input prompt visible (text hints or prompt box structure)
+ *   4. fallback     — preserve current state
+ *
+ * The bottom of the terminal is most informative since Claude Code's TUI
+ * renders status indicators and the input area there.
+ */
 function detectClaudeState(
 	terminal: Terminal,
 	currentState: SessionState,
 ): SessionState {
-	const content = getTerminalContent(terminal);
-	const lowerContent = content.toLowerCase();
+	const lines = getTerminalLines(terminal, 30);
+	const content = lines.join('\n');
 
-	// Confirmation prompts (yes/no or selection dialogs)
+	// Focus on bottom lines where Claude Code renders its status/input area
+	const bottomLines = lines.slice(-15);
+	const bottomLower = bottomLines.map(l => l.toLowerCase());
+	const bottomContent = bottomLower.join('\n');
+
+	// ── 1. WAITING_INPUT: permission / confirmation dialogs ──────────
+
+	// Yes/No confirmation prompts with visible selection
+	if (/(?:do you want|would you like).+\n+[\s\S]*?(?:yes|❯)/i.test(content)) {
+		return 'waiting_input';
+	}
+
+	// Permission approval dialogs (tool/command/file approval)
 	if (
-		/(?:do you want|would you like).+\n+[\s\S]*?(?:yes|❯)/.test(lowerContent)
+		bottomLines.some(
+			l =>
+				/(?:allow|deny)\s+(?:once|always)/i.test(l) ||
+				/(?:approve|reject)\s+(?:tool|command|action)/i.test(l),
+		)
 	) {
 		return 'waiting_input';
 	}
 
-	// "esc to cancel" without an accompanying interrupt hint = waiting for input
+	// Selection indicator (❯) with a question-like prompt nearby
 	if (
-		lowerContent.includes('esc to cancel') &&
-		!lowerContent.includes('ctrl+c to interrupt') &&
-		!lowerContent.includes('esc to interrupt')
+		bottomLines.some(l => /^\s*❯/.test(l)) &&
+		/(?:do you|would you|select|choose|which|allow|approve|confirm)/i.test(
+			bottomContent,
+		)
 	) {
 		return 'waiting_input';
 	}
 
-	// Active processing
+	// "esc to cancel" without an accompanying interrupt hint = waiting for user input
 	if (
-		lowerContent.includes('ctrl+c to interrupt') ||
-		lowerContent.includes('esc to interrupt')
+		bottomContent.includes('esc to cancel') &&
+		!bottomContent.includes('ctrl+c to interrupt') &&
+		!bottomContent.includes('esc to interrupt')
+	) {
+		return 'waiting_input';
+	}
+
+	// ── 2. BUSY: active processing ──────────────────────────────────
+
+	// Interrupt hints = actively processing
+	if (
+		bottomContent.includes('ctrl+c to interrupt') ||
+		bottomContent.includes('esc to interrupt')
 	) {
 		return 'busy';
 	}
 
-	// Idle: input prompt visible
-	// "↵ send" — standard Claude Code idle hint
-	// "type a message" — fallback idle hint in some versions
+	// Braille spinner characters (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏) in bottom area = processing
+	if (bottomLines.some(l => /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/.test(l))) {
+		return 'busy';
+	}
+
+	// ── 3. IDLE: input prompt visible ───────────────────────────────
+
+	// Standard Claude Code idle hints (text-based)
 	if (
-		lowerContent.includes('↵ send') ||
-		lowerContent.includes('enter to send') ||
-		lowerContent.includes('type a message')
+		bottomContent.includes('↵ send') ||
+		bottomContent.includes('enter to send') ||
+		bottomContent.includes('type a message') ||
+		bottomContent.includes('/ for commands')
 	) {
 		return 'idle';
 	}
+
+	// Prompt box structure: visible input area with box-drawing borders
+	// Look for │ > (input marker) near ─╮ or ─╯ (box borders)
+	const hasInputMarker = bottomLines.some(l => /│\s*>\s*/.test(l));
+	const hasBoxBorder = bottomLines.some(l => /─[╮╯]/.test(l));
+	if (hasInputMarker && hasBoxBorder) {
+		return 'idle';
+	}
+
+	// ── 4. Fallback ─────────────────────────────────────────────────
 
 	return currentState;
 }

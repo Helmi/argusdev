@@ -166,6 +166,7 @@ interface AppActions {
 	saveAgent: (agent: AgentConfig) => Promise<boolean>;
 	deleteAgent: (agentId: string) => Promise<boolean>;
 	setDefaultAgentId: (agentId: string) => Promise<boolean>;
+	reorderAgents: (orderedIds: string[]) => Promise<boolean>;
 
 	// Session selection
 	selectSession: (sessionId: string) => void;
@@ -996,6 +997,29 @@ export function AppProvider({children}: {children: ReactNode}) {
 		}
 	};
 
+	const reorderAgentsAction = async (orderedIds: string[]): Promise<boolean> => {
+		try {
+			const res = await apiFetch('/api/agents/reorder', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify({orderedIds}),
+			});
+
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				setError(data.error || 'Failed to reorder agents');
+				return false;
+			}
+
+			await fetchAgents();
+			return true;
+		} catch (e) {
+			console.error(e);
+			setError('Failed to reorder agents. Check your connection.');
+			return false;
+		}
+	};
+
 	// Stable refs for callbacks used in socket handlers — prevents the
 	// socket useEffect from re-running (and reconnecting) when callbacks
 	// get new identities after state updates.
@@ -1819,6 +1843,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		saveAgent,
 		deleteAgent: deleteAgentAction,
 		setDefaultAgentId: setDefaultAgentIdAction,
+		reorderAgents: reorderAgentsAction,
 		// TD Integration
 		tdStatus,
 		tdStatusLoading,

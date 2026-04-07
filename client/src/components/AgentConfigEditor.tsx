@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -322,9 +322,14 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
     choices?.map(c => c.label ? `${c.value}:${c.label}` : c.value).join(', ') || ''
 
   const [choicesText, setChoicesText] = useState(formatChoices(option.choices))
+  const localEdit = useRef(false)
 
-  // Sync choicesText when option.choices changes externally
+  // Sync choicesText when option.choices changes externally (not from our own input)
   useEffect(() => {
+    if (localEdit.current) {
+      localEdit.current = false
+      return
+    }
     setChoicesText(formatChoices(option.choices))
   }, [option.choices])
 
@@ -342,7 +347,9 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
       isExpanded ? 'bg-muted/30' : ''
     )}>
       <div className="flex items-center gap-2">
-        <GripVertical className="h-3 w-3 text-muted-foreground cursor-grab" {...dragHandleProps} />
+        <button type="button" className="touch-none cursor-grab" {...dragHandleProps}>
+          <GripVertical className="h-3 w-3 text-muted-foreground" />
+        </button>
         <button
           type="button"
           className="flex-1 text-left flex items-center gap-2"
@@ -464,6 +471,7 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
               <Input
                 value={choicesText}
                 onChange={(e) => {
+                  localEdit.current = true
                   setChoicesText(e.target.value)
                   onChange({ choices: parseChoices(e.target.value) })
                 }}
@@ -471,7 +479,7 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
                 className="h-6 text-xs font-mono"
               />
               <p className="text-xs text-muted-foreground">
-                Leave empty for free text input
+                Format: <code>value:label</code> — value is sent to the CLI, label is shown in the dropdown. Leave empty for free text input.
               </p>
             </div>
           )}

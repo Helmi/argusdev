@@ -763,6 +763,28 @@ export class ConfigurationManager {
 	}
 
 	/**
+	 * Reorder agents by a list of IDs.
+	 */
+	reorderAgents(orderedIds: string[]): boolean {
+		const config = this.getAgentsConfig();
+		const byId = new Map(config.agents.map(a => [a.id, a]));
+		const reordered: AgentConfig[] = [];
+		for (const id of orderedIds) {
+			const agent = byId.get(id);
+			if (!agent) return false;
+			reordered.push(agent);
+			byId.delete(id);
+		}
+		// Append any agents not in the list (shouldn't happen, but safe)
+		for (const agent of byId.values()) {
+			reordered.push(agent);
+		}
+		config.agents = reordered;
+		this.setAgentsConfig(config);
+		return true;
+	}
+
+	/**
 	 * Set the default agent ID.
 	 */
 	setDefaultAgent(id: string): boolean {

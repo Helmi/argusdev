@@ -37,11 +37,159 @@ function detect(
 }
 
 describe('detectStateForStrategy', () => {
-	it('preserves Claude current state while Ctrl+R search hint is shown', () => {
+	// ── Claude Code: waiting_input ───────────────────────────────────
+
+	it('detects Claude yes/no confirmation prompt as waiting_input', () => {
+		expect(
+			detect('claude', [
+				'Do you want to allow this tool call?',
+				'',
+				'  ❯ Yes',
+				'    No',
+			]),
+		).toBe('waiting_input');
+	});
+
+	it('detects Claude "allow once / allow always" dialog as waiting_input', () => {
+		expect(
+			detect('claude', ['  Allow once', '  Allow always', '  Deny once']),
+		).toBe('waiting_input');
+	});
+
+	it('detects Claude selection with question context as waiting_input', () => {
+		expect(
+			detect('claude', [
+				'Which option would you like?',
+				'  ❯ Option A',
+				'    Option B',
+			]),
+		).toBe('waiting_input');
+	});
+
+	it('detects Claude "esc to cancel" without interrupt hints as waiting_input', () => {
+		expect(
+			detect('claude', [
+				'Select a file to edit',
+				'  file1.ts',
+				'  file2.ts',
+				'esc to cancel',
+			]),
+		).toBe('waiting_input');
+	});
+
+	// ── Claude Code: busy ────────────────────────────────────────────
+
+	it('detects Claude "ctrl+c to interrupt" as busy', () => {
+		expect(
+			detect('claude', ['Reading file src/index.ts', 'ctrl+c to interrupt']),
+		).toBe('busy');
+	});
+
+	it('detects Claude "esc to interrupt" as busy', () => {
+		expect(
+			detect('claude', ['Thinking about the code...', 'esc to interrupt']),
+		).toBe('busy');
+	});
+
+	it('detects Claude braille spinner as busy', () => {
+		expect(detect('claude', ['⠹ Processing...', ''])).toBe('busy');
+	});
+
+	it('detects various braille spinner characters as busy', () => {
+		const spinners = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+		for (const s of spinners) {
+			expect(detect('claude', [`${s} Working...`])).toBe('busy');
+		}
+	});
+
+	// ── Claude Code: idle ────────────────────────────────────────────
+
+	it('detects Claude "↵ send" as idle', () => {
+		expect(
+			detect('claude', [
+				'╭──────────────────────────────────────╮',
+				'│ >                                    │',
+				'╰──────────────────────────────────────╯',
+				'  ↵ send  / for commands',
+			]),
+		).toBe('idle');
+	});
+
+	it('detects Claude "enter to send" as idle', () => {
+		expect(detect('claude', ['Enter to send'])).toBe('idle');
+	});
+
+	it('detects Claude "type a message" as idle', () => {
+		expect(detect('claude', ['Type a message'])).toBe('idle');
+	});
+
+	it('detects Claude "/ for commands" as idle', () => {
+		expect(detect('claude', ['/ for commands'])).toBe('idle');
+	});
+
+	it('detects Claude prompt box structure as idle', () => {
+		// Prompt box with input marker and border = idle even without text hints
+		expect(
+			detect('claude', [
+				'Some previous output...',
+				'╭──────────────────────────────────────╮',
+				'│ >                                    │',
+				'╰──────────────────────────────────────╯',
+			]),
+		).toBe('idle');
+	});
+
+	it('detects Claude prompt box with top border as idle', () => {
+		expect(
+			detect('claude', [
+				'──────────────────────────────────────╮',
+				'│ > hello world                       │',
+				'some other content',
+			]),
+		).toBe('idle');
+	});
+
+	// ── Claude Code: fallback ────────────────────────────────────────
+
+	it('preserves Claude current state when no pattern matches', () => {
 		expect(
 			detect('claude', ['Press Ctrl+R to toggle history search'], 'busy'),
 		).toBe('busy');
 	});
+
+	it('preserves Claude idle state when no pattern matches', () => {
+		expect(detect('claude', ['Some random output from a tool'], 'idle')).toBe(
+			'idle',
+		);
+	});
+
+	// ── Claude Code: priority ordering ───────────────────────────────
+
+	it('prioritizes waiting_input over busy when both signals present', () => {
+		// "esc to cancel" without interrupt = waiting_input takes priority
+		expect(
+			detect('claude', [
+				'Do you want to proceed?',
+				'  ❯ Yes',
+				'    No',
+				'esc to cancel',
+			]),
+		).toBe('waiting_input');
+	});
+
+	it('detects busy over idle when interrupt hint is present with prompt box', () => {
+		// Interrupt hint should win over prompt box
+		expect(
+			detect('claude', [
+				'│ > previous input                    │',
+				'──────────────────────────────────────╯',
+				'Running tool...',
+				'esc to interrupt',
+			]),
+		).toBe('busy');
+	});
+
+	// ── Other agents ─────────────────────────────────────────────────
 
 	it('detects Codex confirmation as waiting_input', () => {
 		expect(detect('codex', ['Press Enter to confirm or Esc to cancel'])).toBe(

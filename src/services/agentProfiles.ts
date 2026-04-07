@@ -25,6 +25,7 @@ const PROFILES: Record<string, AgentConfig> = {
 		kind: 'agent',
 		command: 'claude',
 		icon: 'claude',
+		baseEnv: {CLAUDE_CODE_NO_FLICKER: '1'},
 		options: [
 			{
 				id: 'yolo',

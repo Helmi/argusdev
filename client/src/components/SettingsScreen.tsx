@@ -49,6 +49,7 @@ export function SettingsScreen() {
     saveAgent,
     deleteAgent,
     setDefaultAgentId,
+    reorderAgents,
     fetchAgents,
   } = useAppStore()
 
@@ -117,6 +118,14 @@ export function SettingsScreen() {
       const success = await saveAgent(newAgent)
       if (success) setNewAgent(null)
       else agentsSuccess = false
+    }
+
+    // Persist agent order if it changed
+    const localOrder = localAgents.map(a => a.id)
+    const storeOrder = agents.map(a => a.id)
+    if (JSON.stringify(localOrder) !== JSON.stringify(storeOrder)) {
+      const success = await reorderAgents(localOrder)
+      if (!success) agentsSuccess = false
     }
 
     setSaving(false)
