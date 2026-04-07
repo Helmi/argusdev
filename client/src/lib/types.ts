@@ -242,6 +242,7 @@ export interface AgentConfig {
 	kind: 'agent' | 'terminal';
 	command: string; // Executable (e.g., 'claude', '$SHELL')
 	baseArgs?: string[]; // Fixed args always passed
+	baseEnv?: Record<string, string>; // Extra env vars always set for this agent
 	options: AgentOption[];
 	enabled?: boolean; // Whether this agent is selectable for new sessions (defaults to true)
 	promptArg?: string; // Startup prompt passing mode: positional, explicit flag (e.g. --prompt), or 'none'

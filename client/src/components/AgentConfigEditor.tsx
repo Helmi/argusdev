@@ -39,6 +39,7 @@ const slugify = (str: string) =>
 
 export function AgentConfigEditor({ agent, onChange, onDelete, isNew }: AgentConfigEditorProps) {
   const [optionsExpanded, setOptionsExpanded] = useState(isNew || agent.options.length > 0)
+  const [envExpanded, setEnvExpanded] = useState(Object.keys(agent.baseEnv ?? {}).length > 0)
   const [editingOptionIndex, setEditingOptionIndex] = useState<number | null>(null)
 
   // Auto-generate agent ID from name for new agents
@@ -192,6 +193,25 @@ export function AgentConfigEditor({ agent, onChange, onDelete, isNew }: AgentCon
         onIconChange={(icon) => updateField('icon', icon)}
         onColorChange={(color) => updateField('iconColor', color)}
       />
+
+      {/* Environment Variables Section */}
+      <div className="border-t border-border pt-2">
+        <button
+          type="button"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+          onClick={() => setEnvExpanded(!envExpanded)}
+        >
+          {envExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          Environment Variables ({Object.keys(agent.baseEnv ?? {}).length})
+        </button>
+
+        {envExpanded && (
+          <EnvVarsEditor
+            env={agent.baseEnv ?? {}}
+            onChange={(env) => updateField('baseEnv', Object.keys(env).length > 0 ? env : undefined)}
+          />
+        )}
+      </div>
 
       {/* Options Section */}
       <div className="border-t border-border pt-2">
@@ -485,6 +505,86 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// Environment variables key-value editor
+interface EnvVarsEditorProps {
+  env: Record<string, string>
+  onChange: (env: Record<string, string>) => void
+}
+
+function EnvVarsEditor({ env, onChange }: EnvVarsEditorProps) {
+  const entries = Object.entries(env)
+
+  const updateEntry = (oldKey: string, newKey: string, value: string) => {
+    const updated: Record<string, string> = {}
+    for (const [k, v] of Object.entries(env)) {
+      if (k === oldKey) {
+        if (newKey.trim()) updated[newKey.trim()] = value
+      } else {
+        updated[k] = v
+      }
+    }
+    onChange(updated)
+  }
+
+  const removeEntry = (key: string) => {
+    const updated = { ...env }
+    delete updated[key]
+    onChange(updated)
+  }
+
+  const addEntry = () => {
+    // Find a unique placeholder key
+    let key = ''
+    let i = 0
+    while (key === '' ? entries.length > 0 && entries.some(([k]) => k === '') : env[key] !== undefined) {
+      key = `VAR_${++i}`
+    }
+    onChange({ ...env, [key]: '' })
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      {entries.map(([key, value]) => (
+        <div key={key} className="flex items-center gap-2">
+          <Input
+            value={key}
+            onChange={(e) => updateEntry(key, e.target.value, value)}
+            placeholder="VARIABLE_NAME"
+            className="h-7 text-xs font-mono flex-1"
+          />
+          <span className="text-xs text-muted-foreground">=</span>
+          <Input
+            value={value}
+            onChange={(e) => updateEntry(key, key, e.target.value)}
+            placeholder="value"
+            className="h-7 text-xs font-mono flex-1"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
+            onClick={() => removeEntry(key)}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+      ))}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-6 text-xs w-full"
+        onClick={addEntry}
+      >
+        <Plus className="h-3 w-3 mr-1" />
+        Add Variable
+      </Button>
     </div>
   )
 }
