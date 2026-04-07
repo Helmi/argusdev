@@ -11,9 +11,19 @@ describe('buildClaudeHookSettings', () => {
 		const settings = JSON.parse(buildClaudeHookSettings(9999, 'ses-1'));
 
 		expect(settings.hooks).toBeDefined();
+		expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
+		expect(settings.hooks.PreToolUse).toHaveLength(1);
 		expect(settings.hooks.Notification).toHaveLength(2);
 		expect(settings.hooks.Stop).toHaveLength(1);
-		expect(settings.hooks.PreToolUse).toHaveLength(1);
+	});
+
+	it('uses native http hook type', () => {
+		const settings = JSON.parse(buildClaudeHookSettings(8080, 'ses-x'));
+		const hook = settings.hooks.PreToolUse[0].hooks[0];
+
+		expect(hook.type).toBe('http');
+		expect(hook.url).toBeDefined();
+		expect(hook.command).toBeUndefined();
 	});
 
 	it('maps Notification(permission_prompt) to waiting_input', () => {
@@ -23,8 +33,9 @@ describe('buildClaudeHookSettings', () => {
 		);
 
 		expect(permissionHook).toBeDefined();
-		expect(permissionHook.hooks[0].type).toBe('http');
-		expect(permissionHook.hooks[0].url).toContain('/hook-state/waiting_input');
+		expect(permissionHook.hooks[0].url).toContain(
+			'/hook-state/waiting_input',
+		);
 	});
 
 	it('maps Notification(idle_prompt) to idle', () => {
@@ -39,7 +50,16 @@ describe('buildClaudeHookSettings', () => {
 
 	it('maps Stop to idle', () => {
 		const settings = JSON.parse(buildClaudeHookSettings(8080, 'ses-x'));
-		expect(settings.hooks.Stop[0].hooks[0].url).toContain('/hook-state/idle');
+		expect(settings.hooks.Stop[0].hooks[0].url).toContain(
+			'/hook-state/idle',
+		);
+	});
+
+	it('maps UserPromptSubmit to busy', () => {
+		const settings = JSON.parse(buildClaudeHookSettings(8080, 'ses-x'));
+		expect(settings.hooks.UserPromptSubmit[0].hooks[0].url).toContain(
+			'/hook-state/busy',
+		);
 	});
 
 	it('maps PreToolUse to busy', () => {

@@ -26,6 +26,7 @@ import {Mutex, createInitialSessionStateData} from '../utils/mutex.js';
 import {getDefaultShell, getPtyEnv} from '../utils/platform.js';
 import {adapterRegistry} from '../adapters/index.js';
 import {ensureStartupScriptInGitExclude} from '../utils/startupScript.js';
+import {cleanupHookSettingsFile} from '../utils/hookSettings.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -605,7 +606,11 @@ ${commandTokens.join(' ')}
 			detectionStrategy: options.detectionStrategy ?? 'claude',
 			hookBasedDetection: options.hookBasedDetection ?? false,
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
-			stateMutex: new Mutex(createInitialSessionStateData()),
+			stateMutex: new Mutex({
+				...createInitialSessionStateData(),
+				// Hook-based sessions start idle — hooks will signal busy
+				state: options.hookBasedDetection ? 'idle' : 'busy',
+			}),
 		};
 
 		// Set up persistent background data handler for state detection
@@ -1081,6 +1086,12 @@ ${commandTokens.join(' ')}
 			this.activeIntervals.delete(session.id);
 			session.stateCheckInterval = undefined;
 		}
+
+		// Clean up hook settings temp file
+		if (session.hookBasedDetection) {
+			cleanupHookSettingsFile(session.id);
+		}
+
 		// Clear any pending state and update state to idle before destroying
 		void this.updateSessionState(session, 'idle');
 		this.destroySession(session.id);

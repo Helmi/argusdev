@@ -52,7 +52,7 @@ import {globalSessionOrchestrator} from './globalSessionOrchestrator.js';
 import {fileWatcherService} from './fileWatcherService.js';
 import type {SessionManager} from './sessionManager.js';
 import {cleanupStartupScriptsInWorktree} from '../utils/startupScript.js';
-import {buildClaudeHookSettings} from '../utils/hookSettings.js';
+import {writeHookSettingsFile} from '../utils/hookSettings.js';
 import type {
 	AgentConfig,
 	Session,
@@ -764,8 +764,8 @@ export class APIServer {
 			) {
 				const port = configurationManager.getPort();
 				if (port) {
-					const hookSettings = buildClaudeHookSettings(port, record.id);
-					recoveryArgs.push('--settings', hookSettings);
+					const settingsPath = writeHookSettingsFile(port, record.id);
+					recoveryArgs.push('--settings', settingsPath);
 					recoveryHookBased = true;
 				}
 			}
@@ -1132,10 +1132,16 @@ export class APIServer {
 		this.app.post<{Params: {id: string; state: string}}>(
 			'/api/internal/sessions/:id/hook-state/:state',
 			async (request, reply) => {
+				logger.info(
+					`[HookState] Received hook event: session=${request.params.id} state=${request.params.state}`,
+				);
 				const session = coreService.sessionManager.getSession(
 					request.params.id,
 				);
 				if (!session) {
+					logger.warn(
+						`[HookState] Session not found: ${request.params.id}`,
+					);
 					return reply.code(404).send({error: 'Session not found'});
 				}
 
@@ -1146,9 +1152,15 @@ export class APIServer {
 				};
 				const newState = validStates[request.params.state];
 				if (!newState) {
+					logger.warn(
+						`[HookState] Invalid state: ${request.params.state}`,
+					);
 					return reply.code(400).send({error: 'Invalid state'});
 				}
 
+				logger.info(
+					`[HookState] Applying state transition: session=${session.id} → ${newState}`,
+				);
 				coreService.sessionManager.applyHookStateEvent(session.id, newState);
 				return {ok: true};
 			},
@@ -2810,14 +2822,18 @@ export class APIServer {
 			) {
 				const port = configurationManager.getPort();
 				if (port) {
-					const hookSettings = buildClaudeHookSettings(
+					const settingsPath = writeHookSettingsFile(
 						port,
 						preGeneratedSessionId,
 					);
-					args.push('--settings', hookSettings);
+					args.push('--settings', settingsPath);
 					hookBasedDetection = true;
 					logger.info(
-						`API: Injecting hook-based state detection for session ${preGeneratedSessionId}`,
+						`API: Injecting hook-based state detection for session ${preGeneratedSessionId} via ${settingsPath}`,
+					);
+				} else {
+					logger.warn(
+						'API: No port configured — skipping hook-based state detection',
 					);
 				}
 			}
