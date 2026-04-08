@@ -28,18 +28,20 @@ export function Footer() {
     window.dispatchEvent(new CustomEvent('argusdev-lock'))
   }
 
-  const statusColors = {
+  const statusColors: Record<typeof connectionStatus, string> = {
     connected: 'fill-status-active text-status-active',
     connecting: 'fill-status-idle text-status-idle',
     disconnected: 'fill-status-error text-status-error',
     error: 'fill-status-error text-status-error',
+    'auth-error': 'fill-status-error text-status-error',
   }
 
-  const statusLabels = {
+  const statusLabels: Record<typeof connectionStatus, string> = {
     connected: 'Connected',
     connecting: 'Connecting...',
     disconnected: 'Disconnected',
     error: 'Error',
+    'auth-error': 'Auth expired',
   }
 
   return (

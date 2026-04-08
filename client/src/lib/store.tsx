@@ -611,12 +611,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 			]);
 
 			setWorktrees(worktreesData);
-			// Sort projects alphabetically by name (case-insensitive)
-			const sortedProjects = (projectsData.projects || []).sort(
-				(a: Project, b: Project) =>
-					a.name.localeCompare(b.name, undefined, {sensitivity: 'base'}),
-			);
-			setProjects(sortedProjects);
+			setProjects(projectsData.projects || []);
 
 			if (configRes.ok) {
 				const configData = await configRes.json();
@@ -1047,7 +1042,19 @@ export function AppProvider({children}: {children: ReactNode}) {
 			fetchSessionDataRef.current();
 		});
 		socket.on('disconnect', () => setConnectionStatus('disconnected'));
-		socket.on('connect_error', () => setConnectionStatus('error'));
+		socket.on('connect_error', (err: Error) => {
+			const msg = err.message.toLowerCase();
+			if (
+				msg.includes('auth') ||
+				msg.includes('token') ||
+				msg.includes('session expired') ||
+				msg.includes('unauthorized')
+			) {
+				setConnectionStatus('auth-error');
+			} else {
+				setConnectionStatus('error');
+			}
+		});
 		// Use debounced session fetch for socket events - prevents API storm
 		// Only fetches sessions/state (2 calls), not full data (5 calls)
 		socket.on('session_update', () => debouncedFetchSessionDataRef.current());
@@ -1651,11 +1658,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 			if (data.success) {
 				// Update local state optimistically
 				setProjects(prev =>
-					prev
-						.map(p => (p.path === path ? {...p, name} : p))
-						.sort((a, b) =>
-							a.name.localeCompare(b.name, undefined, {sensitivity: 'base'}),
-						),
+					prev.map(p => (p.path === path ? {...p, name} : p)),
 				);
 				return true;
 			}

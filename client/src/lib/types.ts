@@ -227,6 +227,7 @@ export interface Project {
 	lastAccessed: number;
 	isValid?: boolean;
 	metadata?: ProjectMetadata; // Project-specific metadata
+	tdEnabled?: boolean;
 }
 
 // Connection status for Socket.IO
@@ -234,7 +235,8 @@ export type ConnectionStatus =
 	| 'connected'
 	| 'connecting'
 	| 'disconnected'
-	| 'error';
+	| 'error'
+	| 'auth-error';
 
 // Agent option (single configurable parameter for an agent)
 export interface AgentOption {

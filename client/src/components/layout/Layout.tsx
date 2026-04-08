@@ -3,6 +3,7 @@ import {Header} from './Header';
 import {Footer} from './Footer';
 import {Sidebar} from './Sidebar';
 import {ContextSidebar} from '@/components/ContextSidebar';
+import {ConnectionBanner} from '@/components/ConnectionBanner';
 import {TdReviewBanner} from '@/components/TdReviewBanner';
 import {cn} from '@/lib/utils';
 import {useAppStore} from '@/lib/store';
@@ -57,6 +58,7 @@ export function Layout({children}: LayoutProps) {
 	return (
 		<div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
 			<Header />
+			<ConnectionBanner />
 			<TdReviewBanner />
 			<div className="relative flex min-w-0 flex-1 overflow-hidden">
 				{/* Mobile backdrop */}
