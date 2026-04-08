@@ -130,7 +130,8 @@ class TdService {
 
 		const resolved = path.resolve(projectPath);
 
-		// 1. Check for .td-root file
+		// 1. Check for .td-root file — its presence means td init was run,
+		//    even if .todos/issues.db doesn't exist yet (created on first ticket)
 		const tdRootFile = path.join(resolved, '.td-root');
 		if (existsSync(tdRootFile)) {
 			try {
@@ -139,6 +140,16 @@ class TdService {
 					const tdRoot = path.resolve(resolved, tdRootContent);
 					const tdRootResult = this.checkTodosDir(tdRoot, binaryAvailable);
 					if (tdRootResult.initialized) return tdRootResult;
+					// .td-root exists but .todos/issues.db not yet created —
+					// still treat as enabled (initialized but no tickets yet)
+					return {
+						enabled: binaryAvailable,
+						initialized: true,
+						binaryAvailable,
+						todosDir: path.join(tdRoot, '.todos'),
+						dbPath: null,
+						tdRoot,
+					};
 				}
 			} catch {
 				logger.warn(`[TdService] Failed to read .td-root at ${tdRootFile}`);

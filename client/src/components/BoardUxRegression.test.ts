@@ -7,10 +7,10 @@ function readSource(path: string): string {
 }
 
 describe('Board UX regression checks', () => {
-  it('keeps the task board button always visible in the session title bar', () => {
+  it('conditionally shows the task board button based on td status', () => {
     const source = readSource('client/src/components/TerminalSession.tsx')
     expect(source).toContain('title="Task board"')
-    expect(source).not.toContain('{tdStatus?.projectState?.enabled && (')
+    expect(source).toContain('tdStatus?.projectState?.enabled')
   })
 
   it('uses count-aware "Show N older" text for closed-column progressive reveal', () => {

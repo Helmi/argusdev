@@ -1139,8 +1139,13 @@ export class APIServer {
 					request.params.id,
 				);
 				if (!session) {
-					logger.warn(`[HookState] Session not found: ${request.params.id}`);
-					return reply.code(404).send({error: 'Session not found'});
+					// Return 200 for unknown sessions — the session may have been
+					// destroyed during a daemon restart while the agent process is
+					// still shutting down and firing its final Stop hook.
+					logger.debug(
+						`[HookState] Ignoring hook for unknown session: ${request.params.id}`,
+					);
+					return reply.code(200).send({ignored: true});
 				}
 
 				const validStates: Record<string, SessionState> = {
@@ -1181,10 +1186,25 @@ export class APIServer {
 			// Get all projects from registry, sorted by lastAccessed
 			const projects = pm.getProjects();
 
-			logger.info(`API: Fetched ${projects.length} projects from registry`);
+			// Enrich with per-project td status
+			const globalTdConfig = configurationManager.getTdConfig();
+			const enriched = projects.map(p => {
+				const projectConfig = loadProjectConfig(p.path);
+				const tdConfigEnabled =
+					projectConfig?.td?.enabled ?? globalTdConfig.enabled ?? true;
+				const tdState = tdConfigEnabled
+					? tdService.resolveProjectState(p.path)
+					: null;
+				return {
+					...p,
+					tdEnabled: tdConfigEnabled && (tdState?.enabled ?? false),
+				};
+			});
+
+			logger.info(`API: Fetched ${enriched.length} projects from registry`);
 
 			return {
-				projects: projects,
+				projects: enriched,
 			};
 		});
 
