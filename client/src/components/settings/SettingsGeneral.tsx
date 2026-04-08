@@ -107,7 +107,7 @@ export function SettingsGeneral({ localConfig, setLocalConfig }: SettingsGeneral
               }
             />
             <label htmlFor="sort-by-last" className="text-sm cursor-pointer">
-              Sort by last session
+              Sort worktrees by last session
             </label>
           </div>
           <div className="flex items-center gap-2">
