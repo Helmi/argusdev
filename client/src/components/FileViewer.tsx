@@ -370,7 +370,7 @@ export function FileViewer() {
                   </span>
 
                   {/* Content with syntax highlighting */}
-                  <div className="flex-1 px-2 overflow-x-auto">
+                  <div className="flex-1 px-2 min-w-0 overflow-hidden whitespace-pre-wrap break-all [&_*]:!whitespace-pre-wrap">
                     <SyntaxHighlighter
                       language={language}
                       style={vscDarkPlus}
@@ -380,6 +380,8 @@ export function FileViewer() {
                         background: 'transparent',
                         fontSize: 'inherit',
                         lineHeight: 'inherit',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all',
                       }}
                       codeTagProps={{
                         style: {
