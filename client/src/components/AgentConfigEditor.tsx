@@ -548,8 +548,8 @@ function EnvVarsEditor({ env, onChange }: EnvVarsEditorProps) {
 
   return (
     <div className="mt-2 space-y-2">
-      {entries.map(([key, value]) => (
-        <div key={key} className="flex items-center gap-2">
+      {entries.map(([key, value], index) => (
+        <div key={index} className="flex items-center gap-2">
           <Input
             value={key}
             onChange={(e) => updateEntry(key, e.target.value, value)}
