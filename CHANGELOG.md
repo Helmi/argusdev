@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.1](https://github.com/Helmi/argusdev/compare/v0.7.0...v0.7.1) (2026-04-08)
+
+
+### Features
+
+* **webui:** drag-and-drop project reordering in sidebar ([4d4459c](https://github.com/Helmi/argusdev/commit/4d4459c3ebc3f536b71a4619aeafa6be8e76f916)) — toggle reorder mode to manually arrange projects; order persists across sessions
+* **webui:** connection and auth-expired warning banner ([3b8f602](https://github.com/Helmi/argusdev/commit/3b8f60277ddefd42d0331b6f8aceffbd0069a737)) — amber banner with actionable hints when backend disconnects or auth expires
+* per-project td status ([f27a817](https://github.com/Helmi/argusdev/commit/f27a8170f39ffa94924ce6bf1540993fad32bb36)) — task board and td menu items only appear for projects with td initialized
+* environment variables editor in agent profiles ([4fff136](https://github.com/Helmi/argusdev/commit/4fff1363822805027c7fd807f95be8b5cc0eeeee))
+
+
+### Bug Fixes
+
+* **webui:** changelog view freeze with many uncommitted files ([89f5dca](https://github.com/Helmi/argusdev/commit/89f5dca6bcbd944c601b78f8a507e4661ddde92e)) — server-side truncation (default 200 files) with accurate summary stats, search filter, and git status `-uno` optimization
+* **webui:** env vars editor loses focus on every keystroke ([77158af](https://github.com/Helmi/argusdev/commit/77158afd1003c3d3507baf6b2d2fc2b59bc1db34))
+* **webui:** inconsistent panel header heights ([75f9642](https://github.com/Helmi/argusdev/commit/75f9642dd7a3888c3988a2014886de285a729dc1)) — unified sub-panel headers to h-8
+* **webui:** stale fetch errors in changed files view ([75f9642](https://github.com/Helmi/argusdev/commit/75f9642dd7a3888c3988a2014886de285a729dc1)) — AbortController cancels in-flight requests; transient errors no longer wipe the file list
+* dev server restarts on frontend edits ([70e45de](https://github.com/Helmi/argusdev/commit/70e45dee04e266ba64b1056d121d408cc4afe21a)) — `tsx watch` now ignores `client/`
+* test suite opens browser tabs ([70e45de](https://github.com/Helmi/argusdev/commit/70e45dee04e266ba64b1056d121d408cc4afe21a)) — `openBrowser` skips in VITEST/CI
+* hook endpoint 404 on daemon restart ([f27a817](https://github.com/Helmi/argusdev/commit/f27a8170f39ffa94924ce6bf1540993fad32bb36)) — returns 200 for unknown sessions instead of 404
+* td detection treats `.td-root` as initialized even before first ticket ([f27a817](https://github.com/Helmi/argusdev/commit/f27a8170f39ffa94924ce6bf1540993fad32bb36))
+
+
 ## [0.7.0](https://github.com/Helmi/argusdev/compare/v0.6.0...v0.7.0) (2026-04-07)
 
 
