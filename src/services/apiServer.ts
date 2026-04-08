@@ -4134,6 +4134,14 @@ export class APIServer {
 			this.io?.emit('worktrees_changed', {projectPath});
 		});
 
+		// Forward git_status_changed events to clients
+		fileWatcherService.on('git_status_changed', (projectPath: string) => {
+			logger.debug(
+				`API: File watcher detected git status change for ${projectPath}`,
+			);
+			this.io?.emit('git_status_changed', {projectPath});
+		});
+
 		// Forward projects_changed events to clients
 		fileWatcherService.on('projects_changed', () => {
 			logger.info('API: File watcher detected projects.json change');

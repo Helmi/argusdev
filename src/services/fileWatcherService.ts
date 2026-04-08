@@ -6,8 +6,18 @@ import {getConfigDir} from '../utils/configDir.js';
 
 export interface FileWatcherEvents {
 	worktrees_changed: (projectPath: string) => void;
+	git_status_changed: (projectPath: string) => void;
 	projects_changed: () => void;
 }
+
+// .git/ files whose changes indicate the working tree status changed
+const GIT_STATUS_FILES = new Set([
+	'index',        // staging area changed
+	'HEAD',         // commit or branch switch
+	'MERGE_HEAD',   // merge in progress
+	'REVERT_HEAD',  // revert in progress
+	'CHERRY_PICK_HEAD',
+]);
 
 /**
  * FileWatcherService - Watches filesystem for external changes
@@ -61,9 +71,11 @@ class FileWatcherService extends EventEmitter {
 				gitDir,
 				{recursive: false, persistent: true},
 				(eventType, filename) => {
-					// Only care about worktrees directory changes
 					if (filename === 'worktrees' || filename?.startsWith('worktrees/')) {
 						this.debouncedEmit('worktrees_changed', normalizedPath);
+					}
+					if (filename && (GIT_STATUS_FILES.has(filename) || filename.startsWith('refs/'))) {
+						this.debouncedEmit('git_status_changed', normalizedPath);
 					}
 				},
 			);
@@ -95,6 +107,7 @@ class FileWatcherService extends EventEmitter {
 			watcher.close();
 			this.worktreeWatchers.delete(normalizedPath);
 			this.clearDebounceTimer(`worktrees_changed:${normalizedPath}`);
+			this.clearDebounceTimer(`git_status_changed:${normalizedPath}`);
 			logger.info(
 				`[FileWatcher] Stopped watching worktrees for ${normalizedPath}`,
 			);

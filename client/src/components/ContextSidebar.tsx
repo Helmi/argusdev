@@ -1,5 +1,5 @@
 import {useState, useEffect, useCallback, useRef} from 'react';
-import {useAppStore} from '@/lib/store';
+import {useAppStore, socket} from '@/lib/store';
 import {useIsMobile} from '@/hooks/useIsMobile';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -120,9 +120,6 @@ export function ContextSidebar() {
 		}
 	}, [session?.path, debouncedSearch, showAll]);
 
-	// Track previous session state to detect meaningful changes
-	const prevSessionStateRef = useRef<string | null>(null);
-
 	const formatName = useCallback(
 		(path: string) => path.split('/').pop() || path,
 		[],
@@ -186,26 +183,20 @@ export function ContextSidebar() {
 		fetchChangedFiles();
 	}, [fetchChangedFiles]);
 
-	// Re-fetch when session state changes (e.g., busy -> idle means agent may have modified files)
-	// This replaces the expensive socket listener that fired on every update
+	// Re-fetch when git status changes on disk (file watcher detects commits, staging, etc.)
 	useEffect(() => {
-		if (!session) return;
+		if (!session?.path) return;
 
-		// Only refetch if state actually changed (not on every render)
-		if (
-			prevSessionStateRef.current !== null &&
-			prevSessionStateRef.current !== session.state
-		) {
-			// State changed - files may have been modified
-			// Add a small delay to allow git operations to complete
-			const timer = setTimeout(() => {
+		const handler = (data: {projectPath: string}) => {
+			if (session.path.startsWith(data.projectPath)) {
 				fetchChangedFiles();
-			}, 500);
-			return () => clearTimeout(timer);
-		}
-
-		prevSessionStateRef.current = session.state;
-	}, [session?.state, fetchChangedFiles, session]);
+			}
+		};
+		socket.on('git_status_changed', handler);
+		return () => {
+			socket.off('git_status_changed', handler);
+		};
+	}, [session?.path, fetchChangedFiles]);
 
 	if (!session) {
 		return null;
