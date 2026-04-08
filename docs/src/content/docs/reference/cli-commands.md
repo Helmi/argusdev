@@ -6,17 +6,17 @@ description: Command-line interface reference
 ## Main Command
 
 ```bash
-cacd
+argusdev
 ```
 
-Launches CACD. On first run, the setup wizard runs. After setup, the TUI (terminal interface) starts. If web interface is enabled, the API server runs in the background.
+Launches ArgusDev. On first run, the setup wizard runs. After setup, the TUI (terminal interface) starts. If web interface is enabled, the API server runs in the background.
 
 ## Subcommands
 
 ### setup
 
 ```bash
-cacd setup [options]
+argusdev setup [options]
 ```
 
 Run the first-time setup wizard. Guides you through initial configuration.
@@ -34,10 +34,10 @@ Run the first-time setup wizard. Guides you through initial configuration.
 ### add
 
 ```bash
-cacd add [path]
+argusdev add [path]
 ```
 
-Add a project to CACD's tracking list.
+Add a project to ArgusDev's tracking list.
 
 - Without a path: adds the current directory
 - With a path: adds the specified directory
@@ -47,15 +47,15 @@ The path must be a valid Git repository.
 ### remove
 
 ```bash
-cacd remove <path>
+argusdev remove <path>
 ```
 
-Remove a project from CACD's list. This doesn't delete any files - it just stops tracking the project.
+Remove a project from ArgusDev's list. This doesn't delete any files - it just stops tracking the project.
 
 ### list
 
 ```bash
-cacd list
+argusdev list
 ```
 
 Show all tracked projects with their paths.
@@ -63,7 +63,7 @@ Show all tracked projects with their paths.
 ### auth
 
 ```bash
-cacd auth <command>
+argusdev auth <command>
 ```
 
 Manage WebUI authentication.
@@ -90,40 +90,40 @@ Manage WebUI authentication.
 ## Examples
 
 ```bash
-# Launch CACD
-cacd
+# Launch ArgusDev
+argusdev
 
 # Run first-time setup
-cacd setup
+argusdev setup
 
 # Setup with custom port
-cacd setup --port 8080
+argusdev setup --port 8080
 
 # Add current directory as a project
-cacd add
+argusdev add
 
 # Add a specific project
-cacd add /path/to/my-project
+argusdev add /path/to/my-project
 
 # List all projects
-cacd list
+argusdev list
 
 # Show WebUI access URL
-cacd auth show
+argusdev auth show
 
 # Launch on a specific port
-cacd --port 8080
+argusdev --port 8080
 
 # Run headless (API server only)
-cacd --headless
+argusdev --headless
 
 # Run with devcontainer support
-cacd --devc-up-command "devcontainer up --workspace-folder ." \
+argusdev --devc-up-command "devcontainer up --workspace-folder ." \
      --devc-exec-command "devcontainer exec --workspace-folder ."
 ```
 
 ## Notes
 
 - The `--devc-up-command` and `--devc-exec-command` flags must be used together
-- Port can be set via flag, environment variable (`CACD_PORT`), or config file (flag takes priority)
+- Port can be set via flag, environment variable (`ARGUSDEV_PORT`), or config file (flag takes priority)
 - Headless mode is mainly for development when you want just the API server

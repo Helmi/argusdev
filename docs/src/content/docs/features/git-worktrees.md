@@ -3,7 +3,7 @@ title: Git Worktrees
 description: Manage multiple branches simultaneously
 ---
 
-Git worktrees let you have multiple branches checked out at the same time, each in its own directory. CACD is built around this concept - each AI agent session runs on its own worktree, so agents can work on different branches without conflicts.
+Git worktrees let you have multiple branches checked out at the same time, each in its own directory. ArgusDev is built around this concept - each AI agent session runs on its own worktree, so agents can work on different branches without conflicts.
 
 ## What Are Worktrees?
 
@@ -24,14 +24,14 @@ From the WebUI:
 
 1. Click **New Worktree** or create one while starting a new session
 2. Enter a branch name (new or existing)
-3. Optionally specify a directory path (or let CACD auto-generate it)
+3. Optionally specify a directory path (or let ArgusDev auto-generate it)
 4. Click **Create**
 
-CACD creates the worktree and you can immediately start a session on it.
+ArgusDev creates the worktree and you can immediately start a session on it.
 
 ## Auto-Directory
 
-By default, CACD can auto-generate worktree paths based on branch names. Enable this in settings to skip manually entering paths every time.
+By default, ArgusDev can auto-generate worktree paths based on branch names. Enable this in settings to skip manually entering paths every time.
 
 The pattern uses `{branch}` as a placeholder. For example, with pattern `../worktrees/{branch}`:
 - Branch `feature/login` becomes `../worktrees/feature-login`
@@ -46,7 +46,7 @@ When you're done with a feature:
 3. Choose whether to use rebase
 4. Confirm
 
-CACD merges the worktree's branch into your target branch (typically `main`).
+ArgusDev merges the worktree's branch into your target branch (typically `main`).
 
 ## Deleting a Worktree
 

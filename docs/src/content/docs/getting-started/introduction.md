@@ -1,9 +1,9 @@
 ---
 title: Introduction
-description: What is CACD and why use it?
+description: What is ArgusDev and why use it?
 ---
 
-**CACD (Coding Agent Control Desk)** is a control plane for managing multiple AI coding assistant sessions across projects and Git worktrees.
+**ArgusDev** is a control plane for managing multiple AI coding assistant sessions across projects and Git worktrees.
 
 ## The Problem
 
@@ -18,7 +18,7 @@ Managing this manually across terminals gets messy fast.
 
 ## The Solution
 
-CACD provides a unified interface - both WebUI and TUI - to:
+ArgusDev provides a unified interface - both WebUI and TUI - to:
 
 - **Launch and manage** multiple AI agent sessions
 - **Organize work** using Git worktrees (one branch per agent)
@@ -28,7 +28,7 @@ CACD provides a unified interface - both WebUI and TUI - to:
 
 ## Supported Agents
 
-CACD auto-detects and works with:
+ArgusDev auto-detects and works with:
 
 - **Claude Code** - Anthropic's CLI coding assistant
 - **Gemini CLI** - Google's CLI assistant
@@ -40,5 +40,5 @@ Plus built-in state detection for GitHub Copilot CLI and Cline.
 
 ## Next Steps
 
-- [Installation](/cacd/getting-started/installation/) - Get CACD installed
-- [Quick Start](/cacd/getting-started/quick-start/) - Launch your first session
+- [Installation](/argusdev/getting-started/installation/) - Get ArgusDev installed
+- [Quick Start](/argusdev/getting-started/quick-start/) - Launch your first session

@@ -1,9 +1,9 @@
 ---
 title: Status Detection
-description: How CACD knows what your agents are doing
+description: How ArgusDev knows what your agents are doing
 ---
 
-CACD monitors your AI agent sessions and detects their current state. This lets you see at a glance which sessions need attention and which are still working.
+ArgusDev monitors your AI agent sessions and detects their current state. This lets you see at a glance which sessions need attention and which are still working.
 
 ## Session States
 
@@ -21,11 +21,11 @@ The agent is asking you a question or needs confirmation before proceeding. This
 
 ### Pending Auto-Approval
 
-If auto-approval is enabled, CACD evaluates whether the pending action is safe to approve automatically. This state is temporary while the check runs.
+If auto-approval is enabled, ArgusDev evaluates whether the pending action is safe to approve automatically. This state is temporary while the check runs.
 
 ## How Detection Works
 
-CACD analyzes the terminal output from each session to determine its state. Different agents display their prompts and status in different ways, so CACD has detection patterns for each supported agent:
+ArgusDev analyzes the terminal output from each session to determine its state. Different agents display their prompts and status in different ways, so ArgusDev has detection patterns for each supported agent:
 
 - **Claude Code** - Detects Claude's prompts and permission requests
 - **Gemini CLI** - Matches Gemini's specific output patterns
@@ -46,7 +46,7 @@ Project entries also show aggregate counts like `[3/1/0]` meaning 3 idle, 1 busy
 
 ## Status Hooks
 
-You can trigger scripts when session states change. For example, get a desktop notification when an agent finishes working or needs your input. See [Status Hooks](/cacd/configuration/status-hooks/) for setup instructions.
+You can trigger scripts when session states change. For example, get a desktop notification when an agent finishes working or needs your input. See [Status Hooks](/argusdev/configuration/status-hooks/) for setup instructions.
 
 ## Limitations
 

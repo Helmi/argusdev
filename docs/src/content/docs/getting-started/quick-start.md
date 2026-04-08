@@ -1,14 +1,14 @@
 ---
 title: Quick Start
-description: Get up and running with CACD
+description: Get up and running with ArgusDev
 ---
 
 ## First Run
 
-On first launch, CACD runs an onboarding wizard in the terminal:
+On first launch, ArgusDev runs an onboarding wizard in the terminal:
 
 ```bash
-cacd
+argusdev
 ```
 
 The wizard will:
@@ -28,7 +28,7 @@ If you enabled the web interface during setup, open the URL shown in the termina
 http://localhost:PORT/your-access-token
 ```
 
-The port and token are displayed when CACD starts. You can also run `cacd auth show` to see the URL again.
+The port and token are displayed when ArgusDev starts. You can also run `argusdev auth show` to see the URL again.
 
 ## Create a Session
 
@@ -58,15 +58,15 @@ Sessions show their current state:
 
 ## Adding More Projects
 
-To manage multiple repositories, add them to CACD:
+To manage multiple repositories, add them to ArgusDev:
 
 ```bash
-cacd add /path/to/another/project
+argusdev add /path/to/another/project
 ```
 
 Then switch between projects in the WebUI sidebar.
 
 ## Next Steps
 
-- Explore [Features](/cacd/features/) for detailed guides
-- Check [Configuration](/cacd/configuration/) to customize CACD
+- Explore [Features](/argusdev/features/) for detailed guides
+- Check [Configuration](/argusdev/configuration/) to customize ArgusDev

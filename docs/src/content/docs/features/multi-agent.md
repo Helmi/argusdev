@@ -3,11 +3,11 @@ title: Multi-Agent Support
 description: Work with different AI coding assistants
 ---
 
-CACD supports multiple AI coding assistants. You can run different agents side-by-side, each on its own worktree.
+ArgusDev supports multiple AI coding assistants. You can run different agents side-by-side, each on its own worktree.
 
 ## Auto-Detected Agents
 
-During setup, CACD checks for these agents and adds any it finds:
+During setup, ArgusDev checks for these agents and adds any it finds:
 
 ### Claude Code
 
@@ -72,13 +72,13 @@ These agents have built-in state detection patterns but aren't auto-detected. Yo
 
 ## State Detection
 
-CACD monitors each agent's terminal output to detect its state (idle, busy, waiting). Each agent has its own detection patterns since they display prompts and status differently.
+ArgusDev monitors each agent's terminal output to detect its state (idle, busy, waiting). Each agent has its own detection patterns since they display prompts and status differently.
 
-This means CACD can tell you when an agent needs your attention, even if you're looking at a different session.
+This means ArgusDev can tell you when an agent needs your attention, even if you're looking at a different session.
 
 ## Custom Agents
 
-You can create custom agent profiles for any CLI tool. See [Agent Profiles](/cacd/configuration/agent-profiles/) for details on setting up your own configurations.
+You can create custom agent profiles for any CLI tool. See [Agent Profiles](/argusdev/configuration/agent-profiles/) for details on setting up your own configurations.
 
 ## Switching Agents
 

@@ -3,7 +3,7 @@ title: Session Data Copying
 description: Preserve conversation context across worktrees
 ---
 
-When you create a new worktree, CACD can copy Claude Code's session data from an existing worktree. This lets you continue conversations and maintain context when branching off to work on something new.
+When you create a new worktree, ArgusDev can copy Claude Code's session data from an existing worktree. This lets you continue conversations and maintain context when branching off to work on something new.
 
 ## What Gets Copied
 

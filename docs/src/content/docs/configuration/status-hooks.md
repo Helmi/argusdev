@@ -36,12 +36,12 @@ Your hook commands have access to these variables:
 
 | Variable | Description |
 |----------|-------------|
-| `CACD_WORKTREE_PATH` | Path to the session's worktree |
-| `CACD_WORKTREE_BRANCH` | Branch name of the worktree |
-| `CACD_GIT_ROOT` | Root of the Git repository |
-| `CACD_SESSION_ID` | Unique ID of the session |
-| `CACD_OLD_STATE` | Previous state (idle, busy, waiting_input) |
-| `CACD_NEW_STATE` | New state |
+| `ARGUSDEV_WORKTREE_PATH` | Path to the session's worktree |
+| `ARGUSDEV_WORKTREE_BRANCH` | Branch name of the worktree |
+| `ARGUSDEV_GIT_ROOT` | Root of the Git repository |
+| `ARGUSDEV_SESSION_ID` | Unique ID of the session |
+| `ARGUSDEV_OLD_STATE` | Previous state (idle, busy, waiting_input) |
+| `ARGUSDEV_NEW_STATE` | New state |
 
 ## Examples
 
@@ -50,13 +50,13 @@ Your hook commands have access to these variables:
 Get notified when a session needs attention:
 
 ```bash
-osascript -e 'display notification "Session needs input" with title "CACD"'
+osascript -e 'display notification "Session needs input" with title "ArgusDev"'
 ```
 
 ### Desktop Notification (Linux)
 
 ```bash
-notify-send "CACD" "Session needs input"
+notify-send "ArgusDev" "Session needs input"
 ```
 
 ### Logging
@@ -64,7 +64,7 @@ notify-send "CACD" "Session needs input"
 Log state changes to a file:
 
 ```bash
-echo "$(date): $CACD_SESSION_ID changed from $CACD_OLD_STATE to $CACD_NEW_STATE" >> ~/.cacd-log.txt
+echo "$(date): $ARGUSDEV_SESSION_ID changed from $ARGUSDEV_OLD_STATE to $ARGUSDEV_NEW_STATE" >> ~/.argusdev-log.txt
 ```
 
 ### Play a Sound
@@ -77,13 +77,13 @@ afplay /System/Library/Sounds/Ping.aiff
 
 ```bash
 curl -X POST -H 'Content-type: application/json' \
-  --data '{"text":"CACD session waiting for input"}' \
+  --data '{"text":"ArgusDev session waiting for input"}' \
   YOUR_WEBHOOK_URL
 ```
 
 ## Tips
 
 - Keep hooks fast - slow commands will delay state updates
-- Hook failures don't break CACD, but check your commands work standalone first
+- Hook failures don't break ArgusDev, but check your commands work standalone first
 - Use `On Waiting Input` for notifications - that's when you need to act
-- Combine with terminal multiplexers or window managers to auto-focus CACD when needed
+- Combine with terminal multiplexers or window managers to auto-focus ArgusDev when needed

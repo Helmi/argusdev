@@ -3,7 +3,7 @@ title: Multi-Project Support
 description: Manage multiple repositories from one interface
 ---
 
-CACD can manage multiple Git repositories from a single interface. This is handy if you work across several projects and want to keep your AI sessions organized.
+ArgusDev can manage multiple Git repositories from a single interface. This is handy if you work across several projects and want to keep your AI sessions organized.
 
 ## Adding a Project
 
@@ -18,16 +18,16 @@ CACD can manage multiple Git repositories from a single interface. This is handy
 
 ```bash
 # Add the current directory
-cacd add
+argusdev add
 
 # Add a specific path
-cacd add /path/to/project
+argusdev add /path/to/project
 ```
 
 ## Listing Projects
 
 ```bash
-cacd list
+argusdev list
 ```
 
 Shows all tracked projects with their paths.
@@ -35,10 +35,10 @@ Shows all tracked projects with their paths.
 ## Removing a Project
 
 ```bash
-cacd remove /path/to/project
+argusdev remove /path/to/project
 ```
 
-This only removes the project from CACD's list - it doesn't delete any files.
+This only removes the project from ArgusDev's list - it doesn't delete any files.
 
 ## Switching Projects
 
@@ -58,11 +58,11 @@ This helps you spot which projects need attention without switching to them.
 
 ## Recent Projects
 
-Projects you've used recently appear at the top of the list for quick access. CACD tracks when you last accessed each project.
+Projects you've used recently appear at the top of the list for quick access. ArgusDev tracks when you last accessed each project.
 
 ## How It Works
 
-CACD stores your project list in `~/.config/cacd/projects.json`. Each project entry includes:
+ArgusDev stores your project list in `~/.config/argusdev/projects.json`. Each project entry includes:
 
 - Path to the repository
 - Display name

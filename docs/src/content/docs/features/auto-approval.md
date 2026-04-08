@@ -7,7 +7,7 @@ sidebar:
     variant: caution
 ---
 
-Auto-approval lets CACD automatically respond to agent permission prompts when the requested action appears safe. Instead of you clicking "approve" for every read-only operation, CACD can handle the obvious ones.
+Auto-approval lets ArgusDev automatically respond to agent permission prompts when the requested action appears safe. Instead of you clicking "approve" for every read-only operation, ArgusDev can handle the obvious ones.
 
 :::caution
 This feature is experimental. It uses AI to judge safety, which isn't foolproof. Use it in low-risk environments and keep an eye on what's being approved.
@@ -15,7 +15,7 @@ This feature is experimental. It uses AI to judge safety, which isn't foolproof.
 
 ## How It Works
 
-When an agent enters a "waiting for input" state, CACD can analyze the terminal output and decide:
+When an agent enters a "waiting for input" state, ArgusDev can analyze the terminal output and decide:
 
 1. **Needs permission** - Something risky is happening. Wait for you.
 2. **Safe to approve** - It's a read-only or low-risk operation. Approve automatically.

@@ -1,16 +1,16 @@
 ---
 title: Project Configuration
-description: Per-project settings with .cacd.json
+description: Per-project settings with .argusdev.json
 ---
 
-You can add a `.cacd.json` file to your project root to configure project-specific behavior. This is useful for setup scripts that should run when working with worktrees in that project.
+You can add a `.argusdev.json` file to your project root to configure project-specific behavior. This is useful for setup scripts that should run when working with worktrees in that project.
 
 ## File Location
 
-CACD looks for configuration in this order:
+ArgusDev looks for configuration in this order:
 
-1. `.cacd.json` in the project root
-2. `.cacd/config.json` in the project root
+1. `.argusdev.json` in the project root
+2. `.argusdev/config.json` in the project root
 
 Use whichever fits your preference. The first one found is used.
 
@@ -51,19 +51,19 @@ Scripts have access to:
 
 | Variable | Description |
 |----------|-------------|
-| `CACD_ROOT_PATH` | Git repository root |
-| `CACD_WORKTREE_PATH` | Path to the worktree |
-| `CACD_WORKTREE_NAME` | Name of the worktree |
-| `CACD_BRANCH` | Branch name |
+| `ARGUSDEV_ROOT_PATH` | Git repository root |
+| `ARGUSDEV_WORKTREE_PATH` | Path to the worktree |
+| `ARGUSDEV_WORKTREE_NAME` | Name of the worktree |
+| `ARGUSDEV_BRANCH` | Branch name |
 
 ## Example
 
-A typical `.cacd.json` for a Node.js project:
+A typical `.argusdev.json` for a Node.js project:
 
 ```json
 {
   "scripts": {
-    "setup": "cd \"$CACD_WORKTREE_PATH\" && npm install"
+    "setup": "cd \"$ARGUSDEV_WORKTREE_PATH\" && npm install"
   }
 }
 ```
@@ -73,14 +73,14 @@ For a project with multiple package managers:
 ```json
 {
   "scripts": {
-    "setup": "cd \"$CACD_WORKTREE_PATH\" && npm install && pip install -r requirements.txt"
+    "setup": "cd \"$ARGUSDEV_WORKTREE_PATH\" && npm install && pip install -r requirements.txt"
   }
 }
 ```
 
 ## Notes
 
-- Scripts run asynchronously and don't block CACD
+- Scripts run asynchronously and don't block ArgusDev
 - Failures are logged but don't prevent operations
-- This file is optional - CACD works fine without it
-- Project config is separate from global CACD settings
+- This file is optional - ArgusDev works fine without it
+- Project config is separate from global ArgusDev settings

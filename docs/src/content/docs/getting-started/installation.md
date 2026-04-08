@@ -1,31 +1,31 @@
 ---
 title: Installation
-description: How to install CACD
+description: How to install ArgusDev
 ---
 
 ## Requirements
 
-- Node.js 18 or later
+- Node.js 22 or later
 - One or more AI coding assistants installed (Claude Code, Gemini CLI, etc.)
 
 ## Install via npm
 
 ```bash
-npm install -g ca-cd
+npm install -g argusdev
 ```
 
 ## Run without installing
 
 ```bash
-npx ca-cd
+npx argusdev
 ```
 
 ## Verify installation
 
 ```bash
-cacd --version
+argusdev --version
 ```
 
 ## Next Steps
 
-- [Quick Start](/cacd/getting-started/quick-start/) - Launch your first session
+- [Quick Start](/argusdev/getting-started/quick-start/) - Launch your first session

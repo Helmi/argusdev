@@ -3,7 +3,7 @@ title: Session Management
 description: Creating, monitoring, and managing AI agent sessions
 ---
 
-Sessions are the core of CACD. Each session represents a running AI coding assistant (like Claude Code or Gemini CLI) attached to a specific Git worktree.
+Sessions are the core of ArgusDev. Each session represents a running AI coding assistant (like Claude Code or Gemini CLI) attached to a specific Git worktree.
 
 ## Creating a Session
 
@@ -28,7 +28,7 @@ Each session has one of four states:
 | **Waiting** | Red | Agent needs your confirmation (e.g., to run a command) |
 | **Pending Auto-Approval** | - | Being evaluated for automatic approval (if enabled) |
 
-CACD detects these states by analyzing the terminal output. Different agents have different detection patterns - Claude Code, Gemini, and others each have their own way of signaling state.
+ArgusDev detects these states by analyzing the terminal output. Different agents have different detection patterns - Claude Code, Gemini, and others each have their own way of signaling state.
 
 ## Monitoring Sessions
 
@@ -40,7 +40,7 @@ The sidebar shows all active sessions with their current state. You can:
 
 ## Session Names
 
-Sessions are automatically named based on the worktree and agent. For Claude Code sessions, CACD also tracks the task list name if you're using Claude's task list feature.
+Sessions are automatically named based on the worktree and agent. For Claude Code sessions, ArgusDev also tracks the task list name if you're using Claude's task list feature.
 
 ## Destroying Sessions
 
@@ -56,4 +56,4 @@ The worktree remains intact - only the agent session is terminated. You can star
 
 - Run multiple sessions in parallel on different worktrees to work on several features at once
 - Keep an eye on the state indicators - a "waiting" session might be blocked until you respond
-- Sessions persist across page refreshes but not across CACD restarts
+- Sessions persist across page refreshes but not across ArgusDev restarts

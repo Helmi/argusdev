@@ -3,7 +3,7 @@ title: Keyboard Shortcuts
 description: Customize keybindings for the TUI
 ---
 
-CACD's terminal interface (TUI) supports customizable keyboard shortcuts for common actions.
+ArgusDev's terminal interface (TUI) supports customizable keyboard shortcuts for common actions.
 
 ## Available Shortcuts
 
@@ -45,7 +45,7 @@ These combinations can't be used as shortcuts:
 
 ## Configuration File
 
-Shortcuts are stored in your config file at `~/.config/cacd/config.json`:
+Shortcuts are stored in your config file at `~/.config/argusdev/config.json`:
 
 ```json
 {

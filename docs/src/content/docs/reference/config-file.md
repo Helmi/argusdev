@@ -3,12 +3,12 @@ title: Configuration File
 description: Full config.json reference
 ---
 
-CACD stores its configuration in `~/.config/cacd/config.json` (or a custom location if you set `CACD_CONFIG_DIR`).
+ArgusDev stores its configuration in `~/.config/argusdev/config.json` (or a custom location if you set `ARGUSDEV_CONFIG_DIR`).
 
 ## File Location
 
-- **Linux/macOS:** `~/.config/cacd/config.json`
-- **Custom:** Set via `CACD_CONFIG_DIR` environment variable
+- **Linux/macOS:** `~/.config/argusdev/config.json`
+- **Custom:** Set via `ARGUSDEV_CONFIG_DIR` environment variable
 
 ## Structure
 
@@ -49,7 +49,7 @@ CACD stores its configuration in `~/.config/cacd/config.json` (or a custom locat
 }
 ```
 
-See [Keyboard Shortcuts](/cacd/configuration/shortcuts/).
+See [Keyboard Shortcuts](/argusdev/configuration/shortcuts/).
 
 ### statusHooks
 
@@ -63,19 +63,19 @@ See [Keyboard Shortcuts](/cacd/configuration/shortcuts/).
 }
 ```
 
-See [Status Hooks](/cacd/configuration/status-hooks/).
+See [Status Hooks](/argusdev/configuration/status-hooks/).
 
 ### worktreeHooks
 
 ```json
 {
   "worktreeHooks": {
-    "postCreate": "cd \"$CACD_WORKTREE_PATH\" && npm install"
+    "postCreate": "cd \"$ARGUSDEV_WORKTREE_PATH\" && npm install"
   }
 }
 ```
 
-See [Worktree Hooks](/cacd/configuration/worktree-hooks/).
+See [Worktree Hooks](/argusdev/configuration/worktree-hooks/).
 
 ### worktree
 
@@ -119,7 +119,7 @@ See [Worktree Hooks](/cacd/configuration/worktree-hooks/).
 }
 ```
 
-See [Agent Profiles](/cacd/configuration/agent-profiles/).
+See [Agent Profiles](/argusdev/configuration/agent-profiles/).
 
 ### autoApproval
 
@@ -139,17 +139,17 @@ See [Agent Profiles](/cacd/configuration/agent-profiles/).
 | `timeout` | number | Timeout in seconds (default: 30) |
 | `customCommand` | string | Custom verification command |
 
-See [Auto-Approval](/cacd/features/auto-approval/).
+See [Auto-Approval](/argusdev/features/auto-approval/).
 
 ## Other Files
 
-CACD also maintains:
+ArgusDev also maintains:
 
-- `~/.config/cacd/projects.json` - List of tracked projects
-- `~/.config/cacd/agents.json` - Agent configurations (if separate from main config)
+- `~/.config/argusdev/projects.json` - List of tracked projects
+- `~/.config/argusdev/agents.json` - Agent configurations (if separate from main config)
 
 ## Editing
 
-You can edit the config file directly, but it's easier to use the Settings UI in CACD. Changes made in the UI are saved automatically.
+You can edit the config file directly, but it's easier to use the Settings UI in ArgusDev. Changes made in the UI are saved automatically.
 
-If you edit manually, restart CACD to pick up changes.
+If you edit manually, restart ArgusDev to pick up changes.

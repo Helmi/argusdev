@@ -33,41 +33,41 @@ Your hook has access to:
 
 | Variable | Description |
 |----------|-------------|
-| `CACD_WORKTREE_PATH` | Path to the new worktree |
-| `CACD_WORKTREE_BRANCH` | Branch name |
-| `CACD_GIT_ROOT` | Root of the Git repository |
-| `CACD_BASE_BRANCH` | Branch the worktree was created from (if applicable) |
+| `ARGUSDEV_WORKTREE_PATH` | Path to the new worktree |
+| `ARGUSDEV_WORKTREE_BRANCH` | Branch name |
+| `ARGUSDEV_GIT_ROOT` | Root of the Git repository |
+| `ARGUSDEV_BASE_BRANCH` | Branch the worktree was created from (if applicable) |
 
 ## Examples
 
 ### Install Node Dependencies
 
 ```bash
-cd "$CACD_WORKTREE_PATH" && npm install
+cd "$ARGUSDEV_WORKTREE_PATH" && npm install
 ```
 
 ### Install Multiple Dependency Types
 
 ```bash
-cd "$CACD_WORKTREE_PATH" && npm install && pip install -r requirements.txt
+cd "$ARGUSDEV_WORKTREE_PATH" && npm install && pip install -r requirements.txt
 ```
 
 ### Copy Environment File
 
 ```bash
-cp "$CACD_GIT_ROOT/.env.example" "$CACD_WORKTREE_PATH/.env"
+cp "$ARGUSDEV_GIT_ROOT/.env.example" "$ARGUSDEV_WORKTREE_PATH/.env"
 ```
 
 ### Run Project Setup Script
 
 ```bash
-cd "$CACD_WORKTREE_PATH" && ./scripts/setup.sh
+cd "$ARGUSDEV_WORKTREE_PATH" && ./scripts/setup.sh
 ```
 
 ### Notify When Done
 
 ```bash
-cd "$CACD_WORKTREE_PATH" && npm install && notify-send "Worktree ready" "$CACD_WORKTREE_BRANCH"
+cd "$ARGUSDEV_WORKTREE_PATH" && npm install && notify-send "Worktree ready" "$ARGUSDEV_WORKTREE_BRANCH"
 ```
 
 ## How It Works
@@ -80,5 +80,5 @@ cd "$CACD_WORKTREE_PATH" && npm install && notify-send "Worktree ready" "$CACD_W
 
 - Test your commands manually first
 - Keep hooks reasonably fast - long installs are fine, but don't block on interactive prompts
-- Use `cd "$CACD_WORKTREE_PATH"` at the start to ensure you're in the right directory
+- Use `cd "$ARGUSDEV_WORKTREE_PATH"` at the start to ensure you're in the right directory
 - Chain commands with `&&` so later steps only run if earlier ones succeed

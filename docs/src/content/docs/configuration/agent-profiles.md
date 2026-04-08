@@ -9,7 +9,7 @@ Agent profiles define how each AI assistant is launched and what options are ava
 
 The easiest way to configure agents is through the WebUI:
 
-1. Open CACD in your browser
+1. Open ArgusDev in your browser
 2. Click the **gear icon** in the header to open Settings
 3. Select **Agents** from the sidebar
 
@@ -38,7 +38,7 @@ Each agent profile consists of:
 
 ## Built-in Profiles
 
-CACD auto-detects and configures these agents during setup:
+ArgusDev auto-detects and configures these agents during setup:
 
 - **Claude Code** - Anthropic's CLI assistant with YOLO mode, model selection, continue/resume options
 - **Gemini CLI** - Google's assistant with model selection
