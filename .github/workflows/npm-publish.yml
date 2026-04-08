@@ -86,9 +86,10 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (if not already created)
         run: |
-          gh release create "v$VERSION" --generate-notes --title "ArgusDev v$VERSION"
+          gh release view "v$VERSION" >/dev/null 2>&1 || \
+            gh release create "v$VERSION" --generate-notes --title "ArgusDev v$VERSION"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.get_version.outputs.VERSION }}
