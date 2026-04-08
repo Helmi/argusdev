@@ -29,7 +29,24 @@ import {
 	ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import {
+	DndContext,
+	closestCenter,
+	KeyboardSensor,
+	PointerSensor,
+	useSensor,
+	useSensors,
+} from '@dnd-kit/core';
+import type {DragEndEvent} from '@dnd-kit/core';
+import {
+	SortableContext,
+	sortableKeyboardCoordinates,
+	useSortable,
+	verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {CSS} from '@dnd-kit/utilities';
+import {
 	AlertTriangle,
+	ArrowUpDown,
 	ChevronsRight,
 	ChevronDown,
 	ChevronRight,
@@ -37,6 +54,7 @@ import {
 	FolderGit2,
 	FolderPlus,
 	GitBranch,
+	GripVertical,
 	ListTodo,
 	MessageSquare,
 	MoreVertical,
@@ -56,6 +74,36 @@ const areSetsEqual = (a: Set<string>, b: Set<string>) => {
 	return true;
 };
 
+import type {DraggableAttributes} from '@dnd-kit/core';
+import type {SyntheticListenerMap} from '@dnd-kit/core/dist/hooks/utilities';
+
+interface SortableProps {
+	attributes: DraggableAttributes;
+	listeners: SyntheticListenerMap | undefined;
+}
+
+function SortableProjectWrapper({
+	id,
+	children,
+}: {
+	id: string;
+	children: (props: {sortableProps: SortableProps; style: React.CSSProperties}) => React.ReactNode;
+}) {
+	const {attributes, listeners, setNodeRef, transform, transition, isDragging} =
+		useSortable({id});
+
+	const style: React.CSSProperties = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+		opacity: isDragging ? 0.5 : 1,
+	};
+
+	return (
+		<div ref={setNodeRef} style={style}>
+			{children({sortableProps: {attributes, listeners}, style})}
+		</div>
+	);
+}
 
 export function Sidebar() {
 	const {
@@ -463,10 +511,93 @@ export function Sidebar() {
 		});
 	};
 
-	// Data passthrough (filtering removed for now)
+	// Toggle project expansion
+	const toggleProject = (path: string) => {
+		setExpandedProjects(prev => {
+			const next = new Set(prev);
+			if (next.has(path)) {
+				next.delete(path);
+			} else {
+				next.add(path);
+			}
+			return next;
+		});
+	};
+
+	// Reorder mode
+	const [reorderMode, setReorderMode] = useState(false);
+	const savedExpandedRef = useRef<Set<string> | null>(null);
+
+	// Custom project order (persisted to localStorage)
+	const [projectOrder, setProjectOrder] = useState<string[]>(() => {
+		try {
+			const saved = localStorage.getItem('argusdev-project-order');
+			return saved ? (JSON.parse(saved) as string[]) : [];
+		} catch {
+			return [];
+		}
+	});
+	useEffect(() => {
+		if (projectOrder.length > 0) {
+			localStorage.setItem(
+				'argusdev-project-order',
+				JSON.stringify(projectOrder),
+			);
+		}
+	}, [projectOrder]);
+
+	const toggleReorderMode = () => {
+		if (!reorderMode) {
+			savedExpandedRef.current = new Set(expandedProjects);
+			setExpandedProjects(new Set());
+		} else {
+			if (savedExpandedRef.current) {
+				setExpandedProjects(savedExpandedRef.current);
+				savedExpandedRef.current = null;
+			}
+		}
+		setReorderMode(prev => !prev);
+	};
+
+	// dnd-kit sensors
+	const sensors = useSensors(
+		useSensor(PointerSensor, {activationConstraint: {distance: 5}}),
+		useSensor(KeyboardSensor, {
+			coordinateGetter: sortableKeyboardCoordinates,
+		}),
+	);
+
+	const handleDragEnd = (event: DragEndEvent) => {
+		const {active, over} = event;
+		if (!over || active.id === over.id) return;
+		const ordered = filteredData.projects;
+		const oldIndex = ordered.findIndex(p => p.path === active.id);
+		const newIndex = ordered.findIndex(p => p.path === over.id);
+		if (oldIndex === -1 || newIndex === -1) return;
+		const reordered = [...ordered];
+		const [moved] = reordered.splice(oldIndex, 1);
+		reordered.splice(newIndex, 0, moved!);
+		setProjectOrder(reordered.map(p => p.path));
+	};
+
+	// Apply custom order to projects
 	const filteredData = useMemo(() => {
-		return {projects, worktrees, sessions};
-	}, [projects, worktrees, sessions]);
+		let ordered = [...projects];
+		if (projectOrder.length > 0) {
+			const orderMap = new Map(projectOrder.map((path, i) => [path, i]));
+			ordered.sort((a, b) => {
+				const ai = orderMap.get(a.path) ?? Number.MAX_SAFE_INTEGER;
+				const bi = orderMap.get(b.path) ?? Number.MAX_SAFE_INTEGER;
+				if (ai !== bi) return ai - bi;
+				return a.name.localeCompare(b.name, undefined, {sensitivity: 'base'});
+			});
+		} else {
+			ordered.sort((a, b) =>
+				a.name.localeCompare(b.name, undefined, {sensitivity: 'base'}),
+			);
+		}
+		return {projects: ordered, worktrees, sessions};
+	}, [projects, worktrees, sessions, projectOrder]);
 
 	// Helper to get sessions for a worktree
 	const getSessionsForWorktree = (worktreePath: string) => {
@@ -551,7 +682,7 @@ export function Sidebar() {
 	return (
 		<aside className="flex h-full w-56 flex-col border-r border-border bg-sidebar lg:w-64 overflow-hidden">
 			{/* Action bar */}
-			<div className="flex h-9 items-center gap-1 px-2 border-b border-border">
+			<div className="flex h-8 items-center gap-1 px-2 border-b border-border">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
@@ -589,6 +720,21 @@ export function Sidebar() {
 
 				<div className="flex-1" />
 
+				{projects.length > 1 && (
+					<Button
+						variant="ghost"
+						size="icon"
+						className={cn(
+							'h-6 w-6 shrink-0',
+							reorderMode && 'bg-muted text-foreground',
+						)}
+						onClick={toggleReorderMode}
+						title={reorderMode ? 'Done reordering' : 'Reorder projects'}
+					>
+						<ArrowUpDown className="h-3.5 w-3.5" />
+					</Button>
+				)}
+
 				<Button
 					variant="ghost"
 					size="icon"
@@ -603,12 +749,13 @@ export function Sidebar() {
 			{/* Tree content */}
 			<ScrollArea className="flex-1">
 				<div className="py-1">
-					{filteredData.projects.map((project, projectIndex) => {
+					{(() => {
+						const projectList = filteredData.projects.map((project, projectIndex) => {
 						const projectWorktrees = getWorktreesForProject(project.path);
 						const isCurrentProject = currentProject?.path === project.path;
 						const isInvalid = project.isValid === false;
 
-						return (
+						const renderProject = (sortableProps?: SortableProps) => (
 							<div
 								key={project.path}
 								className={cn(projectIndex > 0 && 'mt-2')}
@@ -618,18 +765,26 @@ export function Sidebar() {
 									<ContextMenuTrigger asChild>
 										<div
 											className={cn(
-												'group flex w-full min-w-0 items-center gap-2 px-2 py-2 text-sm',
+												'group flex w-full min-w-0 items-center gap-2 px-2 py-2 text-sm cursor-pointer',
 												'bg-muted/50 hover:bg-muted transition-colors',
 												isCurrentProject && 'bg-muted',
 												isMobile && 'min-h-[44px]',
 											)}
+											onClick={() => {
+												if (!reorderMode && renamingProject !== project.path) {
+													toggleProject(project.path);
+												}
+											}}
 										>
-											<FolderGit2
-												className={cn(
-													'h-4 w-4 shrink-0 transition-colors',
-													isInvalid ? 'text-yellow-600' : 'text-primary',
-												)}
-											/>
+											{reorderMode ? (
+												<span className="touch-none cursor-grab" {...sortableProps?.attributes} {...sortableProps?.listeners}>
+													<GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+												</span>
+											) : expandedProjects.has(project.path) ? (
+												<ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+											) : (
+												<ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+											)}
 											{renamingProject === project.path ? (
 												<Input
 													ref={projectRenameInputRef}
@@ -683,19 +838,21 @@ export function Sidebar() {
 															<DropdownMenuSeparator />
 														</>
 													)}
-													<DropdownMenuItem
-														onClick={async () => {
-															const selected = await ensureProjectSelected(
-																project.path,
-															);
-															if (!selected) return;
-															openTaskBoard();
-														}}
-														disabled={isInvalid}
-													>
-														<ListTodo className="h-3.5 w-3.5 mr-2" />
-														Task Board
-													</DropdownMenuItem>
+													{project.tdEnabled && (
+														<DropdownMenuItem
+															onClick={async () => {
+																const selected = await ensureProjectSelected(
+																	project.path,
+																);
+																if (!selected) return;
+																openTaskBoard();
+															}}
+															disabled={isInvalid}
+														>
+															<ListTodo className="h-3.5 w-3.5 mr-2" />
+															Task Board
+														</DropdownMenuItem>
+													)}
 													<DropdownMenuItem
 														onClick={async () => {
 															const selected = await ensureProjectSelected(
@@ -767,19 +924,21 @@ export function Sidebar() {
 												<ContextMenuSeparator />
 											</>
 										)}
-										<ContextMenuItem
-											onClick={async () => {
-												const selected = await ensureProjectSelected(
-													project.path,
-												);
-												if (!selected) return;
-												openTaskBoard();
-											}}
-											disabled={isInvalid}
-										>
-											<ListTodo className="h-3.5 w-3.5 mr-2" />
-											Task Board
-										</ContextMenuItem>
+										{project.tdEnabled && (
+											<ContextMenuItem
+												onClick={async () => {
+													const selected = await ensureProjectSelected(
+														project.path,
+													);
+													if (!selected) return;
+													openTaskBoard();
+												}}
+												disabled={isInvalid}
+											>
+												<ListTodo className="h-3.5 w-3.5 mr-2" />
+												Task Board
+											</ContextMenuItem>
+										)}
 										<ContextMenuItem
 											onClick={async () => {
 												const selected = await ensureProjectSelected(
@@ -839,7 +998,7 @@ export function Sidebar() {
 								</ContextMenu>
 
 								{/* Worktrees */}
-								<div className="py-1 min-w-0">
+								{expandedProjects.has(project.path) && <div className="py-1 min-w-0">
 									{projectWorktrees.length === 0 ? (
 										<div className="px-3 py-2 text-xs text-muted-foreground italic">
 											No worktrees
@@ -1131,10 +1290,32 @@ export function Sidebar() {
 											);
 										})
 									)}
-								</div>
+								</div>}
 							</div>
 						);
-					})}
+
+						if (reorderMode) {
+							return (
+								<SortableProjectWrapper key={project.path} id={project.path}>
+									{({sortableProps}) => renderProject(sortableProps)}
+								</SortableProjectWrapper>
+							);
+						}
+
+						return renderProject();
+					});
+
+						if (reorderMode) {
+							return (
+								<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+									<SortableContext items={filteredData.projects.map(p => p.path)} strategy={verticalListSortingStrategy}>
+										{projectList}
+									</SortableContext>
+								</DndContext>
+							);
+						}
+						return projectList;
+					})()}
 
 					{/* Show message if no projects */}
 					{filteredData.projects.length === 0 && (
