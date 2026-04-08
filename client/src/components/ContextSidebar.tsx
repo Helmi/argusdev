@@ -207,22 +207,6 @@ export function ContextSidebar() {
 		prevSessionStateRef.current = session.state;
 	}, [session?.state, fetchChangedFiles, session]);
 
-	// Re-fetch when worktree git status changes (e.g., external commits, file watcher events)
-	const gitStatusKey = worktree?.gitStatus
-		? `${worktree.gitStatus.filesAdded}-${worktree.gitStatus.filesDeleted}`
-		: null;
-	const prevGitStatusRef = useRef<string | null>(null);
-	useEffect(() => {
-		if (
-			gitStatusKey !== null &&
-			prevGitStatusRef.current !== null &&
-			prevGitStatusRef.current !== gitStatusKey
-		) {
-			fetchChangedFiles();
-		}
-		prevGitStatusRef.current = gitStatusKey;
-	}, [gitStatusKey, fetchChangedFiles]);
-
 	if (!session) {
 		return null;
 	}
