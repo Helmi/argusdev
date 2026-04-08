@@ -67,6 +67,9 @@ export function getLocalHostname(
 }
 
 export function openBrowser(url: string): void {
+	// Never open a browser in test or CI environments
+	if (process.env['VITEST'] || process.env['CI']) return;
+
 	const cmd =
 		process.platform === 'darwin'
 			? 'open'
