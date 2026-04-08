@@ -54,6 +54,7 @@ export const SdkSession = memo(
 			selectedSessions,
 			agents,
 			openTaskBoard,
+			tdStatus,
 		} = useAppStore();
 		const isMobile = useIsMobile();
 		const hasMultipleSessions = selectedSessions.length > 1;
@@ -278,7 +279,7 @@ export const SdkSession = memo(
 				{/* Header — matches TerminalSession header */}
 				<div
 					className={cn(
-						'flex h-7 items-center justify-between border-b border-border bg-card px-2',
+						'flex h-8 items-center justify-between border-b border-border bg-card px-2',
 						isFocused && 'bg-primary/10',
 					)}
 				>
@@ -316,15 +317,17 @@ export const SdkSession = memo(
 
 					<div className="flex items-center gap-0.5">
 						{/* Task board button */}
-						<Button
-							variant="ghost"
-							size="icon"
-							className="h-5 w-5 text-muted-foreground hover:text-foreground"
-							onClick={openTaskBoard}
-							title="Task board"
-						>
-							<LayoutGrid className="h-3 w-3" />
-						</Button>
+						{tdStatus?.projectState?.enabled && (
+							<Button
+								variant="ghost"
+								size="icon"
+								className="h-5 w-5 text-muted-foreground hover:text-foreground"
+								onClick={openTaskBoard}
+								title="Task board"
+							>
+								<LayoutGrid className="h-3 w-3" />
+							</Button>
+						)}
 
 						{/* Info button */}
 						<Button

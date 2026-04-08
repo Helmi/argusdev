@@ -73,12 +73,20 @@ export function ContextSidebar() {
 	const agentIcon = agentConfig?.icon || legacyIconProps?.icon;
 	const agentIconColor = agentConfig?.iconColor || legacyIconProps?.iconColor;
 
+	// Abort controller for in-flight fetches
+	const abortRef = useRef<AbortController | null>(null);
+
 	// Fetch changed files function
 	const fetchChangedFiles = useCallback(async () => {
 		if (!session?.path) {
 			setFilesResponse(null);
 			return;
 		}
+
+		// Cancel any in-flight request
+		abortRef.current?.abort();
+		const controller = new AbortController();
+		abortRef.current = controller;
 
 		setFilesLoading(true);
 		setFilesError(null);
@@ -92,17 +100,23 @@ export function ContextSidebar() {
 			} else {
 				params.set('limit', '200');
 			}
-			const response = await fetch(`/api/worktree/files?${params}`);
+			const response = await fetch(`/api/worktree/files?${params}`, {
+				signal: controller.signal,
+			});
 			if (!response.ok) {
 				throw new Error('Failed to fetch changed files');
 			}
 			const data: ChangedFilesResponse = await response.json();
 			setFilesResponse(data);
 		} catch (err) {
+			// Ignore aborted requests — a newer fetch is already in flight
+			if (err instanceof DOMException && err.name === 'AbortError') return;
+			// Keep existing data visible on transient errors (git lock contention etc.)
 			setFilesError(err instanceof Error ? err.message : 'Unknown error');
-			setFilesResponse(null);
 		} finally {
-			setFilesLoading(false);
+			if (!controller.signal.aborted) {
+				setFilesLoading(false);
+			}
 		}
 	}, [session?.path, debouncedSearch, showAll]);
 
@@ -519,7 +533,7 @@ export function ContextSidebar() {
 	return (
 		<aside className="flex w-64 flex-col border-l border-border bg-sidebar lg:w-72 xl:w-80 overflow-hidden">
 			{/* Header */}
-			<div className="flex h-7 items-center justify-between border-b border-border px-2 shrink-0">
+			<div className="flex h-8 items-center justify-between border-b border-border px-2 shrink-0">
 				<span className="text-xs font-medium text-muted-foreground">
 					Session Details
 				</span>
