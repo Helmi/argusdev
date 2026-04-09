@@ -1,5 +1,6 @@
 import {useState, useEffect, useCallback, useRef} from 'react';
 import {useAppStore, socket} from '@/lib/store';
+import {apiFetch} from '@/lib/apiFetch';
 import {useIsMobile} from '@/hooks/useIsMobile';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -100,7 +101,7 @@ export function ContextSidebar() {
 			} else {
 				params.set('limit', '200');
 			}
-			const response = await fetch(`/api/worktree/files?${params}`, {
+			const response = await apiFetch(`/api/worktree/files?${params}`, {
 				signal: controller.signal,
 			});
 			if (!response.ok) {
