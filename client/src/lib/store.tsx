@@ -120,6 +120,9 @@ interface AppState {
 	// File Viewing State (from file browser)
 	viewingFile: {worktreePath: string; filePath: string} | null;
 
+	// File Preview State (overlay dialog from terminal links)
+	previewFile: {worktreePath: string; filePath: string} | null;
+
 	// Config
 	config: AppConfig;
 	configLoading: boolean;
@@ -279,6 +282,10 @@ interface AppActions {
 	openFile: (worktreePath: string, filePath: string) => void;
 	closeFile: () => void;
 
+	// File preview (overlay dialog from terminal links)
+	openFilePreview: (worktreePath: string, filePath: string) => void;
+	closeFilePreview: () => void;
+
 	// TD Integration
 	fetchTdStatus: () => Promise<void>;
 	fetchProjectConfig: () => Promise<void>;
@@ -422,6 +429,10 @@ export function AppProvider({children}: {children: ReactNode}) {
 		worktreePath: string;
 	} | null>(null);
 	const [viewingFile, setViewingFile] = useState<{
+		worktreePath: string;
+		filePath: string;
+	} | null>(null);
+	const [previewFile, setPreviewFile] = useState<{
 		worktreePath: string;
 		filePath: string;
 	} | null>(null);
@@ -1595,6 +1606,11 @@ export function AppProvider({children}: {children: ReactNode}) {
 	};
 	const closeFile = () => setViewingFile(null);
 
+	const openFilePreview = (worktreePath: string, filePath: string) => {
+		setPreviewFile({worktreePath, filePath});
+	};
+	const closeFilePreview = () => setPreviewFile(null);
+
 	const updateConfig = async (newConfig: AppConfig): Promise<boolean> => {
 		try {
 			const res = await apiFetch('/api/config', {
@@ -1788,6 +1804,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		settingsSection,
 		viewingFileDiff,
 		viewingFile,
+		previewFile,
 		config,
 		configLoading,
 		theme,
@@ -1828,6 +1845,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 		closeFileDiff,
 		openFile,
 		closeFile,
+		openFilePreview,
+		closeFilePreview,
 		updateConfig,
 		setTheme,
 		setFont,

@@ -31,6 +31,7 @@ import {cn} from '@/lib/utils';
 import type {Session} from '@/lib/types';
 import {mapSessionState} from '@/lib/types';
 import {useIsMobile} from '@/hooks/useIsMobile';
+import {createFilePathLinkProvider} from '@/lib/filePathLinkProvider';
 
 // Debounced fit function to prevent layout thrashing
 function createDebouncedFit(delay = 100) {
@@ -133,6 +134,7 @@ export const TerminalSession = memo(function TerminalSession({
 		agents,
 		openTaskBoard,
 		tdStatus,
+		openFilePreview,
 	} = useAppStore();
 	const isMobile = useIsMobile();
 	const hasMultipleSessions = selectedSessions.length > 1;
@@ -164,6 +166,8 @@ export const TerminalSession = memo(function TerminalSession({
 	const sessionIdRef = useRef(session.id);
 	// Lock to prevent checkScrollPosition from overriding programmatic scrolls
 	const isProgrammaticScrollRef = useRef(false);
+	const openFilePreviewRef = useRef(openFilePreview);
+	openFilePreviewRef.current = openFilePreview;
 
 	const isContextOpen = contextSidebarSessionId === session.id;
 
@@ -199,6 +203,12 @@ export const TerminalSession = memo(function TerminalSession({
 
 		term.loadAddon(fitAddon);
 		term.loadAddon(webLinksAddon);
+
+		const filePathLinkDisposable = term.registerLinkProvider(
+			createFilePathLinkProvider(term, (filePath: string) => {
+				openFilePreviewRef.current(session.path, filePath);
+			}),
+		);
 
 		term.open(terminalRef.current);
 		fitAddon.fit();
@@ -557,6 +567,7 @@ export const TerminalSession = memo(function TerminalSession({
 			resizeObserver.disconnect();
 			onDataDisposable.dispose();
 			onWriteDisposable.dispose();
+			filePathLinkDisposable.dispose();
 			if (terminalRef.current) {
 				terminalRef.current.removeEventListener('wheel', wheelHandler);
 				terminalRef.current.removeEventListener('paste', pasteHandler);

@@ -4,6 +4,7 @@ import { Layout } from '@/components/layout'
 import { SessionGrid } from '@/components/SessionGrid'
 import { InlineDiffViewer } from '@/components/InlineDiffViewer'
 import { FileViewer } from '@/components/FileViewer'
+import { FilePreviewDialog } from '@/components/FilePreviewDialog'
 import { TaskBoard } from '@/components/TaskBoard'
 import { ConversationView } from '@/components/ConversationView'
 import { ErrorBanner } from '@/components/ErrorBanner'
@@ -78,6 +79,7 @@ function AuthenticatedAppContent() {
       {addWorktreeOpen && <AddWorktreeScreen />}
       {addSessionOpen && <AddSessionScreen />}
       {settingsOpen && <SettingsScreen />}
+      <FilePreviewDialog />
     </>
   )
 }
