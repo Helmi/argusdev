@@ -22,7 +22,7 @@ import {randomUUID, randomBytes} from 'crypto';
 import {execFileSync} from 'child_process';
 import {existsSync, watch, type FSWatcher} from 'fs';
 import {writeFile, mkdir, readdir, unlink, stat} from 'fs/promises';
-import {tmpdir} from 'os';
+import {tmpdir, homedir} from 'os';
 import {generateRandomPort, isDevMode} from '../constants/env.js';
 import {
 	validateWorktreePath,
@@ -1639,24 +1639,42 @@ export class APIServer {
 					.send({error: 'path and file query parameters required'});
 			}
 
-			// Validate worktree path
-			let validatedWorktreePath: string;
-			try {
-				validatedWorktreePath = validateWorktreePath(worktreePath);
-			} catch (_error) {
-				logger.warn(`Invalid worktree path requested: ${worktreePath}`);
-				return reply.code(400).send({error: 'Invalid worktree path'});
-			}
-
-			// Validate file path doesn't escape worktree
+			// Resolve absolute and ~/ paths directly; relative paths resolve within worktree
 			let fullPath: string;
-			try {
-				fullPath = validatePathWithinBase(validatedWorktreePath, filePath);
-			} catch (_error) {
-				logger.warn(
-					`Path traversal attempt blocked: ${filePath} in ${worktreePath}`,
-				);
-				return reply.code(400).send({error: 'Invalid file path'});
+			const expandedFile = filePath.startsWith('~/')
+				? path.join(homedir(), filePath.slice(2))
+				: filePath;
+
+			if (path.isAbsolute(expandedFile)) {
+				fullPath = path.normalize(expandedFile);
+			} else {
+				// Validate worktree path
+				let validatedWorktreePath: string;
+				try {
+					validatedWorktreePath = validateWorktreePath(worktreePath);
+				} catch (_error) {
+					logger.warn(
+						`Invalid worktree path requested: ${worktreePath}`,
+					);
+					return reply
+						.code(400)
+						.send({error: 'Invalid worktree path'});
+				}
+
+				// Validate file path doesn't escape worktree
+				try {
+					fullPath = validatePathWithinBase(
+						validatedWorktreePath,
+						filePath,
+					);
+				} catch (_error) {
+					logger.warn(
+						`Path traversal attempt blocked: ${filePath} in ${worktreePath}`,
+					);
+					return reply
+						.code(400)
+						.send({error: 'Invalid file path'});
+				}
 			}
 
 			try {
