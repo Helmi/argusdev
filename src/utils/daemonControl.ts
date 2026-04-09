@@ -1,6 +1,7 @@
 import {spawn, type StdioOptions} from 'child_process';
 import {closeSync, openSync} from 'fs';
 import {unlink} from 'fs/promises';
+import {ENV_VARS} from '../constants/env.js';
 import {
 	getDaemonPidFilePath,
 	isProcessRunning,
@@ -87,10 +88,16 @@ export function spawnDetachedDaemon(
 	const stdio: StdioOptions =
 		logFd === undefined ? 'ignore' : ['ignore', logFd, logFd];
 
+	// Strip dev-mode env vars so the background daemon always uses its own
+	// config directory — never the local .argusdev-dev/ from a dev session.
+	const cleanEnv = {...process.env};
+	delete cleanEnv[ENV_VARS.DEV_MODE];
+	delete cleanEnv[ENV_VARS.CONFIG_DIR];
+
 	const child = spawn(process.execPath, buildSpawnArgs(entrypointPath, port), {
 		detached: true,
 		stdio,
-		env: process.env,
+		env: cleanEnv,
 	});
 
 	if (logFd !== undefined) {

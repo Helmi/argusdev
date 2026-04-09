@@ -612,18 +612,46 @@ try {
 	process.exit(1);
 }
 
+// Warn if another daemon (dev or production) is also running
+const startupLines = [
+	'ArgusDev daemon started',
+	`Local URL:    ${webConfig?.url || `http://localhost:${port}`}`,
+	`Token:        ${accessToken || '(none configured)'}`,
+	`External URL: ${webConfig?.externalUrl || '(unavailable)'}`,
+	`PID:          ${daemonPid}`,
+	`Config Dir:   ${configDir}`,
+	`PID File:     ${daemonPidFilePath}`,
+];
+
+if (devModeActive) {
+	// In dev mode — check if a production daemon is running
+	const {homedir} = await import('os');
+	const prodConfigDir =
+		process.platform === 'win32'
+			? join(
+					process.env['APPDATA'] || join(homedir(), 'AppData', 'Roaming'),
+					'argusdev',
+				)
+			: join(homedir(), '.config', 'argusdev');
+	const prodPidFile = getDaemonPidFilePath(prodConfigDir);
+	try {
+		const prodPid = await readDaemonPidFile(prodPidFile);
+		if (prodPid !== undefined && isProcessRunning(prodPid)) {
+			startupLines.push(
+				'',
+				`⚠ Production daemon also running (PID ${prodPid}, config: ${prodConfigDir})`,
+				'  Dev and production are fully isolated — this is safe.',
+			);
+		}
+	} catch {
+		// ignore — best-effort check
+	}
+}
+
+startupLines.push('', 'Use SIGTERM or Ctrl+C to stop');
+
 formatter.write({
-	text: [
-		'ArgusDev daemon started',
-		`Local URL:    ${webConfig?.url || `http://localhost:${port}`}`,
-		`Token:        ${accessToken || '(none configured)'}`,
-		`External URL: ${webConfig?.externalUrl || '(unavailable)'}`,
-		`PID:          ${daemonPid}`,
-		`Config Dir:   ${configDir}`,
-		`PID File:     ${daemonPidFilePath}`,
-		'',
-		'Use SIGTERM or Ctrl+C to stop',
-	],
+	text: startupLines,
 	data: {
 		ok: true,
 		command: 'daemon',
