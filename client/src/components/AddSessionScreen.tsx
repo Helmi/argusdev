@@ -34,6 +34,10 @@ import {
 	renderTdTemplate,
 } from '@/lib/tdBranchTemplate';
 import {
+	resolveProjectPathForWorktree,
+	worktreeBelongsToProject,
+} from '@/lib/tdWorktreeResolver';
+import {
 	getPreferredPromptTemplateName,
 	shouldAutoReplacePromptTemplate,
 } from '@/lib/tdPromptTemplate';
@@ -445,32 +449,26 @@ export function AddSessionScreen() {
 	// Find which project a worktree belongs to
 	const getProjectForWorktree = useCallback(
 		(worktreePath: string) => {
-			for (const project of projects) {
-				const projectName = project.path.split('/').pop() || '';
-				if (
-					worktreePath.startsWith(project.path) ||
-					worktreePath.includes(`/.worktrees/${projectName}/`)
-				) {
-					return project;
-				}
-			}
-			return null;
+			const projectPath = resolveProjectPathForWorktree(
+				worktreePath,
+				projects.map(project => project.path),
+				addSessionProjectPath || undefined,
+			);
+			if (!projectPath) return null;
+			return projects.find(project => project.path === projectPath) || null;
 		},
-		[projects],
+		[projects, addSessionProjectPath],
 	);
 
 	// Filter worktrees for selected project
 	const projectWorktrees = useMemo(() => {
 		if (!selectedProjectPath) return [];
-		const projectName = selectedProjectPath.split('/').pop() || '';
 		return worktrees.filter(w => {
 			if (w.path.includes('/.worktrees/{project}/')) return false;
-			return (
-				w.path.startsWith(selectedProjectPath) ||
-				w.path.includes(`/.worktrees/${projectName}/`)
-			);
+			if (addSessionWorktreePath && w.path === addSessionWorktreePath) return true;
+			return worktreeBelongsToProject(w.path, selectedProjectPath);
 		});
-	}, [worktrees, selectedProjectPath]);
+	}, [worktrees, selectedProjectPath, addSessionWorktreePath]);
 
 	// Handle pre-selected worktree — always populate dropdown, but only force
 	// mode='existing' for fix/review sessions; work sessions default to 'new'
@@ -1206,8 +1204,8 @@ export function AddSessionScreen() {
 													<p className="text-xs text-amber-600">
 														Could not infer the task worktree automatically.
 														{selectedTdTask?.created_branch
-															? ` Select the worktree for ${selectedTdTask.created_branch}.`
-															: ' Select the correct task worktree manually.'}
+															? ` Select the worktree for ${selectedTdTask.created_branch}, or create that worktree first.`
+															: ' Select the correct task worktree manually, or create it first.'}
 													</p>
 												)}
 											</div>
