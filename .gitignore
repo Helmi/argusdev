@@ -42,3 +42,4 @@ TASK.md
 package-lock.json
 .gstack/
 client/.env.development
+.omx/
