@@ -35,6 +35,18 @@ const mockWatch = vi.fn<(...args: unknown[]) => unknown>();
 const mockCleanupStartupScriptsInWorktree = vi.fn<
 	(worktreePath: string, maxAgeMs: number, now?: number) => Promise<number>
 >(() => Promise.resolve(0));
+const tempDirs: string[] = [];
+
+function makeTempTranscript(fileName: string, content: string): string {
+	const {mkdtempSync, writeFileSync} = require('node:fs') as typeof import('node:fs');
+	const {tmpdir} = require('node:os') as typeof import('node:os');
+	const path = require('node:path') as typeof import('node:path');
+	const dir = mkdtempSync(path.join(tmpdir(), 'argusdev-api-'));
+	tempDirs.push(dir);
+	const filePath = path.join(dir, fileName);
+	writeFileSync(filePath, content, 'utf8');
+	return filePath;
+}
 
 vi.mock('../utils/startupScript.js', async importOriginal => {
 	const actual =
@@ -325,6 +337,10 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		mockSessionStoreCountSessions.mockReset();
 		mockSessionStoreGetOriginalWorkTdSessionId.mockReset();
 		mockCleanupStartupScriptsInWorktree.mockReset();
+		for (const dir of tempDirs.splice(0)) {
+			const {rmSync} = require('node:fs') as typeof import('node:fs');
+			rmSync(dir, {recursive: true, force: true});
+		}
 		mockSessionStoreQuerySessions.mockReturnValue([]);
 		mockSessionStoreGetSessionById.mockReturnValue(null);
 		mockSessionStoreCountSessions.mockReturnValue(0);
@@ -1856,6 +1872,57 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		expect(response.statusCode).toBe(200);
 		const sessions = JSON.parse(response.body) as unknown[];
 		expect(sessions).toHaveLength(0);
+	});
+
+	it('/api/conversations/:sessionId/messages falls back to plain-text parsing for unknown agents', async () => {
+		const transcriptPath = makeTempTranscript(
+			'unknown.jsonl',
+			[
+				'plain text transcript line',
+				JSON.stringify({
+					timestamp: '2026-04-14T10:00:10.000Z',
+					type: 'entry',
+					message: 'plain text fallback line',
+				}),
+			].join('\n'),
+		);
+
+		mockSessionStoreGetSessionById.mockReturnValue({
+			id: 'session-unknown',
+			agentProfileId: 'missing-agent',
+			agentProfileName: 'Mystery Agent',
+			agentType: 'mystery',
+			agentOptions: {},
+			agentSessionId: 'mystery-1',
+			agentSessionPath: transcriptPath,
+			worktreePath: '/repo/.worktrees/mystery',
+			branchName: 'feat-mystery',
+			projectPath: '/repo',
+			tdTaskId: null,
+			tdSessionId: null,
+			sessionName: 'Unknown session',
+			contentPreview: null,
+			intent: 'work',
+			createdAt: 1_713_088_000,
+			endedAt: null,
+		});
+
+		const response = await apiServer.app.inject({
+			method: 'GET',
+			url: '/api/conversations/session-unknown/messages',
+			headers: {cookie: 'argusdev_session=test'},
+		});
+
+		expect(response.statusCode).toBe(200);
+		const payload = JSON.parse(response.body) as {
+			metadata: {messageCount?: number};
+			messages: Array<{content: string}>;
+			error?: string;
+		};
+		expect(payload.error).toBeUndefined();
+		expect(payload.metadata.messageCount).toBe(2);
+		expect(payload.messages[0]?.content).toBe('plain text transcript line');
+		expect(payload.messages[1]?.content).toBe('plain text fallback line');
 	});
 
 	it('/api/worktrees hasSession reflects sessions from all managers', async () => {

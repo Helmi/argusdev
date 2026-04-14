@@ -2203,24 +2203,24 @@ export class APIServer {
 					const configuredAgent = configurationManager.getAgentById(
 						storedSession.agentProfileId,
 					);
-					return configuredAgent
-						? adapterRegistry.createGeneric(configuredAgent)
-						: null;
+					if (configuredAgent) {
+						return adapterRegistry.createGeneric(configuredAgent);
+					}
+
+					return adapterRegistry.createGeneric({
+						id: storedSession.agentType || 'unknown',
+						name:
+							storedSession.agentProfileName ||
+							storedSession.agentType ||
+							'Unknown Agent',
+						kind: 'agent',
+						command: storedSession.agentType || 'sh',
+						options: [],
+						enabled: true,
+						icon: 'bot',
+						detectionStrategy: undefined,
+					});
 				})();
-			if (!adapter) {
-				return {
-					sessionId: storedSession.id,
-					session: storedSession,
-					metadata: {},
-					messages: [],
-					total: 0,
-					limit,
-					offset,
-					missingSessionFile: false,
-					subAgentSessions: [],
-					error: `No adapter registered for ${storedSession.agentType}`,
-				};
-			}
 
 			try {
 				const [metadata, parsedMessages, subAgentSessions] = await Promise.all([
