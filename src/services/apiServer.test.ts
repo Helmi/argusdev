@@ -2421,3 +2421,50 @@ describe('APIServer TD project review metadata', () => {
 		});
 	});
 });
+
+describe('APIServer td workflow actions', () => {
+	it('unblocks a task via the td CLI', async () => {
+		const mod = await import('./apiServer.js');
+		const api = mod.apiServer as unknown as {
+			setupPromise: Promise<void>;
+			app: {
+				inject: (request: {
+					method: string;
+					url: string;
+					headers?: Record<string, string>;
+				}) => Promise<{
+					statusCode: number;
+					json: () => unknown;
+				}>;
+			};
+		};
+		await api.setupPromise;
+
+		vi.mocked(coreService.getSelectedProject).mockReturnValue({
+			path: '/repo',
+			name: 'Repo',
+			relativePath: '/repo',
+		});
+
+		const response = await api.app.inject({
+			method: 'POST',
+			url: '/api/td/issues/td-blocked/unblock',
+			headers: {cookie: 'argusdev_session=test'},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(mockExecFileSync).toHaveBeenCalledWith(
+			'td',
+			['unblock', 'td-blocked'],
+			expect.objectContaining({
+				cwd: '/repo',
+				encoding: 'utf-8',
+				timeout: 5000,
+			}),
+		);
+		expect(response.json()).toEqual({
+			success: true,
+			message: 'Task td-blocked unblocked',
+		});
+	});
+});
