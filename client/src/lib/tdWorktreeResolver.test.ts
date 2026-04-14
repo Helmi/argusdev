@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import type {Worktree} from './types';
 import {
 	normalizeTdBranchName,
+	resolveProjectPathForWorktree,
 	resolveTdIssueWorktreePath,
 } from './tdWorktreeResolver';
 
@@ -27,6 +28,25 @@ describe('tdWorktreeResolver', () => {
 		expect(normalizeTdBranchName('')).toBe('');
 	});
 
+	it('resolves project path from matching worktree ownership', () => {
+		expect(
+			resolveProjectPathForWorktree('/projects/app/.worktrees/feature-td-1', [
+				'/projects/app',
+				'/projects/other',
+			]),
+		).toBe('/projects/app');
+	});
+
+	it('falls back to the hinted project when sibling worktree naming hides ownership', () => {
+		expect(
+			resolveProjectPathForWorktree(
+				'/projects/task-td-29fb05-fix-worktree',
+				['/projects/app'],
+				'/projects/app',
+			),
+		).toBe('/projects/app');
+	});
+
 	it('resolves by matching branch name and prefers worktrees without sessions', () => {
 		const worktrees = [
 			makeWorktree('/repo/.worktrees/feature-td-1-a', 'feature/td-1', true),
@@ -50,6 +70,23 @@ describe('tdWorktreeResolver', () => {
 		).toBe('/repo/.worktrees/feature/td-2');
 	});
 
+	it('falls back to a sibling worktree path when project scoping misses it', () => {
+		const worktrees = [
+			makeWorktree(
+				'/projects/task-td-29fb05-fix-worktree',
+				'task/td-29fb05-fix-worktree',
+			),
+		];
+
+		expect(
+			resolveTdIssueWorktreePath(
+				worktrees,
+				'task/td-29fb05-fix-worktree',
+				'/projects/app',
+			),
+		).toBe('/projects/task-td-29fb05-fix-worktree');
+	});
+
 	it('scopes resolution to the selected project path when provided', () => {
 		const worktrees = [
 			makeWorktree('/projects/app-a/.worktrees/feature/td-3', 'feature/td-3'),
@@ -69,6 +106,23 @@ describe('tdWorktreeResolver', () => {
 		expect(
 			resolveTdIssueWorktreePath(worktrees, 'feature/td-5'),
 		).toBeUndefined();
+	});
+
+	it('matches by td task id when branch prefixes differ', () => {
+		const worktrees = [
+			makeWorktree(
+				'/projects/app/.worktrees/fix-td-29fb05-fix-worktree',
+				'fix/td-29fb05-fix-worktree',
+			),
+		];
+
+		expect(
+			resolveTdIssueWorktreePath(
+				worktrees,
+				'task/td-29fb05-fix-worktree',
+				'/projects/app',
+			),
+		).toBe('/projects/app/.worktrees/fix-td-29fb05-fix-worktree');
 	});
 
 	it('never resolves to the project root even if its branch matches', () => {
