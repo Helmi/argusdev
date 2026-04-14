@@ -7,8 +7,15 @@ import {configurationManager} from './configurationManager.js';
 // Mock child_process module
 vi.mock('child_process');
 
-// Mock fs module
-vi.mock('fs');
+// Mock fs module — preserve real surface but force existsSync to true so
+// the prunable-filter in the parser doesn't drop tests' fake worktree paths
+vi.mock('fs', async importOriginal => {
+	const actual = await importOriginal<typeof import('fs')>();
+	return {
+		...actual,
+		existsSync: vi.fn(() => true),
+	};
+});
 
 // Mock worktreeConfigManager
 vi.mock('./worktreeConfigManager.js', () => ({

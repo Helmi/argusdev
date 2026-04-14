@@ -123,6 +123,11 @@ vi.mock('./projectManager.js', () => ({
 			})),
 			getProjects: vi.fn(() => [{path: '/repo', name: 'Repo'}]),
 			validateProjects: vi.fn(),
+			toGitProject: vi.fn((project: {path: string; name: string}) => ({
+				...project,
+				isValid: true,
+				relativePath: project.path,
+			})),
 			addTaskListName: vi.fn(),
 			getTaskListNames: vi.fn(() => []),
 			removeTaskListName: vi.fn(() => true),
