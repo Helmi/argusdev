@@ -109,6 +109,8 @@ vi.mock('./projectManager.js', () => ({
 				name: projectPath.split('/').pop() || 'Repo',
 				isValid: true,
 			})),
+			getProjects: vi.fn(() => [{path: '/repo', name: 'Repo'}]),
+			validateProjects: vi.fn(),
 			addTaskListName: vi.fn(),
 			getTaskListNames: vi.fn(() => []),
 			removeTaskListName: vi.fn(() => true),
@@ -2339,10 +2341,13 @@ describe('APIServer TD project review metadata', () => {
 		const {coreService: mockedCoreService} = await import('./coreService.js');
 		const {tdService: mockedTdService} = await import('./tdService.js');
 
-		mockedProjectManager.getProjects = vi.fn(() => [
+		const projectList = [
 			{path: '/repo-a', name: 'Repo A'},
 			{path: '/repo-b', name: 'Repo B'},
-		]);
+		];
+		mockedProjectManager.getProjects = vi.fn(() => projectList);
+		mockedProjectManager.instance.getProjects = vi.fn(() => projectList);
+		mockedProjectManager.instance.validateProjects = vi.fn();
 		mockedProjectManager.instance.getProject = vi.fn((projectPath: string) => ({
 			path: projectPath,
 			name: projectPath.split('/').pop() || 'Repo',
