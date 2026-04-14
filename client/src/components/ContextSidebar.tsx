@@ -215,6 +215,9 @@ export function ContextSidebar() {
 	// Content shared between mobile and desktop
 	const mainContent = (
 		<>
+			{/* Task Context (only when td is enabled) */}
+			<TaskContextCard worktreePath={session.path} />
+
 			{/* Session Info - Header area with status dot, icon, and name */}
 			<div className="space-y-3">
 				<div className="flex items-center gap-2 min-w-0">
@@ -288,9 +291,6 @@ export function ContextSidebar() {
 					</Tooltip>
 				</div>
 			</div>
-
-			{/* Task Context (only when td is enabled) */}
-			<TaskContextCard worktreePath={session.path} />
 
 			{/* Divider */}
 			<div className="border-t border-border" />

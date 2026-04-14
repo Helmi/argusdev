@@ -1,7 +1,13 @@
 import {useState, useEffect, useCallback} from 'react';
 import {apiFetch} from '@/lib/apiFetch';
+import {Button} from '@/components/ui/button';
 import {useAppStore} from '@/lib/store';
 import type {TdIssue} from '@/lib/types';
+import {
+	findLinkedTdIssue,
+	getTdWorkflowActions,
+	linkedTdIssueStatuses,
+} from '@/lib/tdLinkedIssue';
 import {cn} from '@/lib/utils';
 import {TaskDetailModal} from '@/components/TaskDetailModal';
 import {
@@ -11,6 +17,10 @@ import {
 	CheckCircle2,
 	PauseCircle,
 	AlertCircle,
+	ExternalLink,
+	Loader2,
+	Send,
+	RotateCcw,
 } from 'lucide-react';
 
 const statusIcons: Record<string, typeof Circle> = {
@@ -41,60 +51,159 @@ interface TaskContextCardProps {
 }
 
 export function TaskContextCard({worktreePath}: TaskContextCardProps) {
-	const {tdStatus} = useAppStore();
+	const {currentProject, tdStatus, worktrees} = useAppStore();
 	const [task, setTask] = useState<TdIssue | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+	const [actionLoading, setActionLoading] = useState<string | null>(null);
+	const [actionError, setActionError] = useState<string | null>(null);
+	const [showCommentInput, setShowCommentInput] = useState(false);
+	const [commentText, setCommentText] = useState('');
 
 	const closeModal = useCallback(() => {
 		setSelectedIssueId(null);
 	}, []);
 
-	// Fetch linked task for this worktree (by matching branch to created_branch)
+	const fetchTaskDetail = useCallback(async (issueId: string) => {
+		try {
+			const response = await apiFetch(`/api/td/issues/${issueId}`);
+			if (!response.ok) {
+				setTask(null);
+				return;
+			}
+
+			const data = await response.json();
+			setTask(data.issue || null);
+		} catch {
+			setTask(null);
+		}
+	}, []);
+
+	// Fetch linked task for this worktree
 	useEffect(() => {
 		if (!worktreePath || !tdStatus?.projectState?.enabled) {
 			setTask(null);
+			setActionError(null);
+			setShowCommentInput(false);
+			setCommentText('');
 			return;
 		}
 
+		let cancelled = false;
+
 		const fetchLinkedTask = async () => {
 			setLoading(true);
+			setTask(null);
+			setActionError(null);
+			setShowCommentInput(false);
+			setCommentText('');
+
 			try {
-				// Get all in-progress tasks and find one linked to this worktree
-				const res = await apiFetch('/api/td/issues?status=in_progress');
-				if (!res.ok) return;
+				const res = await apiFetch(
+					`/api/td/issues?status=${linkedTdIssueStatuses}`,
+				);
+				if (!res.ok) {
+					if (!cancelled) {
+						setTask(null);
+					}
+					return;
+				}
 
 				const data = await res.json();
-				const issues: TdIssue[] = data.issues;
+				const issues: TdIssue[] = Array.isArray(data.issues) ? data.issues : [];
+				const matched = findLinkedTdIssue(
+					issues,
+					worktrees,
+					worktreePath,
+					currentProject?.path,
+				);
 
-				// Try to match by created_branch or by worktree path containing the task's branch
-				const folderName = worktreePath.split('/').pop() || '';
-				const matched = issues.find(issue => {
-					if (
-						issue.created_branch &&
-						worktreePath.includes(issue.created_branch)
-					)
-						return true;
-					// Match by folder name containing issue ID
-					if (folderName.includes(issue.id)) return true;
-					return false;
-				});
+				if (cancelled) return;
 
 				if (matched) {
 					setTask(matched);
-				} else {
-					setTask(null);
+					return;
 				}
+
+				setTask(null);
 			} catch {
 				// Silent fail — td is optional
-				setTask(null);
+				if (!cancelled) {
+					setTask(null);
+				}
 			} finally {
-				setLoading(false);
+				if (!cancelled) {
+					setLoading(false);
+				}
 			}
 		};
 
 		fetchLinkedTask();
-	}, [worktreePath, tdStatus?.projectState?.enabled]);
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		currentProject?.path,
+		tdStatus?.projectState?.enabled,
+		worktreePath,
+		worktrees,
+	]);
+
+	const taskId = task?.id || '';
+	const taskStatus = task?.status || '';
+	const StatusIcon = statusIcons[taskStatus] || Circle;
+	const workflowActions = getTdWorkflowActions(taskStatus);
+
+	const handleOpenTask = () => {
+		if (!taskId) return;
+		setSelectedIssueId(taskId);
+	};
+
+	const runTaskAction = useCallback(
+		async (action: 'review' | 'approve' | 'request-changes' | 'unblock') => {
+			if (!taskId) return;
+
+			setActionLoading(action);
+			setActionError(null);
+
+			try {
+				const response = await apiFetch(`/api/td/issues/${taskId}/${action}`, {
+					method: 'POST',
+					headers:
+						action === 'request-changes'
+							? {'Content-Type': 'application/json'}
+							: undefined,
+					body:
+						action === 'request-changes'
+							? JSON.stringify({
+									comment: commentText.trim() || undefined,
+								})
+							: undefined,
+				});
+
+				if (!response.ok) {
+					const data = await response
+						.json()
+						.catch(() => ({error: 'Task action failed'}));
+					setActionError(data.error || 'Task action failed');
+					return;
+				}
+
+				await fetchTaskDetail(taskId);
+				if (action === 'request-changes') {
+					setShowCommentInput(false);
+					setCommentText('');
+				}
+			} catch (error) {
+				setActionError(
+					error instanceof Error ? error.message : 'Task action failed',
+				);
+			} finally {
+				setActionLoading(null);
+			}
+		},
+		[commentText, fetchTaskDetail, taskId],
+	);
 
 	if (!tdStatus?.projectState?.enabled) {
 		return null;
@@ -113,33 +222,154 @@ export function TaskContextCard({worktreePath}: TaskContextCardProps) {
 		return null;
 	}
 
-	const StatusIcon = statusIcons[task.status] || Circle;
-
-	const handleOpenTask = () => {
-		setSelectedIssueId(task.id);
-	};
-
 	return (
 		<>
-			<button
-				onClick={handleOpenTask}
-				type="button"
-				className="flex w-full items-center gap-1.5 text-left group rounded-md p-1 -m-1 hover:bg-muted/40 transition-colors"
-				title={`Open task ${task.id}`}
-			>
-				<StatusIcon
-					className={cn('h-3 w-3 shrink-0', statusColors[task.status])}
-				/>
-				<span className="text-xs font-mono text-muted-foreground shrink-0">
-					{task.id}
-				</span>
-				<span className="text-xs truncate flex-1">{task.title}</span>
-				<span className={cn('text-xs shrink-0', priorityColors[task.priority])}>
-					{task.priority}
-				</span>
-			</button>
+			<section className="space-y-3 rounded-md border border-border bg-card/40 p-3">
+				<div className="flex items-center justify-between gap-2">
+					<div className="flex items-center gap-2 min-w-0">
+						<ListTodo className="h-4 w-4 shrink-0 text-muted-foreground" />
+						<span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+							TD
+						</span>
+					</div>
+					<span
+						className={cn(
+							'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs',
+							statusColors[task.status],
+						)}
+					>
+						<StatusIcon className="h-3 w-3 shrink-0" />
+						{task.status.replace('_', ' ')}
+					</span>
+				</div>
+
+				<div className="space-y-1 min-w-0">
+					<div className="flex items-center gap-2 min-w-0">
+						<span className="text-xs font-mono text-muted-foreground shrink-0">
+							{task.id}
+						</span>
+						<span className={cn('text-xs shrink-0', priorityColors[task.priority])}>
+							{task.priority}
+						</span>
+					</div>
+					<button
+						onClick={handleOpenTask}
+						type="button"
+						className="block w-full text-left text-sm font-medium hover:text-foreground/80 transition-colors"
+						title={`Open task ${task.id}`}
+					>
+						{task.title}
+					</button>
+				</div>
+
+				<div className="flex flex-wrap gap-2">
+					<Button
+						size="sm"
+						variant="outline"
+						className="h-7 text-xs"
+						onClick={handleOpenTask}
+					>
+						<ExternalLink className="mr-1.5 h-3 w-3" />
+						View task
+					</Button>
+
+					{workflowActions.includes('submit_review') && (
+						<Button
+							size="sm"
+							className="h-7 text-xs"
+							disabled={!!actionLoading}
+							onClick={() => runTaskAction('review')}
+						>
+							{actionLoading === 'review' ? (
+								<Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+							) : (
+								<Send className="mr-1.5 h-3 w-3" />
+							)}
+							Submit for review
+						</Button>
+					)}
+
+					{workflowActions.includes('approve') && (
+						<Button
+							size="sm"
+							className="h-7 text-xs"
+							disabled={!!actionLoading}
+							onClick={() => runTaskAction('approve')}
+						>
+							{actionLoading === 'approve' ? (
+								<Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+							) : (
+								<CheckCircle2 className="mr-1.5 h-3 w-3" />
+							)}
+							Approve
+						</Button>
+					)}
+
+					{workflowActions.includes('request_changes') && (
+						<Button
+							size="sm"
+							variant="outline"
+							className="h-7 text-xs"
+							disabled={!!actionLoading}
+							onClick={() => setShowCommentInput(open => !open)}
+						>
+							<RotateCcw className="mr-1.5 h-3 w-3" />
+							Request changes
+						</Button>
+					)}
+
+					{workflowActions.includes('unblock') && (
+						<Button
+							size="sm"
+							className="h-7 text-xs"
+							disabled={!!actionLoading}
+							onClick={() => runTaskAction('unblock')}
+						>
+							{actionLoading === 'unblock' ? (
+								<Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+							) : (
+								<RotateCcw className="mr-1.5 h-3 w-3" />
+							)}
+							Unblock
+						</Button>
+					)}
+				</div>
+
+				{showCommentInput && workflowActions.includes('request_changes') && (
+					<div className="space-y-2 rounded border border-border p-2">
+						<textarea
+							value={commentText}
+							onChange={event => setCommentText(event.target.value)}
+							placeholder="Describe what needs to change..."
+							className="min-h-20 w-full rounded border border-border bg-background px-2 py-1.5 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+						/>
+						<div className="flex justify-end">
+							<Button
+								size="sm"
+								variant="destructive"
+								className="h-6 text-xs"
+								disabled={!!actionLoading}
+								onClick={() => runTaskAction('request-changes')}
+							>
+								{actionLoading === 'request-changes' ? (
+									<Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+								) : null}
+								Send back
+							</Button>
+						</div>
+					</div>
+				)}
+
+				{actionError && (
+					<div className="text-xs text-destructive">{actionError}</div>
+				)}
+			</section>
 			{selectedIssueId && (
-				<TaskDetailModal issueId={selectedIssueId} onClose={closeModal} />
+				<TaskDetailModal
+					issueId={selectedIssueId}
+					onClose={closeModal}
+					onRefresh={() => fetchTaskDetail(selectedIssueId)}
+				/>
 			)}
 		</>
 	);

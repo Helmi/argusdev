@@ -3093,6 +3093,7 @@ export class APIServer {
 				}
 				project = {
 					...requestedProject,
+					isValid: requestedProject.isValid ?? true,
 					relativePath: requestedProject.path,
 				};
 			}
@@ -3459,6 +3460,33 @@ export class APIServer {
 					return reply
 						.code(500)
 						.send({error: `Failed to request changes: ${err}`});
+				}
+			},
+		);
+
+		// Unblock a blocked task
+		this.app.post<{Params: {id: string}}>(
+			'/api/td/issues/:id/unblock',
+			async (request, reply) => {
+				const {id} = request.params;
+				const {project} = resolveSelectedProjectTdContext();
+				if (!project) {
+					return reply.code(400).send({error: 'No project selected'});
+				}
+				if (!tdService.isAvailable()) {
+					return reply.code(400).send({error: 'TD not available'});
+				}
+
+				try {
+					execFileSync('td', ['unblock', id], {
+						encoding: 'utf-8',
+						timeout: 5000,
+						cwd: project.path,
+					});
+					return {success: true, message: `Task ${id} unblocked`};
+				} catch (err) {
+					logger.warn(`API: td unblock failed for ${id}: ${err}`);
+					return reply.code(500).send({error: `Failed to unblock: ${err}`});
 				}
 			},
 		);
