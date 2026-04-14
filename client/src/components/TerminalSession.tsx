@@ -20,12 +20,13 @@ import {
 	MoreVertical,
 	Copy,
 	Trash2,
-	Info,
 	GitBranch,
 	ArrowDown,
 	Pencil,
 	RotateCcw,
-	LayoutGrid,
+	ListTodo,
+	PanelRightOpen,
+	PanelRightClose,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {Session} from '@/lib/types';
@@ -787,24 +788,23 @@ export const TerminalSession = memo(function TerminalSession({
 							onClick={openTaskBoard}
 							title="Task board"
 						>
-							<LayoutGrid className="h-3 w-3" />
+							<ListTodo className="h-3 w-3" />
 						</Button>
 					)}
 
-					{/* Info button */}
+					{/* Context sidebar toggle */}
 					<Button
 						variant="ghost"
 						size="icon"
-						className={cn(
-							'h-5 w-5',
-							isContextOpen
-								? 'text-foreground'
-								: 'text-muted-foreground hover:text-foreground',
-						)}
+						className="h-5 w-5 text-muted-foreground hover:text-foreground"
 						onClick={() => toggleContextSidebar(session.id)}
-						title="Show session context"
+						title={isContextOpen ? 'Hide session context' : 'Show session context'}
 					>
-						<Info className="h-3 w-3" />
+						{isContextOpen ? (
+							<PanelRightClose className="h-3 w-3" />
+						) : (
+							<PanelRightOpen className="h-3 w-3" />
+						)}
 					</Button>
 
 					{/* Maximize/Minimize - hidden on mobile */}
