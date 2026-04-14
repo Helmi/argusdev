@@ -664,8 +664,12 @@ export function Sidebar() {
 					<div className="flex flex-col items-center gap-1 py-2">
 						{projects.map(project => {
 							const reviewCount = tdReviewCountsByProject[project.path] || 0;
+							const isInvalid = project.isValid === false;
 							return (
-								<div key={project.path} className="relative">
+								<div
+									key={project.path}
+									className="flex flex-col items-center gap-0.5"
+								>
 									<Button
 										variant="ghost"
 										size="icon"
@@ -675,9 +679,33 @@ export function Sidebar() {
 										<FolderGit2 className="h-3.5 w-3.5" />
 									</Button>
 									{reviewCount > 0 && (
-										<span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-purple-500 px-1 text-center text-xs font-medium text-white">
-											{reviewCount}
-										</span>
+										<button
+											type="button"
+											disabled={isInvalid}
+											onClick={async e => {
+												e.stopPropagation();
+												if (isInvalid) return;
+												const selected = await ensureProjectSelected(
+													project.path,
+												);
+												if (!selected) return;
+												openTaskBoard();
+											}}
+											className={cn(
+												'rounded-full bg-purple-500 px-1.5 py-0 text-xs font-medium text-white leading-4',
+												isInvalid
+													? 'opacity-50 cursor-not-allowed'
+													: 'hover:bg-purple-400 cursor-pointer',
+											)}
+											title={
+												isInvalid
+													? `Invalid project path: ${project.path}`
+													: `${reviewCount} task${reviewCount === 1 ? '' : 's'} in review — open board`
+											}
+											aria-label={`${reviewCount} task${reviewCount === 1 ? '' : 's'} in review for ${project.name}`}
+										>
+											Rev
+										</button>
 									)}
 								</div>
 							);
@@ -813,9 +841,33 @@ export function Sidebar() {
 												</span>
 											)}
 											{reviewCount > 0 && (
-												<span className="shrink-0 rounded-full bg-purple-500/15 px-1.5 py-0.5 text-xs font-medium text-purple-400">
-													{reviewCount}
-												</span>
+												<button
+													type="button"
+													disabled={isInvalid}
+													onClick={async e => {
+														e.stopPropagation();
+														if (isInvalid) return;
+														const selected = await ensureProjectSelected(
+															project.path,
+														);
+														if (!selected) return;
+														openTaskBoard();
+													}}
+													className={cn(
+														'shrink-0 rounded-full bg-purple-500/15 px-1.5 py-0.5 text-xs font-medium text-purple-400 transition-colors',
+														isInvalid
+															? 'opacity-50 cursor-not-allowed'
+															: 'hover:bg-purple-500/25 hover:text-purple-300',
+													)}
+													title={
+														isInvalid
+															? `Invalid project path: ${project.path}`
+															: `${reviewCount} task${reviewCount === 1 ? '' : 's'} in review — open board`
+													}
+													aria-label={`${reviewCount} task${reviewCount === 1 ? '' : 's'} in review — open board`}
+												>
+													Rev
+												</button>
 											)}
 											{isInvalid && (
 												<span
