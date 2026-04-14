@@ -909,15 +909,21 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const fetchTdBoard = useCallback(async () => {
 		try {
-			const res = await apiFetch('/api/td/board');
+			const projectPath = currentProject?.path;
+			if (!projectPath) return;
+			const res = await apiFetch(
+				`/api/td/board?projectPath=${encodeURIComponent(projectPath)}`,
+			);
 			if (res.ok) {
 				const data = await res.json();
-				setTdBoardView(data.board);
+				if ((data.projectPath || projectPath) === currentProjectRef.current?.path) {
+					setTdBoardView(data.board);
+				}
 			}
 		} catch (err) {
 			console.error('Failed to fetch td board:', err);
 		}
-	}, []);
+	}, [currentProject?.path]);
 
 	const openTaskBoard = useCallback(() => {
 		// Remember the active session so closing the board can return to it.

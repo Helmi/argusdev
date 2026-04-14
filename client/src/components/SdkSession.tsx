@@ -326,7 +326,7 @@ export const SdkSession = memo(
 								onClick={openTaskBoard}
 								title="Task board"
 							>
-								<ListTodo className="h-3 w-3" />
+								<ListTodo className="h-3.5 w-3.5" />
 							</Button>
 						)}
 
@@ -339,9 +339,9 @@ export const SdkSession = memo(
 							title={isContextOpen ? 'Hide session context' : 'Show session context'}
 						>
 							{isContextOpen ? (
-								<PanelRightClose className="h-3 w-3" />
+								<PanelRightClose className="h-3.5 w-3.5" />
 							) : (
-								<PanelRightOpen className="h-3 w-3" />
+								<PanelRightOpen className="h-3.5 w-3.5" />
 							)}
 						</Button>
 
@@ -354,9 +354,9 @@ export const SdkSession = memo(
 								onClick={() => setIsMaximized(!isMaximized)}
 							>
 								{isMaximized ? (
-									<Minimize2 className="h-3 w-3" />
+									<Minimize2 className="h-3.5 w-3.5" />
 								) : (
-									<Maximize2 className="h-3 w-3" />
+									<Maximize2 className="h-3.5 w-3.5" />
 								)}
 							</Button>
 						)}
@@ -369,7 +369,7 @@ export const SdkSession = memo(
 									size="icon"
 									className="h-5 w-5 text-muted-foreground hover:text-foreground"
 								>
-									<MoreVertical className="h-3 w-3" />
+									<MoreVertical className="h-3.5 w-3.5" />
 								</Button>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="end" className="text-xs">
@@ -398,7 +398,7 @@ export const SdkSession = memo(
 							className="h-5 w-5 text-muted-foreground hover:text-foreground"
 							onClick={() => onRemove(session.id)}
 						>
-							<X className="h-3 w-3" />
+							<X className="h-3.5 w-3.5" />
 						</Button>
 					</div>
 				</div>

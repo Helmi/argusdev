@@ -3148,11 +3148,36 @@ export class APIServer {
 		);
 
 		// TD board view (grouped by status)
-		this.app.get('/api/td/board', async (request, reply) => {
-			const {project, projectState} = resolveSelectedProjectTdContext();
-			if (!project || !projectState) {
+		this.app.get<{
+			Querystring: {projectPath?: string};
+		}>('/api/td/board', async (request, reply) => {
+			const requestedProjectPath = request.query.projectPath?.trim();
+			let project = coreService.getSelectedProject();
+			if (requestedProjectPath) {
+				const requestedProject =
+					projectManager.instance.getProject(requestedProjectPath);
+				if (!requestedProject) {
+					return reply.code(404).send({error: 'Project not found in registry'});
+				}
+				if (requestedProject.isValid === false) {
+					return reply
+						.code(400)
+						.send({error: 'Project path is invalid or no longer exists'});
+				}
+				project = projectManager.instance.toGitProject(requestedProject);
+			}
+			if (!project) {
 				return reply.code(400).send({error: 'No project selected'});
 			}
+
+			const projectConfig = loadProjectConfig(project.path);
+			const globalTdConfig = configurationManager.getTdConfig();
+			const tdEnabled =
+				projectConfig?.td?.enabled ?? globalTdConfig.enabled ?? true;
+			const rawProjectState = tdService.resolveProjectState(project.path);
+			const projectState = !tdEnabled
+				? {...rawProjectState, enabled: false}
+				: rawProjectState;
 
 			if (!projectState.enabled || !projectState.dbPath) {
 				return reply
@@ -3162,7 +3187,7 @@ export class APIServer {
 
 			const reader = new TdReader(projectState.dbPath);
 			try {
-				return {board: reader.getBoard()};
+				return {board: reader.getBoard(), projectPath: project.path};
 			} finally {
 				reader.close();
 			}
