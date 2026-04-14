@@ -69,6 +69,7 @@ describe('WorktreeService', () => {
 		});
 		// Default mock for getWorktreeHooks to return empty config
 		mockedGetWorktreeHooks.mockReturnValue({});
+		mockedExistsSync.mockReturnValue(true);
 		service = new WorktreeService('/fake/path');
 	});
 
@@ -596,7 +597,12 @@ branch refs/heads/feature-branch
 			});
 
 			mockedExistsSync.mockImplementation(p => {
-				return String(p) === path.join('/fake/path/feature-branch', '.claude');
+				const normalizedPath = String(p);
+				return (
+					normalizedPath === '/fake/path' ||
+					normalizedPath === '/fake/path/feature-branch' ||
+					normalizedPath === path.join('/fake/path/feature-branch', '.claude')
+				);
 			});
 
 			mockedStatSync.mockImplementation(
@@ -638,7 +644,11 @@ branch refs/heads/feature-branch
 				throw new Error('Command not mocked: ' + cmd);
 			});
 
-			mockedExistsSync.mockReturnValue(false);
+			mockedExistsSync.mockImplementation(
+				worktreePath =>
+					String(worktreePath) === '/fake/path' ||
+					String(worktreePath) === '/fake/path/feature-branch',
+			);
 
 			const effect = service.hasClaudeDirectoryInBranchEffect('feature-branch');
 			const result = await Effect.runPromise(effect);
@@ -855,6 +865,72 @@ branch refs/heads/main
 				isMainWorktree: false,
 			});
 			expect(result[1]).toMatchObject({
+				path: '/fake/path',
+				branch: 'main',
+				isMainWorktree: true,
+			});
+		});
+
+		it('should skip prunable worktrees from the visible list', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+prunable gitdir file points to non-existent location
+`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+
+			const effect = service.getWorktreesEffect();
+			const result = await Effect.runPromise(effect);
+
+			expect(result).toHaveLength(1);
+			expect(result[0]).toMatchObject({
+				path: '/fake/path',
+				branch: 'main',
+				isMainWorktree: true,
+			});
+		});
+
+		it('should skip missing worktree directories from the visible list', async () => {
+			mockedExecSync.mockImplementation((cmd, _options) => {
+				if (typeof cmd === 'string') {
+					if (cmd === 'git rev-parse --git-common-dir') {
+						return '/fake/path/.git\n';
+					}
+					if (cmd === 'git worktree list --porcelain') {
+						return `worktree /fake/path
+HEAD abcd1234
+branch refs/heads/main
+
+worktree /fake/path/feature
+HEAD efgh5678
+branch refs/heads/feature
+`;
+					}
+				}
+				throw new Error('Command not mocked: ' + cmd);
+			});
+			mockedExistsSync.mockImplementation(
+				worktreePath => String(worktreePath) !== '/fake/path/feature',
+			);
+
+			const effect = service.getWorktreesEffect();
+			const result = await Effect.runPromise(effect);
+
+			expect(result).toHaveLength(1);
+			expect(result[0]).toMatchObject({
 				path: '/fake/path',
 				branch: 'main',
 				isMainWorktree: true,
