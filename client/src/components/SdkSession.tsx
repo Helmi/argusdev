@@ -283,6 +283,7 @@ export const SdkSession = memo(
 						'flex h-8 items-center justify-between border-b border-border bg-card px-2',
 						isFocused && 'bg-primary/10',
 					)}
+					onClick={e => e.stopPropagation()}
 				>
 					<div className="flex items-center gap-2 text-xs min-w-0">
 						<StatusIndicator status={mapSessionState(state)} />
