@@ -17,6 +17,12 @@ interface ReconcileOutput {
 	dismissedIds: string[];
 }
 
+interface ReconcileProjectReviewStateInput {
+	previousNotifications: TdReviewNotification[];
+	dismissedIds: string[];
+	reviewIssueIds: string[];
+}
+
 export function mergeIncomingReviewNotifications(
 	previous: TdReviewNotification[],
 	incoming: TdReviewNotification[],
@@ -41,25 +47,49 @@ export function reconcileReviewNotifications({
 	);
 	const reviewReadyIds = new Set(reviewReadyIssues.map(issue => issue.id));
 	const nextDismissedIds = dismissedIds.filter(id => reviewReadyIds.has(id));
-
 	const retained = previousNotifications.filter(notification =>
 		reviewReadyIds.has(notification.id),
 	);
-	const existingIds = new Set(retained.map(notification => notification.id));
-	const additions = reviewReadyIssues
-		.filter(
-			issue =>
-				!existingIds.has(issue.id) && !nextDismissedIds.includes(issue.id),
-		)
-		.map(issue => ({
-			id: issue.id,
-			title: issue.title,
-			priority: issue.priority,
-		}));
+	const notifications =
+		retained.length === previousNotifications.length &&
+		retained.every((notification, index) => notification === previousNotifications[index])
+			? previousNotifications
+			: retained;
+	const nextDismissed =
+		nextDismissedIds.length === dismissedIds.length &&
+		nextDismissedIds.every((id, index) => id === dismissedIds[index])
+			? dismissedIds
+			: nextDismissedIds;
 
 	return {
-		notifications:
-			additions.length > 0 ? [...retained, ...additions] : retained,
-		dismissedIds: nextDismissedIds,
+		notifications,
+		dismissedIds: nextDismissed,
+	};
+}
+
+export function reconcileProjectReviewState({
+	previousNotifications,
+	dismissedIds,
+	reviewIssueIds,
+}: ReconcileProjectReviewStateInput): ReconcileOutput {
+	const reviewReadyIds = new Set(reviewIssueIds);
+	const nextDismissedIds = dismissedIds.filter(id => reviewReadyIds.has(id));
+	const retained = previousNotifications.filter(notification =>
+		reviewReadyIds.has(notification.id),
+	);
+	const notifications =
+		retained.length === previousNotifications.length &&
+		retained.every((notification, index) => notification === previousNotifications[index])
+			? previousNotifications
+			: retained;
+	const nextDismissed =
+		nextDismissedIds.length === dismissedIds.length &&
+		nextDismissedIds.every((id, index) => id === dismissedIds[index])
+			? dismissedIds
+			: nextDismissedIds;
+
+	return {
+		notifications,
+		dismissedIds: nextDismissed,
 	};
 }

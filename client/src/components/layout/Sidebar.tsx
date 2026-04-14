@@ -115,6 +115,7 @@ export function Sidebar() {
 		selectedSessions,
 		sidebarOpen,
 		sidebarCollapsed,
+		tdReviewCountsByProject,
 		expandSidebar,
 		toggleSidebar,
 		selectSession,
@@ -661,17 +662,26 @@ export function Sidebar() {
 				</Button>
 				<ScrollArea className="flex-1">
 					<div className="flex flex-col items-center gap-1 py-2">
-						{projects.map(project => (
-							<Button
-								key={project.path}
-								variant="ghost"
-								size="icon"
-								className="h-7 w-7"
-								title={project.name}
-							>
-								<FolderGit2 className="h-3.5 w-3.5" />
-							</Button>
-						))}
+						{projects.map(project => {
+							const reviewCount = tdReviewCountsByProject[project.path] || 0;
+							return (
+								<div key={project.path} className="relative">
+									<Button
+										variant="ghost"
+										size="icon"
+										className="h-7 w-7"
+										title={project.name}
+									>
+										<FolderGit2 className="h-3.5 w-3.5" />
+									</Button>
+									{reviewCount > 0 && (
+										<span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-purple-500 px-1 text-center text-xs font-medium text-white">
+											{reviewCount}
+										</span>
+									)}
+								</div>
+							);
+						})}
 					</div>
 				</ScrollArea>
 			</aside>
@@ -751,15 +761,16 @@ export function Sidebar() {
 				<div className="py-1">
 					{(() => {
 						const projectList = filteredData.projects.map((project, projectIndex) => {
-						const projectWorktrees = getWorktreesForProject(project.path);
-						const isCurrentProject = currentProject?.path === project.path;
-						const isInvalid = project.isValid === false;
+							const projectWorktrees = getWorktreesForProject(project.path);
+							const isCurrentProject = currentProject?.path === project.path;
+							const isInvalid = project.isValid === false;
+							const reviewCount = tdReviewCountsByProject[project.path] || 0;
 
-						const renderProject = (sortableProps?: SortableProps) => (
-							<div
-								key={project.path}
-								className={cn(projectIndex > 0 && 'mt-2')}
-							>
+							const renderProject = (sortableProps?: SortableProps) => (
+								<div
+									key={project.path}
+									className={cn(projectIndex > 0 && 'mt-2')}
+								>
 								{/* Project header - prominent separator */}
 								<ContextMenu>
 									<ContextMenuTrigger asChild>
@@ -799,6 +810,11 @@ export function Sidebar() {
 											) : (
 												<span className="truncate font-medium flex-1 text-left">
 													{project.name}
+												</span>
+											)}
+											{reviewCount > 0 && (
+												<span className="shrink-0 rounded-full bg-purple-500/15 px-1.5 py-0.5 text-xs font-medium text-purple-400">
+													{reviewCount}
 												</span>
 											)}
 											{isInvalid && (
