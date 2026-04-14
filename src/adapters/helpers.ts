@@ -23,6 +23,17 @@ export function safeReadJsonLines(filePath: string): unknown[] {
 	}
 }
 
+export function safeReadLines(filePath: string): string[] {
+	try {
+		return readFileSync(filePath, 'utf8')
+			.split('\n')
+			.map(line => line.trim())
+			.filter(Boolean);
+	} catch {
+		return [];
+	}
+}
+
 export function safeReadJsonFile(filePath: string): unknown {
 	try {
 		return JSON.parse(readFileSync(filePath, 'utf8'));

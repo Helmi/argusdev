@@ -23,12 +23,13 @@ interface CodexLine extends Record<string, unknown> {
 	timestamp?: unknown;
 	session_meta?: Record<string, unknown>;
 	response_item?: Record<string, unknown>;
+	payload?: Record<string, unknown>;
 }
 
-function extractToolCallsFromResponse(
-	responseItem: Record<string, unknown>,
+function extractToolCallsFromMessage(
+	messageRecord: Record<string, unknown>,
 ): ToolCallData[] {
-	const toolCalls = responseItem['tool_calls'];
+	const toolCalls = messageRecord['tool_calls'];
 	if (!Array.isArray(toolCalls)) return [];
 
 	return toolCalls
@@ -57,6 +58,25 @@ function extractToolCallsFromResponse(
 		.filter(Boolean) as ToolCallData[];
 }
 
+function extractFunctionCall(
+	payload: Record<string, unknown>,
+): ToolCallData | null {
+	const name = typeof payload['name'] === 'string' ? payload['name'] : null;
+	if (!name) return null;
+
+	return {
+		name,
+		input:
+			payload['arguments'] === undefined
+				? undefined
+				: extractString(payload['arguments']),
+		output:
+			payload['output'] === undefined
+				? undefined
+				: extractString(payload['output']),
+	};
+}
+
 function extractThinkingBlocks(
 	responseItem: Record<string, unknown>,
 ): ThinkingBlockData[] {
@@ -81,6 +101,44 @@ function extractThinkingBlocks(
 			tokenCount,
 		},
 	];
+}
+
+function extractReasoningSummary(
+	payload: Record<string, unknown>,
+): string {
+	const summary = payload['summary'];
+	if (!Array.isArray(summary)) {
+		return '';
+	}
+
+	return summary
+		.map(item => extractString(item))
+		.filter(Boolean)
+		.join('\n')
+		.trim();
+}
+
+function getCodexPayload(row: CodexLine): Record<string, unknown> | null {
+	if (row.payload && typeof row.payload === 'object') {
+		return row.payload;
+	}
+	if (row.response_item && typeof row.response_item === 'object') {
+		return row.response_item;
+	}
+	if (row.session_meta && typeof row.session_meta === 'object') {
+		return row.session_meta;
+	}
+	return null;
+}
+
+function getCodexSessionMeta(row: CodexLine): Record<string, unknown> | null {
+	if (row.type === 'session_meta' && row.payload && typeof row.payload === 'object') {
+		return row.payload;
+	}
+	if (row.session_meta && typeof row.session_meta === 'object') {
+		return row.session_meta;
+	}
+	return null;
 }
 
 export class CodexAdapter extends BaseAgentAdapter {
@@ -113,7 +171,7 @@ export class CodexAdapter extends BaseAgentAdapter {
 		for (const candidate of candidates) {
 			const sample = safeReadJsonLines(candidate).slice(0, 40) as CodexLine[];
 			for (const row of sample) {
-				const sessionMeta = row.session_meta;
+				const sessionMeta = getCodexSessionMeta(row);
 				if (sessionMeta && typeof sessionMeta === 'object') {
 					const cwd = sessionMeta['cwd'];
 					if (
@@ -143,47 +201,71 @@ export class CodexAdapter extends BaseAgentAdapter {
 		const messages: ConversationMessage[] = [];
 
 		rows.forEach((row, index) => {
-			const responseItem =
-				row.response_item && typeof row.response_item === 'object'
-					? row.response_item
-					: null;
-			const rawRole = responseItem?.['role'] || row.role || row.type;
+			const payload = getCodexPayload(row);
+			const payloadType =
+				typeof payload?.['type'] === 'string'
+					? payload['type']
+					: typeof row.type === 'string'
+						? row.type
+						: undefined;
+			const rawRole = payload?.['role'] || row.role || payloadType || row.type;
 			const role = normalizeRole(rawRole);
 			const content = extractString(
-				responseItem?.['content'] ||
-					responseItem?.['message'] ||
-					row['content'],
+				payload?.['content'] || payload?.['message'] || row['content'],
 			);
 			const timestamp = normalizeTimestamp(
 				row.timestamp ||
-					responseItem?.['timestamp'] ||
-					responseItem?.['created_at'],
+					payload?.['timestamp'] ||
+					payload?.['created_at'],
 			);
 
-			const toolCalls = responseItem
-				? extractToolCallsFromResponse(responseItem)
+			const toolCalls =
+				payloadType === 'function_call'
+					? (() => {
+							const toolCall = payload ? extractFunctionCall(payload) : null;
+							return toolCall ? [toolCall] : [];
+						})()
+					: payload
+						? extractToolCallsFromMessage(payload)
+						: [];
+			const thinkingBlocks = payload
+				? extractThinkingBlocks(payload)
 				: [];
-			const thinkingBlocks = responseItem
-				? extractThinkingBlocks(responseItem)
-				: [];
+			const reasoningSummary =
+				payloadType === 'reasoning' && payload ? extractReasoningSummary(payload) : '';
+			const output =
+				payloadType === 'function_call_output'
+					? extractString(payload?.['output'])
+					: undefined;
+			const finalContent = content || reasoningSummary || output || '';
+			const allThinkingBlocks =
+				payloadType === 'reasoning' && reasoningSummary
+					? [...thinkingBlocks, {content: reasoningSummary}]
+					: thinkingBlocks;
 
-			if (!content && toolCalls.length === 0 && thinkingBlocks.length === 0) {
+			if (!finalContent && toolCalls.length === 0 && allThinkingBlocks.length === 0) {
 				return;
 			}
 
 			messages.push({
 				id: `codex-${index}`,
-				role,
+				role:
+					payloadType === 'function_call_output'
+						? 'tool'
+						: payloadType === 'function_call'
+							? 'assistant'
+							: role,
 				timestamp,
-				content,
-				preview: buildPreview(content || '[tool activity]'),
+				content: finalContent,
+				preview: buildPreview(finalContent || '[tool activity]'),
 				model:
-					typeof responseItem?.['model'] === 'string'
-						? responseItem['model']
+					typeof payload?.['model'] === 'string'
+						? payload['model']
 						: undefined,
 				toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-				thinkingBlocks: thinkingBlocks.length > 0 ? thinkingBlocks : undefined,
-				rawType: typeof row.type === 'string' ? row.type : undefined,
+				thinkingBlocks:
+					allThinkingBlocks.length > 0 ? allThinkingBlocks : undefined,
+				rawType: payloadType,
 			});
 		});
 
@@ -208,13 +290,16 @@ export class CodexAdapter extends BaseAgentAdapter {
 		let options: Record<string, unknown> | undefined;
 
 		for (const row of rows) {
-			if (row.session_meta && typeof row.session_meta === 'object') {
-				const sessionMeta = row.session_meta as Record<string, unknown>;
+			const sessionMeta = getCodexSessionMeta(row);
+			if (sessionMeta && typeof sessionMeta === 'object') {
 				if (typeof sessionMeta['model'] === 'string') {
 					model = sessionMeta['model'];
 				}
 				if (typeof sessionMeta['session_id'] === 'string') {
 					sessionId = sessionMeta['session_id'];
+				}
+				if (typeof sessionMeta['id'] === 'string') {
+					sessionId = sessionMeta['id'];
 				}
 				options = sessionMeta;
 			}
@@ -251,10 +336,7 @@ export class CodexAdapter extends BaseAgentAdapter {
 		const discovered = new Set<string>();
 
 		for (const row of rows) {
-			const responseItem =
-				row['response_item'] && typeof row['response_item'] === 'object'
-					? (row['response_item'] as Record<string, unknown>)
-					: null;
+			const responseItem = getCodexPayload(row);
 			const keys = [
 				'subagent_session_id',
 				'subagentSessionId',
