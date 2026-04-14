@@ -1663,27 +1663,18 @@ export class APIServer {
 				try {
 					validatedWorktreePath = validateWorktreePath(worktreePath);
 				} catch (_error) {
-					logger.warn(
-						`Invalid worktree path requested: ${worktreePath}`,
-					);
-					return reply
-						.code(400)
-						.send({error: 'Invalid worktree path'});
+					logger.warn(`Invalid worktree path requested: ${worktreePath}`);
+					return reply.code(400).send({error: 'Invalid worktree path'});
 				}
 
 				// Validate file path doesn't escape worktree
 				try {
-					fullPath = validatePathWithinBase(
-						validatedWorktreePath,
-						filePath,
-					);
+					fullPath = validatePathWithinBase(validatedWorktreePath, filePath);
 				} catch (_error) {
 					logger.warn(
 						`Path traversal attempt blocked: ${filePath} in ${worktreePath}`,
 					);
-					return reply
-						.code(400)
-						.send({error: 'Invalid file path'});
+					return reply.code(400).send({error: 'Invalid file path'});
 				}
 			}
 
@@ -3091,10 +3082,7 @@ export class APIServer {
 						.code(400)
 						.send({error: 'Project path is invalid or no longer exists'});
 				}
-				project = {
-					...requestedProject,
-					relativePath: requestedProject.path,
-				};
+				project = projectManager.instance.toGitProject(requestedProject);
 			}
 
 			const projectConfig = project ? loadProjectConfig(project.path) : null;
@@ -4233,14 +4221,19 @@ export class APIServer {
 	 * Forwards change events to connected clients via socket.io.
 	 */
 	private setupFileWatchers(): void {
+		const syncWatchedProjects = (): void => {
+			const projectPaths = projectManager
+				.getProjects()
+				.filter(project => project.isValid !== false)
+				.map(project => project.path);
+			fileWatcherService.updateWatchedProjects(projectPaths);
+		};
+
 		// Start watching projects.json global file
 		fileWatcherService.startWatchingProjects();
 
-		// Start watching the currently selected project's worktrees
-		const selectedProject = coreService.getSelectedProject();
-		if (selectedProject) {
-			fileWatcherService.startWatchingWorktrees(selectedProject.path);
-		}
+		// Keep all tracked projects eventually consistent, not only the selected one.
+		syncWatchedProjects();
 
 		// Forward worktrees_changed events to clients
 		fileWatcherService.on('worktrees_changed', (projectPath: string) => {
@@ -4264,14 +4257,13 @@ export class APIServer {
 
 			// Reload projects from disk
 			projectManager.loadProjects();
+			syncWatchedProjects();
 
 			this.io?.emit('projects_changed');
 		});
 
-		// Update watchers on project switch
-		coreService.on('projectSelected', project => {
-			fileWatcherService.updateWatchedProjects(project ? [project.path] : []);
-		});
+		coreService.on('projectAdded', syncWatchedProjects);
+		coreService.on('projectRemoved', syncWatchedProjects);
 	}
 
 	/**

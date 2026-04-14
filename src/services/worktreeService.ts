@@ -737,13 +737,13 @@ export class WorktreeService {
 					const parseWorktree = (
 						lines: string[],
 						startIndex: number,
-					): [Worktree | null, number] => {
+					): [(Worktree & {isPrunable?: boolean}) | null, number] => {
 						const worktreeLine = lines[startIndex];
 						if (!worktreeLine?.startsWith('worktree ')) {
 							return [null, startIndex];
 						}
 
-						const worktree: Worktree = {
+						const worktree: Worktree & {isPrunable?: boolean} = {
 							path: worktreeLine.substring(9),
 							isMainWorktree: false,
 							hasSession: false,
@@ -761,6 +761,8 @@ export class WorktreeService {
 								worktree.branch = branch.startsWith('refs/heads/')
 									? branch.substring(11)
 									: branch;
+							} else if (line?.startsWith('prunable')) {
+								worktree.isPrunable = true;
 							} else if (line === 'bare') {
 								worktree.isMainWorktree = true;
 							}
@@ -773,7 +775,7 @@ export class WorktreeService {
 					let index = 0;
 					while (index < lines.length) {
 						const [worktree, nextIndex] = parseWorktree(lines, index);
-						if (worktree) {
+						if (worktree && !worktree.isPrunable && existsSync(worktree.path)) {
 							worktrees.push(worktree);
 						}
 						index = nextIndex > index ? nextIndex : index + 1;

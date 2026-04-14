@@ -1,3 +1,4 @@
+import {execSync} from 'child_process';
 import {watch, FSWatcher, existsSync} from 'fs';
 import path from 'path';
 import {logger} from '../utils/logger.js';
@@ -12,10 +13,10 @@ export interface FileWatcherEvents {
 
 // .git/ files whose changes indicate the working tree status changed
 const GIT_STATUS_FILES = new Set([
-	'index',        // staging area changed
-	'HEAD',         // commit or branch switch
-	'MERGE_HEAD',   // merge in progress
-	'REVERT_HEAD',  // revert in progress
+	'index', // staging area changed
+	'HEAD', // commit or branch switch
+	'MERGE_HEAD', // merge in progress
+	'REVERT_HEAD', // revert in progress
 	'CHERRY_PICK_HEAD',
 ]);
 
@@ -30,9 +31,13 @@ const GIT_STATUS_FILES = new Set([
  */
 class FileWatcherService extends EventEmitter {
 	private worktreeWatchers: Map<string, FSWatcher> = new Map();
+	private worktreeSnapshots: Map<string, string> = new Map();
 	private projectsWatcher: FSWatcher | null = null;
+	private reconciliationPoller: NodeJS.Timeout | null = null;
 	private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
 	private readonly debounceMs = 500;
+	private readonly reconciliationIntervalMs = 5000;
+	private readonly gitTimeoutMs = 2000;
 
 	constructor() {
 		super();
@@ -65,6 +70,11 @@ class FileWatcherService extends EventEmitter {
 		// The worktrees directory may not exist yet (no linked worktrees)
 		// Watch the parent .git directory with recursive: false, then filter
 		try {
+			const snapshot = this.readWorktreeSnapshot(normalizedPath);
+			if (snapshot !== null) {
+				this.worktreeSnapshots.set(normalizedPath, snapshot);
+			}
+
 			// We watch the .git directory and filter for worktrees changes
 			// This handles the case where worktrees/ doesn't exist yet
 			const watcher = watch(
@@ -72,9 +82,12 @@ class FileWatcherService extends EventEmitter {
 				{recursive: false, persistent: true},
 				(eventType, filename) => {
 					if (filename === 'worktrees' || filename?.startsWith('worktrees/')) {
-						this.debouncedEmit('worktrees_changed', normalizedPath);
+						this.debouncedReconcileWorktrees(normalizedPath);
 					}
-					if (filename && (GIT_STATUS_FILES.has(filename) || filename.startsWith('refs/'))) {
+					if (
+						filename &&
+						(GIT_STATUS_FILES.has(filename) || filename.startsWith('refs/'))
+					) {
 						this.debouncedEmit('git_status_changed', normalizedPath);
 					}
 				},
@@ -85,6 +98,7 @@ class FileWatcherService extends EventEmitter {
 			});
 
 			this.worktreeWatchers.set(normalizedPath, watcher);
+			this.startReconciliationPoller();
 			logger.info(
 				`[FileWatcher] Started watching worktrees for ${normalizedPath}`,
 			);
@@ -106,8 +120,13 @@ class FileWatcherService extends EventEmitter {
 		if (watcher) {
 			watcher.close();
 			this.worktreeWatchers.delete(normalizedPath);
+			this.worktreeSnapshots.delete(normalizedPath);
 			this.clearDebounceTimer(`worktrees_changed:${normalizedPath}`);
 			this.clearDebounceTimer(`git_status_changed:${normalizedPath}`);
+			this.clearDebounceTimer(`reconcile_worktrees:${normalizedPath}`);
+			if (this.worktreeWatchers.size === 0) {
+				this.stopReconciliationPoller();
+			}
 			logger.info(
 				`[FileWatcher] Stopped watching worktrees for ${normalizedPath}`,
 			);
@@ -194,6 +213,8 @@ class FileWatcherService extends EventEmitter {
 		for (const [projectPath] of this.worktreeWatchers) {
 			this.stopWatchingWorktrees(projectPath);
 		}
+		this.stopReconciliationPoller();
+		this.worktreeSnapshots.clear();
 
 		// Clear all timers
 		for (const timer of this.debounceTimers.values()) {
@@ -255,6 +276,109 @@ class FileWatcherService extends EventEmitter {
 			clearTimeout(timer);
 			this.debounceTimers.delete(key);
 		}
+	}
+
+	private debouncedReconcileWorktrees(projectPath: string): void {
+		const timerKey = `reconcile_worktrees:${projectPath}`;
+		this.clearDebounceTimer(timerKey);
+
+		const timer = setTimeout(() => {
+			this.debounceTimers.delete(timerKey);
+			this.reconcileWorktrees(projectPath);
+		}, this.debounceMs);
+
+		this.debounceTimers.set(timerKey, timer);
+	}
+
+	private startReconciliationPoller(): void {
+		if (this.reconciliationPoller) {
+			return;
+		}
+
+		this.reconciliationPoller = setInterval(() => {
+			for (const projectPath of this.worktreeWatchers.keys()) {
+				this.reconcileWorktrees(projectPath);
+			}
+		}, this.reconciliationIntervalMs);
+	}
+
+	private stopReconciliationPoller(): void {
+		if (!this.reconciliationPoller) {
+			return;
+		}
+
+		clearInterval(this.reconciliationPoller);
+		this.reconciliationPoller = null;
+	}
+
+	private reconcileWorktrees(projectPath: string): void {
+		const snapshot = this.readWorktreeSnapshot(projectPath);
+		if (snapshot === null) {
+			return;
+		}
+
+		const previous = this.worktreeSnapshots.get(projectPath);
+		this.worktreeSnapshots.set(projectPath, snapshot);
+
+		if (previous === undefined || previous === snapshot) {
+			return;
+		}
+
+		this.emit('worktrees_changed', projectPath);
+	}
+
+	private readWorktreeSnapshot(projectPath: string): string | null {
+		try {
+			const output = execSync('git worktree list --porcelain', {
+				cwd: projectPath,
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'pipe'],
+				timeout: this.gitTimeoutMs,
+			});
+			const paths = this.parseVisibleWorktreePaths(output);
+			return paths.sort().join('\n');
+		} catch (error) {
+			logger.debug(
+				`[FileWatcher] Failed to reconcile worktrees for ${projectPath}: ${String(error)}`,
+			);
+			return null;
+		}
+	}
+
+	private parseVisibleWorktreePaths(output: string): string[] {
+		const paths: string[] = [];
+		let currentPath: string | null = null;
+		let isPrunable = false;
+
+		const flush = (): void => {
+			if (!currentPath) {
+				return;
+			}
+
+			const resolvedPath = path.resolve(currentPath);
+			if (!isPrunable && existsSync(resolvedPath)) {
+				paths.push(resolvedPath);
+			}
+
+			currentPath = null;
+			isPrunable = false;
+		};
+
+		for (const rawLine of output.split('\n')) {
+			const line = rawLine.replace(/\r$/, '');
+			if (line.startsWith('worktree ')) {
+				flush();
+				currentPath = line.substring(9);
+				continue;
+			}
+
+			if (line.startsWith('prunable')) {
+				isPrunable = true;
+			}
+		}
+
+		flush();
+		return paths;
 	}
 }
 
