@@ -17,6 +17,8 @@ const mockGetAllActiveSessions = vi.fn<() => unknown[]>(() => []);
 const mockExecFileSync = vi.fn();
 const mockLoadPromptTemplatesByScope = vi.fn();
 const mockTdReaderGetIssueWithDetails = vi.fn();
+const mockTdReaderListIssues = vi.fn(() => []);
+const mockTdReaderClose = vi.fn();
 const mockCreateWorktreeEffect = vi.fn();
 const mockSessionStoreQuerySessions = vi.fn<() => unknown[]>(() => []);
 const mockSessionStoreGetSessionById = vi.fn<() => unknown | null>(() => null);
@@ -102,6 +104,11 @@ vi.mock('./projectManager.js', () => ({
 	projectManager: {
 		getProjects: vi.fn(() => [{path: '/repo', name: 'Repo'}]),
 		instance: {
+			getProject: vi.fn((projectPath: string) => ({
+				path: projectPath,
+				name: projectPath.split('/').pop() || 'Repo',
+				isValid: true,
+			})),
 			addTaskListName: vi.fn(),
 			getTaskListNames: vi.fn(() => []),
 			removeTaskListName: vi.fn(() => true),
@@ -178,10 +185,10 @@ vi.mock('./tdService.js', () => ({
 }));
 
 vi.mock('./tdReader.js', () => ({
-	TdReader: vi.fn().mockImplementation(() => ({
+	TdReader: vi.fn().mockImplementation((dbPath: string) => ({
 		getIssueWithDetails: mockTdReaderGetIssueWithDetails,
-		listIssues: vi.fn(() => []),
-		close: vi.fn(),
+		listIssues: vi.fn((query?: unknown) => mockTdReaderListIssues(dbPath, query)),
+		close: vi.fn(() => mockTdReaderClose(dbPath)),
 	})),
 }));
 
@@ -312,6 +319,9 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		mockGetAllActiveSessions.mockReset();
 		mockGetAllActiveSessions.mockReturnValue([]);
 		mockTdReaderGetIssueWithDetails.mockReset();
+		mockTdReaderListIssues.mockReset();
+		mockTdReaderListIssues.mockReturnValue([]);
+		mockTdReaderClose.mockReset();
 		mockCreateWorktreeEffect.mockReset();
 		mockSessionStoreQuerySessions.mockReset();
 		mockSessionStoreGetSessionById.mockReset();
@@ -2148,5 +2158,261 @@ describe('APIServer TD issues.db watcher', () => {
 		expect(mockEmit).not.toHaveBeenCalled();
 		expect(mockWatcher.close).toHaveBeenCalled();
 		vi.useRealTimers();
+	});
+});
+
+describe('APIServer TD review polling', () => {
+	let apiServer: import('./apiServer.js').APIServer;
+	let setTimeoutSpy: {mockRestore: () => void};
+	let setIntervalSpy: {mockRestore: () => void};
+	let initialPoll: (() => void) | undefined;
+	let intervalPoll: (() => void) | undefined;
+
+	beforeEach(async () => {
+		vi.clearAllMocks();
+		vi.resetModules();
+
+		const timeoutCallbacks: Array<{callback: () => void; delay?: number}> = [];
+		const intervalCallbacks: Array<{callback: () => void; delay?: number}> = [];
+		setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation(((
+			callback: () => void,
+			delay?: number,
+		) => {
+			timeoutCallbacks.push({callback, delay});
+			return 1 as unknown as ReturnType<typeof setTimeout>;
+		}) as typeof setTimeout);
+		setIntervalSpy = vi.spyOn(global, 'setInterval').mockImplementation(((
+			callback: () => void,
+			delay?: number,
+		) => {
+			intervalCallbacks.push({callback, delay});
+			return 1 as unknown as ReturnType<typeof setInterval>;
+		}) as typeof setInterval);
+
+		const {projectManager: mockedProjectManager} =
+			await import('./projectManager.js');
+		const {tdService: mockedTdService} = await import('./tdService.js');
+		const projectConfig = await import('../utils/projectConfig.js');
+
+		mockedProjectManager.getProjects = vi.fn(() => [
+			{path: '/repo-a', name: 'Repo A'},
+			{path: '/repo-b', name: 'Repo B'},
+		]);
+		mockedTdService.resolveProjectState = vi.fn((projectPath: string) => ({
+			enabled: true,
+			initialized: true,
+			binaryAvailable: true,
+			todosDir: `${projectPath}/.todos`,
+			dbPath: `${projectPath}/.todos/issues.db`,
+			tdRoot: projectPath,
+		}));
+		vi.mocked(projectConfig.loadProjectConfig).mockImplementation(() => ({
+			td: {enabled: true, autoStart: true},
+		}));
+
+		const apiServerModule = await import('./apiServer.js');
+		apiServer = apiServerModule.apiServer;
+		const apiServerInternal = apiServer as unknown as {
+			setupPromise: Promise<void>;
+		};
+		await apiServerInternal.setupPromise;
+
+		initialPoll = timeoutCallbacks.find(item => item.delay === 5000)?.callback;
+		intervalPoll = intervalCallbacks.find(item => item.delay === 30000)?.callback;
+	});
+
+	afterEach(() => {
+		setTimeoutSpy.mockRestore();
+		setIntervalSpy.mockRestore();
+	});
+
+	it('seeds per-project review state without emitting existing reviews as new', () => {
+		const mockEmit = vi.fn();
+		const internal = apiServer as unknown as {
+			io: {emit: ReturnType<typeof vi.fn>} | undefined;
+		};
+		internal.io = {emit: mockEmit};
+
+		mockTdReaderListIssues.mockImplementation((dbPath: string) => {
+			if (dbPath.includes('/repo-a/')) {
+				return [
+					{id: 'td-a1', title: 'Repo A review', priority: 'P1', status: 'in_review'},
+				];
+			}
+			return [
+				{id: 'td-b1', title: 'Repo B review', priority: 'P2', status: 'in_review'},
+				{id: 'td-b2', title: 'Repo B follow-up', priority: 'P0', status: 'in_review'},
+			];
+		});
+
+		initialPoll?.();
+
+		expect(mockEmit).toHaveBeenCalledWith('td_review_changed', {
+			projectPath: '/repo-a',
+			count: 1,
+			reviewIssueIds: ['td-a1'],
+			newIssueIds: [],
+			newIssues: [],
+		});
+		expect(mockEmit).toHaveBeenCalledWith('td_review_changed', {
+			projectPath: '/repo-b',
+			count: 2,
+			reviewIssueIds: ['td-b1', 'td-b2'],
+			newIssueIds: [],
+			newIssues: [],
+		});
+	});
+
+	it('emits per-project count changes and only new review ids on later polls', () => {
+		const mockEmit = vi.fn();
+		const internal = apiServer as unknown as {
+			io: {emit: ReturnType<typeof vi.fn>} | undefined;
+		};
+		internal.io = {emit: mockEmit};
+
+		let phase: 'initial' | 'updated' = 'initial';
+		mockTdReaderListIssues.mockImplementation((dbPath: string) => {
+			if (phase === 'initial') {
+				if (dbPath.includes('/repo-a/')) {
+					return [
+						{id: 'td-a1', title: 'Repo A review', priority: 'P1', status: 'in_review'},
+					];
+				}
+				return [
+					{id: 'td-b1', title: 'Repo B review', priority: 'P2', status: 'in_review'},
+				];
+			}
+
+			if (dbPath.includes('/repo-a/')) {
+				return [
+					{id: 'td-a1', title: 'Repo A review', priority: 'P1', status: 'in_review'},
+					{id: 'td-a2', title: 'Repo A new review', priority: 'P0', status: 'in_review'},
+				];
+			}
+			return [];
+		});
+
+		initialPoll?.();
+		mockEmit.mockClear();
+
+		phase = 'updated';
+		intervalPoll?.();
+
+		expect(mockEmit).toHaveBeenCalledWith('td_review_changed', {
+			projectPath: '/repo-a',
+			count: 2,
+			reviewIssueIds: ['td-a1', 'td-a2'],
+			newIssueIds: ['td-a2'],
+			newIssues: [
+				{id: 'td-a2', title: 'Repo A new review', priority: 'P0'},
+			],
+		});
+		expect(mockEmit).toHaveBeenCalledWith('td_review_changed', {
+			projectPath: '/repo-b',
+			count: 0,
+			reviewIssueIds: [],
+			newIssueIds: [],
+			newIssues: [],
+		});
+	});
+});
+
+describe('APIServer TD project review metadata', () => {
+	let apiServer: {
+		setupPromise: Promise<void>;
+		app: {
+			inject: (request: {
+				method: string;
+				url: string;
+				headers?: Record<string, string>;
+			}) => Promise<{statusCode: number; json: () => unknown}>;
+			close: () => Promise<void>;
+		};
+	};
+
+	beforeEach(async () => {
+		vi.clearAllMocks();
+		vi.resetModules();
+
+		const {projectManager: mockedProjectManager} =
+			await import('./projectManager.js');
+		const {coreService: mockedCoreService} = await import('./coreService.js');
+		const {tdService: mockedTdService} = await import('./tdService.js');
+
+		mockedProjectManager.getProjects = vi.fn(() => [
+			{path: '/repo-a', name: 'Repo A'},
+			{path: '/repo-b', name: 'Repo B'},
+		]);
+		mockedProjectManager.instance.getProject = vi.fn((projectPath: string) => ({
+			path: projectPath,
+			name: projectPath.split('/').pop() || 'Repo',
+			isValid: true,
+		}));
+		mockedCoreService.getSelectedProject = vi.fn(() => ({
+			path: '/repo-a',
+			name: 'Repo A',
+			relativePath: '/repo-a',
+			isValid: true,
+		}));
+		mockedTdService.resolveProjectState = vi.fn((projectPath: string) => ({
+			enabled: true,
+			initialized: true,
+			binaryAvailable: true,
+			todosDir: `${projectPath}/.todos`,
+			dbPath: `${projectPath}/.todos/issues.db`,
+			tdRoot: projectPath,
+		}));
+
+		mockTdReaderListIssues.mockImplementation((dbPath: string, query?: unknown) => {
+			const status = (query as {status?: string} | undefined)?.status;
+			if (status === 'in_review') {
+				if (dbPath.includes('/repo-a/')) {
+					return [{id: 'td-a1', title: 'Repo A review', priority: 'P1'}];
+				}
+				return [
+					{id: 'td-b1', title: 'Repo B review', priority: 'P2'},
+					{id: 'td-b2', title: 'Repo B follow-up', priority: 'P0'},
+				];
+			}
+
+			if (dbPath.includes('/repo-b/')) {
+				return [{id: 'td-b3', title: 'Repo B open task', priority: 'P2'}];
+			}
+			return [{id: 'td-a2', title: 'Repo A open task', priority: 'P3'}];
+		});
+
+		const mod = await import('./apiServer.js');
+		apiServer = mod.apiServer as unknown as typeof apiServer;
+		await apiServer.setupPromise;
+	});
+
+	it('returns tdReviewCount in projects payload for late-connected clients', async () => {
+		const response = await apiServer.app.inject({
+			method: 'GET',
+			url: '/api/projects',
+			headers: {cookie: 'argusdev_session=test'},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({
+			projects: [
+				expect.objectContaining({path: '/repo-a', tdReviewCount: 1}),
+				expect.objectContaining({path: '/repo-b', tdReviewCount: 2}),
+			],
+		});
+	});
+
+	it('returns issues for an explicit projectPath without relying on selected project', async () => {
+		const response = await apiServer.app.inject({
+			method: 'GET',
+			url: '/api/td/issues?projectPath=%2Frepo-b&status=open',
+			headers: {cookie: 'argusdev_session=test'},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({
+			projectPath: '/repo-b',
+			issues: [{id: 'td-b3', title: 'Repo B open task', priority: 'P2'}],
+		});
 	});
 });

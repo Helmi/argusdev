@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import type {TdIssue} from './types';
 import {
 	mergeIncomingReviewNotifications,
+	reconcileProjectReviewState,
 	reconcileReviewNotifications,
 } from './tdReviewNotifications';
 
@@ -35,10 +36,20 @@ function makeIssue(overrides: Partial<TdIssue>): TdIssue {
 }
 
 describe('tdReviewNotifications', () => {
-	it('adds new in_review tasks as notifications', () => {
+	it('does not create notifications from fetched in_review tasks alone', () => {
 		const result = reconcileReviewNotifications({
 			issues: [makeIssue({id: 'td-1', status: 'in_review'})],
 			previousNotifications: [],
+			dismissedIds: [],
+		});
+
+		expect(result.notifications).toEqual([]);
+	});
+
+	it('retains notifications for tasks still in_review', () => {
+		const result = reconcileReviewNotifications({
+			issues: [makeIssue({id: 'td-1', status: 'in_review'})],
+			previousNotifications: [{id: 'td-1', title: 'Task', priority: 'P1'}],
 			dismissedIds: [],
 		});
 
@@ -81,9 +92,8 @@ describe('tdReviewNotifications', () => {
 			dismissedIds: firstPass.dismissedIds,
 		});
 
-		expect(secondPass.notifications).toEqual([
-			{id: 'td-1', title: 'Task', priority: 'P1'},
-		]);
+		expect(secondPass.notifications).toEqual([]);
+		expect(secondPass.dismissedIds).toEqual([]);
 	});
 
 	it('ignores incoming socket notifications for dismissed tasks', () => {
@@ -97,5 +107,16 @@ describe('tdReviewNotifications', () => {
 		);
 
 		expect(result).toEqual([{id: 'td-1', title: 'Task 1', priority: 'P1'}]);
+	});
+
+	it('clears dismissed ids for background projects when review ids change', () => {
+		const result = reconcileProjectReviewState({
+			previousNotifications: [{id: 'td-1', title: 'Task 1', priority: 'P1'}],
+			dismissedIds: ['td-1', 'td-2'],
+			reviewIssueIds: ['td-3'],
+		});
+
+		expect(result.notifications).toEqual([]);
+		expect(result.dismissedIds).toEqual([]);
 	});
 });

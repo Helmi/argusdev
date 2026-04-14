@@ -228,6 +228,7 @@ export interface Project {
 	isValid?: boolean;
 	metadata?: ProjectMetadata; // Project-specific metadata
 	tdEnabled?: boolean;
+	tdReviewCount?: number;
 }
 
 // Connection status for Socket.IO

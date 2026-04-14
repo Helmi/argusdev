@@ -1195,9 +1195,19 @@ export class APIServer {
 				const tdState = tdConfigEnabled
 					? tdService.resolveProjectState(p.path)
 					: null;
+				let tdReviewCount = 0;
+				if (tdConfigEnabled && tdState?.enabled && tdState.dbPath) {
+					const reader = new TdReader(tdState.dbPath);
+					try {
+						tdReviewCount = reader.listIssues({status: 'in_review'}).length;
+					} finally {
+						reader.close();
+					}
+				}
 				return {
 					...p,
 					tdEnabled: tdConfigEnabled && (tdState?.enabled ?? false),
+					tdReviewCount,
 				};
 			});
 
@@ -3059,11 +3069,45 @@ export class APIServer {
 			};
 		});
 
-		// TD issues list (for current project)
+		// TD issues list
 		this.app.get<{
-			Querystring: {status?: string; type?: string; parentId?: string};
+			Querystring: {
+				projectPath?: string;
+				status?: string;
+				type?: string;
+				parentId?: string;
+			};
 		}>('/api/td/issues', async (request, reply) => {
-			const {project, projectState} = resolveSelectedProjectTdContext();
+			const requestedProjectPath = request.query.projectPath?.trim();
+			let project = coreService.getSelectedProject();
+			if (requestedProjectPath) {
+				const requestedProject =
+					projectManager.instance.getProject(requestedProjectPath);
+				if (!requestedProject) {
+					return reply.code(404).send({error: 'Project not found in registry'});
+				}
+				if (requestedProject.isValid === false) {
+					return reply
+						.code(400)
+						.send({error: 'Project path is invalid or no longer exists'});
+				}
+				project = {
+					...requestedProject,
+					relativePath: requestedProject.path,
+				};
+			}
+
+			const projectConfig = project ? loadProjectConfig(project.path) : null;
+			const globalTdConfig = configurationManager.getTdConfig();
+			const tdEnabled =
+				projectConfig?.td?.enabled ?? globalTdConfig.enabled ?? true;
+			const rawProjectState = project
+				? tdService.resolveProjectState(project.path)
+				: null;
+			const projectState =
+				rawProjectState && !tdEnabled
+					? {...rawProjectState, enabled: false}
+					: rawProjectState;
 			if (!project || !projectState) {
 				return reply.code(400).send({error: 'No project selected'});
 			}
@@ -3081,7 +3125,7 @@ export class APIServer {
 					type: request.query.type,
 					parentId: request.query.parentId,
 				});
-				return {issues};
+				return {projectPath: project.path, issues};
 			} finally {
 				reader.close();
 			}
@@ -4008,53 +4052,107 @@ export class APIServer {
 			notifyUpdate(session);
 		});
 
-		// TD review polling — detect tasks entering in_review and notify frontend
-		const knownReviewIds = new Set<string>();
+		// TD review polling — survey all td-enabled projects and emit per-project changes
+		const knownReviewIdsByProject = new Map<string, Set<string>>();
+		const emitTdReviewChanged = (
+			projectPath: string,
+			count: number,
+			reviewIssueIds: string[],
+			newReviews: Array<{id: string; title: string; priority: string}>,
+		) => {
+			this.io?.emit('td_review_changed', {
+				projectPath,
+				count,
+				reviewIssueIds,
+				newIssueIds: newReviews.map(issue => issue.id),
+				newIssues: newReviews,
+			});
+		};
+		const clearTrackedReviews = (projectPath: string) => {
+			const knownReviewIds = knownReviewIdsByProject.get(projectPath);
+			if (!knownReviewIds) return;
+			knownReviewIdsByProject.delete(projectPath);
+			if (knownReviewIds.size > 0) {
+				emitTdReviewChanged(projectPath, 0, [], []);
+			}
+		};
 		const pollTdReviews = () => {
 			try {
-				const project = coreService.getSelectedProject();
-				if (!project) return;
-				const rawState = tdService.resolveProjectState(project.path);
-				const projectConfig = loadProjectConfig(project.path);
-				const state =
-					projectConfig?.td?.enabled === false
-						? {...rawState, enabled: false}
-						: rawState;
-				if (!state.enabled || !state.dbPath) return;
+				const activeProjectPaths = new Set<string>();
+				for (const project of projectManager.getProjects()) {
+					const rawState = tdService.resolveProjectState(project.path);
+					const projectConfig = loadProjectConfig(project.path);
+					const state =
+						projectConfig?.td?.enabled === false
+							? {...rawState, enabled: false}
+							: rawState;
+					if (!state.enabled || !state.dbPath) {
+						clearTrackedReviews(project.path);
+						continue;
+					}
 
-				const reader = new TdReader(state.dbPath);
-				try {
-					const reviewIssues = reader.listIssues({status: 'in_review'});
-					const newReviews = reviewIssues.filter(
-						i => !knownReviewIds.has(i.id),
-					);
-					if (newReviews.length > 0) {
-						newReviews.forEach(i => knownReviewIds.add(i.id));
-						this.io?.emit('td_review_ready', {
-							issues: newReviews.map(i => ({
-								id: i.id,
-								title: i.title,
-								priority: i.priority,
-							})),
-						});
-						logger.info(
-							`API: ${newReviews.length} new task(s) ready for review`,
-						);
-					}
-					// Clean up IDs no longer in review
-					for (const id of knownReviewIds) {
-						if (!reviewIssues.some(i => i.id === id)) {
-							knownReviewIds.delete(id);
+					activeProjectPaths.add(project.path);
+
+					const reader = new TdReader(state.dbPath);
+					try {
+						const reviewIssues = reader.listIssues({status: 'in_review'});
+						const reviewIds = new Set(reviewIssues.map(issue => issue.id));
+						const knownReviewIds = knownReviewIdsByProject.get(project.path);
+
+						if (!knownReviewIds) {
+							knownReviewIdsByProject.set(project.path, reviewIds);
+							if (reviewIssues.length > 0) {
+								emitTdReviewChanged(
+									project.path,
+									reviewIssues.length,
+									[...reviewIds],
+									[],
+								);
+							}
+							continue;
 						}
+
+						const newReviews = reviewIssues
+							.filter(issue => !knownReviewIds.has(issue.id))
+							.map(issue => ({
+								id: issue.id,
+								title: issue.title,
+								priority: issue.priority,
+							}));
+
+						if (
+							newReviews.length > 0 ||
+							knownReviewIds.size !== reviewIds.size
+						) {
+							emitTdReviewChanged(
+								project.path,
+								reviewIssues.length,
+								[...reviewIds],
+								newReviews,
+							);
+							if (newReviews.length > 0) {
+								logger.info(
+									`API: ${newReviews.length} new task(s) ready for review in ${project.path}`,
+								);
+							}
+						}
+
+						knownReviewIdsByProject.set(project.path, reviewIds);
+					} finally {
+						reader.close();
 					}
-				} finally {
-					reader.close();
+				}
+
+				for (const projectPath of knownReviewIdsByProject.keys()) {
+					if (!activeProjectPaths.has(projectPath)) {
+						clearTrackedReviews(projectPath);
+					}
 				}
 			} catch {
 				// Silent — td polling is best-effort
 			}
 		};
-		// Poll every 30 seconds, start after 5s
+
 		setTimeout(pollTdReviews, 5000);
 		setInterval(pollTdReviews, 30000);
 
