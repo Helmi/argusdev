@@ -395,6 +395,14 @@ export function Sidebar() {
 				// Initial load with no saved state - expand all
 				projects.forEach(p => newExpandedProjects.add(p.path));
 				projectsChanged = true;
+			} else if (
+				hasSavedProjectState &&
+				knownProjectPaths.size === 0 &&
+				projects.length > 0
+			) {
+				// Initial load WITH saved state — respect the saved expand/collapse
+				// decisions; do not treat these projects as "new" and auto-expand
+				// them (knownProjectPaths is seeded below, which ends this branch)
 			} else if (newProjects.length > 0) {
 				// Auto-expand newly added projects
 				newProjects.forEach(p => newExpandedProjects.add(p.path));
@@ -417,6 +425,13 @@ export function Sidebar() {
 				// Initial load with no saved state - expand all
 				worktrees.forEach(w => newExpandedWorktrees.add(w.path));
 				worktreesChanged = true;
+			} else if (
+				hasSavedWorktreeState &&
+				knownWorktreePaths.size === 0 &&
+				worktrees.length > 0
+			) {
+				// Initial load WITH saved state — respect the saved expand/collapse
+				// decisions; do not treat these worktrees as "new" and auto-expand
 			} else if (newWorktrees.length > 0) {
 				// Auto-expand newly added worktrees
 				newWorktrees.forEach(w => newExpandedWorktrees.add(w.path));
