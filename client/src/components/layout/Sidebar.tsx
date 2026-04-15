@@ -274,20 +274,28 @@ export function Sidebar() {
 		[saveRenamedSession, cancelSessionRename],
 	);
 
-	// Auto-focus and select project rename input when it appears
+	// Auto-focus and select project rename input when it appears.
+	// Deferred via rAF because the rename is triggered from a Radix
+	// DropdownMenuItem, and Radix restores focus to the dropdown trigger on
+	// close — stealing our focus if we grab it synchronously in the effect.
 	useEffect(() => {
-		if (renamingProject && projectRenameInputRef.current) {
-			projectRenameInputRef.current.focus();
-			projectRenameInputRef.current.select();
-		}
+		if (!renamingProject) return;
+		const rafId = requestAnimationFrame(() => {
+			projectRenameInputRef.current?.focus();
+			projectRenameInputRef.current?.select();
+		});
+		return () => cancelAnimationFrame(rafId);
 	}, [renamingProject]);
 
 	// Auto-focus and select session rename input when it appears
+	// (see renamingProject note above for why this is deferred)
 	useEffect(() => {
-		if (renamingSession && sessionRenameInputRef.current) {
-			sessionRenameInputRef.current.focus();
-			sessionRenameInputRef.current.select();
-		}
+		if (!renamingSession) return;
+		const rafId = requestAnimationFrame(() => {
+			sessionRenameInputRef.current?.focus();
+			sessionRenameInputRef.current?.select();
+		});
+		return () => cancelAnimationFrame(rafId);
 	}, [renamingSession]);
 
 
