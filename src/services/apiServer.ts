@@ -52,7 +52,10 @@ import {globalSessionOrchestrator} from './globalSessionOrchestrator.js';
 import {fileWatcherService} from './fileWatcherService.js';
 import type {SessionManager} from './sessionManager.js';
 import {cleanupStartupScriptsInWorktree} from '../utils/startupScript.js';
-import {writeHookSettingsFile} from '../utils/hookSettings.js';
+import {
+	writeHookSettingsFile,
+	sweepOrphanHookSettings,
+} from '../utils/hookSettings.js';
 import type {
 	AgentConfig,
 	Session,
@@ -867,6 +870,14 @@ export class APIServer {
 		logger.info(
 			`API: Session recovery complete (${restoredCount}/${recoverableSessions.length} restored)`,
 		);
+
+		const liveIds = new Set(
+			coreService.sessionManager.getAllSessions().map(s => s.id),
+		);
+		const removed = sweepOrphanHookSettings(liveIds);
+		if (removed > 0) {
+			logger.info(`API: Removed ${removed} orphan hook settings file(s)`);
+		}
 	}
 
 	private async setup(): Promise<void> {
