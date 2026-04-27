@@ -2,8 +2,13 @@ import type { Terminal, ILinkProvider, ILink } from 'xterm'
 
 // Bare file paths: at least one `/`, ends with extension, optional :line:col
 // Supports relative (./foo, ../foo, foo/bar), absolute (/usr/...), and home (~/.config/...)
+// Segments after the first `/` may contain single spaces between word chars
+// (e.g. ".../Agent Setup/My File.md"). The first segment stays single-word to
+// avoid greedily absorbing leading sentence text. Each space-separated chunk
+// must start with an alphanumeric char so that adjacent paths (e.g. " ../b")
+// don't get merged across "and" joiners.
 const FILE_PATH_RE =
-  /(?:^|(?<=[\s:'"(,]))((~\/|\.{0,2}\/)?[a-zA-Z0-9_@.+-]+(?:\/[a-zA-Z0-9_@.+-]+)+\.[a-zA-Z]{1,10}(?::\d+(?::\d+)?)?)/g
+  /(?:^|(?<=[\s:'"(,]))((~\/|\.{0,2}\/)?[a-zA-Z0-9_@.+-]+(?:\/[a-zA-Z0-9_@.+-]+(?: [a-zA-Z0-9_@+-][a-zA-Z0-9_@.+-]*)*)+\.[a-zA-Z]{1,10}(?::\d+(?::\d+)?)?)/g
 
 // Markdown-style links: [display text](path)
 const MD_LINK_RE = /\[([^\]]{1,100})\]\(([^)]{1,300})\)/g
