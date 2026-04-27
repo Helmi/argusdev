@@ -24,6 +24,7 @@ import {
 	ArrowDown,
 	Pencil,
 	RotateCcw,
+	RefreshCw,
 	ListTodo,
 	PanelRightOpen,
 	PanelRightClose,
@@ -227,25 +228,41 @@ export const TerminalSession = memo(function TerminalSession({
 		const currentSessionId = session.id;
 		const isDevMode = import.meta.env.DEV;
 
-		// Handle incoming data - uses ref for latest session.id check
-		const handleData = (msg: {sessionId: string; data: string} | string) => {
+		// DIAGNOSTIC: track replay window to log xterm-generated responses to host
+		// during/just after history replay. Remove once root cause is confirmed.
+		const REPLAY_WINDOW_MS = 600;
+		let replayWindowUntil = 0;
+		const queryPatterns: Array<{ name: string; re: RegExp }> = [
+			{ name: 'CPR-query \\x1b[6n', re: /\x1b\[6n/g },
+			{ name: 'DSR-query \\x1b[5n', re: /\x1b\[5n/g },
+			{ name: 'DA1 \\x1b[c / \\x1b[?c', re: /\x1b\[\??c/g },
+			{ name: 'DA2 \\x1b[>c', re: /\x1b\[>c/g },
+			{ name: 'DECRQM \\x1b[?...$p', re: /\x1b\[\?[0-9;]+\$p/g },
+		];
+
+		const handleDataWithDiag = (msg: {sessionId: string; data: string} | string) => {
 			const content = typeof msg === 'string' ? msg : msg.data;
 			const msgSessionId = typeof msg === 'string' ? null : msg.sessionId;
+			if (!isMounted) return;
+			if (msgSessionId && msgSessionId !== sessionIdRef.current) return;
 
-			// Guard: Return immediately if component has been unmounted
-			if (!isMounted) {
-				return;
+			// Only the first big payload after subscribe is replay; arm the window
+			// when we see a chunk larger than ~1KB (live data is usually small).
+			if (content.length > 1024 && replayWindowUntil === 0) {
+				replayWindowUntil = Date.now() + REPLAY_WINDOW_MS;
+				const counts = queryPatterns
+					.map(p => ({ name: p.name, count: (content.match(p.re) || []).length }))
+					.filter(c => c.count > 0);
+				console.log(
+					`[term-diag] replay for ${sessionIdRef.current} agent=${session.agentId} bytes=${content.length} queries=${
+						counts.length ? JSON.stringify(counts) : 'none'
+					}`,
+				);
 			}
-
-			// Strict check: Ignore data from other sessions using ref for current value
-			if (msgSessionId && msgSessionId !== sessionIdRef.current) {
-				return;
-			}
-
 			term.write(content);
 		};
 
-		currentSocket.on('terminal_data', handleData);
+		currentSocket.on('terminal_data', handleDataWithDiag);
 
 		// Handle outgoing data - uses ref for current session.id
 		// Filter terminal-to-host response sequences that xterm.js generates.
@@ -267,6 +284,21 @@ export const TerminalSession = memo(function TerminalSession({
 		const CPR_DEBOUNCE_MS = 100;
 
 		const onDataDisposable = term.onData(data => {
+			// DIAGNOSTIC: log any onData fired during the replay window
+			if (replayWindowUntil > 0 && Date.now() < replayWindowUntil) {
+				const hex = Array.from(data)
+					.map(c => {
+						const code = c.charCodeAt(0);
+						return code < 32 || code === 127
+							? '\\x' + code.toString(16).padStart(2, '0')
+							: c;
+					})
+					.join('');
+				console.log(
+					`[term-diag] onData during replay agent=${session.agentId} len=${data.length} bytes="${hex}"`,
+				);
+			}
+
 			// Always filter DA, DECRPM, DSR for all sessions
 			let filtered = data.replace(otherResponsePattern, '');
 
@@ -555,7 +587,7 @@ export const TerminalSession = memo(function TerminalSession({
 
 			// Use captured references for cleanup to ensure correct socket/session
 			currentSocket.off('connect', handleConnect);
-			currentSocket.off('terminal_data', handleData);
+			currentSocket.off('terminal_data', handleDataWithDiag);
 			currentSocket.off('image_path', handleImagePath);
 			initialFitTimers.forEach(timer => clearTimeout(timer));
 			window.removeEventListener('resize', handleViewportChange);
@@ -707,6 +739,29 @@ export const TerminalSession = memo(function TerminalSession({
 		});
 	}, []);
 
+	// Force xterm to redraw and trigger a PTY SIGWINCH so the TUI agent redraws.
+	// Mirrors what manual browser resize does — useful when codex/claude leave gibberish.
+	const handleRedraw = useCallback(() => {
+		const term = xtermRef.current;
+		const fitAddon = fitAddonRef.current;
+		if (!term || !fitAddon) return;
+
+		term.refresh(0, term.rows - 1);
+
+		const { cols, rows } = term;
+		if (cols > 1) {
+			socket.emit('resize', { sessionId: session.id, cols: cols - 1, rows });
+		}
+		setTimeout(() => {
+			if (!xtermRef.current || !fitAddonRef.current) return;
+			fitAddonRef.current.fit();
+			const next = { cols: xtermRef.current.cols, rows: xtermRef.current.rows };
+			lastDimsRef.current = next;
+			socket.emit('resize', { sessionId: session.id, ...next });
+			xtermRef.current.refresh(0, xtermRef.current.rows - 1);
+		}, 60);
+	}, [socket, session.id]);
+
 	// Handle clicking the terminal area to focus
 	const handleTerminalClick = useCallback((e: React.MouseEvent) => {
 		e.stopPropagation();
@@ -806,6 +861,17 @@ export const TerminalSession = memo(function TerminalSession({
 						) : (
 							<PanelRightOpen className="h-3.5 w-3.5" />
 						)}
+					</Button>
+
+					{/* Force redraw - fixes gibberish from TUI agents */}
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-5 w-5 text-muted-foreground hover:text-foreground"
+						onClick={handleRedraw}
+						title="Redraw terminal"
+					>
+						<RefreshCw className="h-3.5 w-3.5" />
 					</Button>
 
 					{/* Maximize/Minimize - hidden on mobile */}
