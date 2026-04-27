@@ -863,8 +863,12 @@ ${commandTokens.join(' ')}
 			const buffer = Buffer.from(data, 'utf8');
 			session.outputHistory.push(buffer);
 
-			// Limit memory usage - keep max 10MB of output history
-			const MAX_HISTORY_SIZE = 10 * 1024 * 1024; // 10MB
+			// Limit memory usage - keep max 1MB of output history.
+			// xterm renders only ~1000 lines (~500KB-1MB once ANSI overhead is
+			// included), so anything beyond this is parsed on replay and then
+			// immediately scrolled off — wasted memory and a larger surface for
+			// replay-time corruption (xterm auto-answering embedded queries).
+			const MAX_HISTORY_SIZE = 1 * 1024 * 1024; // 1MB
 			let totalSize = session.outputHistory.reduce(
 				(sum, buf) => sum + buf.length,
 				0,
