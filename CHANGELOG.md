@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.2](https://github.com/Helmi/argusdev/compare/v0.7.1...v0.7.2) (2026-04-27)
+
+A polish-and-stability release. The headline ergonomic wins are a manual terminal redraw button (no more browser-resize gymnastics when codex or claude leave gibberish on the screen), a markdown-rendering file preview dialog, clickable file paths in the terminal, and richer td context inside the session sidebar. td integration is still flaky in places — expect more iteration in 0.7.3.
+
+
+### Features
+
+* **webui:** manual terminal redraw button ([321eaa7](https://github.com/Helmi/argusdev/commit/321eaa7b086f717b0dc17abf0526293e3a4f8185)) — toolbar button (RefreshCw) that nudges xterm and fires a cols-1/cols resize so the TUI agent receives SIGWINCH and repaints; mirrors browser-resize without the friction. Includes replay-window diagnostic logging for session-switch render glitches.
+* **webui:** clickable file path links in terminal sessions ([4b80e55](https://github.com/Helmi/argusdev/commit/4b80e554f07f5025c38d61dc5a4b7496129a05df)) — bare paths and markdown-style links in agent output are recognized and clickable; opens the in-app file preview. Path matching extended to handle spaces in segments ([5c14e0f](https://github.com/Helmi/argusdev/commit/5c14e0f09127ba9db25a722fd19361d6d8c03c84)).
+* **webui:** file preview dialog with markdown rendering ([86a8424](https://github.com/Helmi/argusdev/commit/86a842410053967089dea098dc048912caa6901a)) — quick-preview any file from the worktree; markdown is rendered, code is syntax-highlighted. Backed by a worktree file endpoint that supports absolute and `~/` paths ([23f4d75](https://github.com/Helmi/argusdev/commit/23f4d75ed966ad67395e71abcd91b550043c4470)).
+* **webui:** td task context and workflow actions in session details sidebar ([19827e4](https://github.com/Helmi/argusdev/commit/19827e4ef6be088e3548080ea8e40ead8c0089e0)) — sessions linked to a td issue surface task title, status, and quick workflow actions (start review, etc.) directly in the right sidebar.
+* **webui:** per-project "Rev" pill in sidebar project rows ([86de108](https://github.com/Helmi/argusdev/commit/86de10857d0d821ff2fb24b6d39967a64244c353)) — shows count of in-review td tasks per project, scoped to that project's td database.
+
+
+### Bug Fixes
+
+* **daemon:** persist Claude Code hook settings under configDir, not tmpdir ([bbd6e92](https://github.com/Helmi/argusdev/commit/bbd6e92f556635df3b335268be2ab10ea2d59f75)) — hook settings survived only until the OS cleaned tmp; now stored alongside the rest of the daemon config.
+* **daemon:** reconcile worktree list on a timer so external deletions propagate ([99cd709](https://github.com/Helmi/argusdev/commit/99cd709d452157cd1c30dda6f07a4ac39ff034dd)) — worktrees deleted from the shell now disappear from the UI without restarting the daemon.
+* **daemon:** isolate dev server from production daemon ([15e69e0](https://github.com/Helmi/argusdev/commit/15e69e0089f9afce0987d6553f4d812a47491353)) — `bun run dev` no longer fights the globally installed daemon over ports/state.
+* **api:** scope td review polling by project ([d910064](https://github.com/Helmi/argusdev/commit/d910064a0c03debc7bdc0987029c005ed4c9f1c3)) — review notifications now correctly attribute changes to the originating project instead of leaking across all projects.
+* **webui:** changes tab updates on external git changes ([3296a9f](https://github.com/Helmi/argusdev/commit/3296a9fa56c590bdc3e2d276050daca257502ba0)) — file watcher picks up commits and stash operations made outside the UI.
+* **webui:** changes tab no longer drops auth or breaks the build with test files ([74f03a6](https://github.com/Helmi/argusdev/commit/74f03a66fda22949486b79217f0e6e6cc55955b1)).
+* **webui:** auto-select matching worktree when starting review from task ([bf61c6a](https://github.com/Helmi/argusdev/commit/bf61c6aa91958884a9f59b1917423f6c683767f2)) — "Start review" from a td task picks the worktree whose branch matches the task instead of the default.
+* **webui:** render codex and unknown-agent transcripts in ConversationView ([3f54258](https://github.com/Helmi/argusdev/commit/3f5425843fd6bf2f7baae619a21636324c297aa0)) — previously only Claude transcripts rendered; codex and generic agents now show as well.
+* **webui:** preserve collapsed project/worktree state across reloads ([aa56a2f](https://github.com/Helmi/argusdev/commit/aa56a2f1071ee86a9adaec63e4bf0164733fb513)).
+* **webui:** sidebar rename input gets focus and selects text on open ([0c7f4a9](https://github.com/Helmi/argusdev/commit/0c7f4a9fe23ad6147a23717ac2d4fed41dce127f)).
+* **webui:** right sidebar toggle requires only one click ([7299fc2](https://github.com/Helmi/argusdev/commit/7299fc2b3dc7838f82a427bc6d4aa0cc1546af15)).
+* **webui:** project-scoped td board fetch + larger session toolbar icons ([6d3c8fc](https://github.com/Helmi/argusdev/commit/6d3c8fc3efd868fd18568452169ef05f3ccab105)) — task board now queries only the active project's td DB; toolbar icons sized up for legibility.
+* **webui:** unify taskboard icon and replace info icon with panel toggle ([93cee61](https://github.com/Helmi/argusdev/commit/93cee6155ad96dbc3cf14264861859947c077d91)).
+* **webui:** clarify sort setting label ([d2a360d](https://github.com/Helmi/argusdev/commit/d2a360dfcd56c59f7484156768aea2858d2800dd)).
+* **webui:** file viewer text wraps instead of overflowing ([885e463](https://github.com/Helmi/argusdev/commit/885e463e86624c74e1fe0eddb7685d4f53374bf1)).
+* **ci:** skip GitHub release creation if already exists ([afa13bc](https://github.com/Helmi/argusdev/commit/afa13bc5903b3d062a5c8aa7844d479fc1b62806)) — re-running the publish workflow no longer fails on the GitHub Release step.
+
+
+### Performance
+
+* **daemon:** reduce per-session output history cap from 10MB to 1MB ([257c39b](https://github.com/Helmi/argusdev/commit/257c39b29b49358ecaf934f210af4ff54986d004)) — large memory headroom for long-running sessions; visible scrollback unaffected for normal use.
+
 ## [0.7.1](https://github.com/Helmi/argusdev/compare/v0.7.0...v0.7.1) (2026-04-08)
 
 
