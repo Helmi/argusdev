@@ -12,6 +12,11 @@ import {Effect} from 'effect';
 import {coreService} from './coreService.js';
 import type {FSWatcher} from 'node:fs';
 
+// node:fs is mocked below (vi.mock('fs', ...)). Use require() inside helpers
+// to access the real implementations and bypass the mock — static imports
+// would either be intercepted or trigger hoisting-order issues with mockWatch.
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 const mockGetAllActiveSessions = vi.fn<() => unknown[]>(() => []);
 
 const mockExecFileSync = vi.fn();
