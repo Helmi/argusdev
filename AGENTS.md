@@ -1,18 +1,16 @@
 # ArgusDev
 
-A local development orchestrator for AI coding agent sessions. Runs as a **daemon** exposing a **Fastify API + Socket.IO** server, a **React WebUI**, and a **CLI** (`argusdev`). Manages PTY sessions for coding agents (Codex, Claude Code, Pi, etc.), git worktrees, and optional task integration via `td`.
-
-Originally forked from [kbwo/ccmanager](https://github.com/kbwo/ccmanager) — codebases have fully diverged, no compatibility. Occasionally worth checking their `sessionManager` and `worktreeService` for bug fix ideas.
+A local development orchestrator for AI coding agent sessions. Runs as a **daemon** exposing a **Fastify API + Socket.IO** server and a **React WebUI**. Manages PTY sessions for coding agents (Codex, Claude Code, Pi, etc.), git worktrees, and optional task integration via `td`.
 
 **Repo:** [github.com/Helmi/argusdev](https://github.com/Helmi/argusdev) (private)
 
 ## Task Management
 
-Optional: If `td` is installed, run `td usage --new-session` at conversation start for task context. The app works without `td`.
+When instructed in context with the 'td' task  management or with tasks starting with 'td-...' make sure to be aware of how td works and use the td-cli-helper skill to progress tasks accordingly.
 
 ## Safety Guardrails
 
-- **CRITICAL:** Never run `bun run build` or `bun run install:global` without explicit user confirmation. The global install is used productively.
+- **CRITICAL:** Never run `bun run build` or `bun run install:global` without explicit user confirmation. The global install is used productively. Make use of the dev-server to confirm changes.
 - **NEVER** execute release commands autonomously. See the `argusdev-release` skill for the release workflow.
 - **NEVER** push to `main` without a passing build.
 
@@ -103,14 +101,6 @@ The UI runs at a density that balances information and readability. Do not go sm
 - Never use `min-w-max` on the board container — columns must share the viewport width via flex
 - Expanded columns: `flex-1 min-w-[220px] max-w-[480px]`
 - Collapsed columns: `w-10 shrink-0` (icon + count only, no manual toggle)
-
-## gstack
-
-Use `/browse` from gstack for **all web browsing**. Never use `mcp__claude-in-chrome__*` tools.
-
-Available skills: `/office-hours`, `/plan-ceo-review`, `/plan-eng-review`, `/plan-design-review`, `/design-consultation`, `/review`, `/ship`, `/land-and-deploy`, `/canary`, `/benchmark`, `/browse`, `/qa`, `/qa-only`, `/design-review`, `/setup-browser-cookies`, `/setup-deploy`, `/retro`, `/investigate`, `/document-release`, `/codex`, `/cso`, `/careful`, `/freeze`, `/guard`, `/unfreeze`, `/gstack-upgrade`.
-
-If gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
 
 ## Conventions
 
