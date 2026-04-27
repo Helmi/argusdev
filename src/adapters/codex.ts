@@ -103,9 +103,7 @@ function extractThinkingBlocks(
 	];
 }
 
-function extractReasoningSummary(
-	payload: Record<string, unknown>,
-): string {
+function extractReasoningSummary(payload: Record<string, unknown>): string {
 	const summary = payload['summary'];
 	if (!Array.isArray(summary)) {
 		return '';
@@ -132,7 +130,11 @@ function getCodexPayload(row: CodexLine): Record<string, unknown> | null {
 }
 
 function getCodexSessionMeta(row: CodexLine): Record<string, unknown> | null {
-	if (row.type === 'session_meta' && row.payload && typeof row.payload === 'object') {
+	if (
+		row.type === 'session_meta' &&
+		row.payload &&
+		typeof row.payload === 'object'
+	) {
 		return row.payload;
 	}
 	if (row.session_meta && typeof row.session_meta === 'object') {
@@ -214,9 +216,7 @@ export class CodexAdapter extends BaseAgentAdapter {
 				payload?.['content'] || payload?.['message'] || row['content'],
 			);
 			const timestamp = normalizeTimestamp(
-				row.timestamp ||
-					payload?.['timestamp'] ||
-					payload?.['created_at'],
+				row.timestamp || payload?.['timestamp'] || payload?.['created_at'],
 			);
 
 			const toolCalls =
@@ -228,11 +228,11 @@ export class CodexAdapter extends BaseAgentAdapter {
 					: payload
 						? extractToolCallsFromMessage(payload)
 						: [];
-			const thinkingBlocks = payload
-				? extractThinkingBlocks(payload)
-				: [];
+			const thinkingBlocks = payload ? extractThinkingBlocks(payload) : [];
 			const reasoningSummary =
-				payloadType === 'reasoning' && payload ? extractReasoningSummary(payload) : '';
+				payloadType === 'reasoning' && payload
+					? extractReasoningSummary(payload)
+					: '';
 			const output =
 				payloadType === 'function_call_output'
 					? extractString(payload?.['output'])
@@ -243,7 +243,11 @@ export class CodexAdapter extends BaseAgentAdapter {
 					? [...thinkingBlocks, {content: reasoningSummary}]
 					: thinkingBlocks;
 
-			if (!finalContent && toolCalls.length === 0 && allThinkingBlocks.length === 0) {
+			if (
+				!finalContent &&
+				toolCalls.length === 0 &&
+				allThinkingBlocks.length === 0
+			) {
 				return;
 			}
 
@@ -259,9 +263,7 @@ export class CodexAdapter extends BaseAgentAdapter {
 				content: finalContent,
 				preview: buildPreview(finalContent || '[tool activity]'),
 				model:
-					typeof payload?.['model'] === 'string'
-						? payload['model']
-						: undefined,
+					typeof payload?.['model'] === 'string' ? payload['model'] : undefined,
 				toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
 				thinkingBlocks:
 					allThinkingBlocks.length > 0 ? allThinkingBlocks : undefined,

@@ -94,7 +94,9 @@ describe('conversation transcript adapters', () => {
 					payload: {
 						type: 'message',
 						role: 'user',
-						content: [{type: 'input_text', text: 'Open the conversations view'}],
+						content: [
+							{type: 'input_text', text: 'Open the conversations view'},
+						],
 					},
 				}),
 				JSON.stringify({
@@ -138,7 +140,9 @@ describe('conversation transcript adapters', () => {
 						type: 'message',
 						role: 'assistant',
 						model: 'gpt-5-codex',
-						content: [{type: 'output_text', text: 'The parser is Claude-specific.'}],
+						content: [
+							{type: 'output_text', text: 'The parser is Claude-specific.'},
+						],
 					},
 				}),
 			].join('\n'),

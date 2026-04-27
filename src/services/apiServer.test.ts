@@ -40,7 +40,8 @@ const mockCleanupStartupScriptsInWorktree = vi.fn<
 const tempDirs: string[] = [];
 
 function makeTempTranscript(fileName: string, content: string): string {
-	const {mkdtempSync, writeFileSync} = require('node:fs') as typeof import('node:fs');
+	const {mkdtempSync, writeFileSync} =
+		require('node:fs') as typeof import('node:fs');
 	const {tmpdir} = require('node:os') as typeof import('node:os');
 	const path = require('node:path') as typeof import('node:path');
 	const dir = mkdtempSync(path.join(tmpdir(), 'argusdev-api-'));
@@ -206,7 +207,9 @@ vi.mock('./tdService.js', () => ({
 vi.mock('./tdReader.js', () => ({
 	TdReader: vi.fn().mockImplementation((dbPath: string) => ({
 		getIssueWithDetails: mockTdReaderGetIssueWithDetails,
-		listIssues: vi.fn((query?: unknown) => mockTdReaderListIssues(dbPath, query)),
+		listIssues: vi.fn((query?: unknown) =>
+			mockTdReaderListIssues(dbPath, query),
+		),
 		close: vi.fn(() => mockTdReaderClose(dbPath)),
 	})),
 }));
@@ -2263,8 +2266,9 @@ describe('APIServer TD review polling', () => {
 			return 1 as unknown as ReturnType<typeof setInterval>;
 		}) as typeof setInterval);
 
-		const {projectManager: mockedProjectManager} =
-			await import('./projectManager.js');
+		const {projectManager: mockedProjectManager} = await import(
+			'./projectManager.js'
+		);
 		const {tdService: mockedTdService} = await import('./tdService.js');
 		const projectConfig = await import('../utils/projectConfig.js');
 
@@ -2292,7 +2296,9 @@ describe('APIServer TD review polling', () => {
 		await apiServerInternal.setupPromise;
 
 		initialPoll = timeoutCallbacks.find(item => item.delay === 5000)?.callback;
-		intervalPoll = intervalCallbacks.find(item => item.delay === 30000)?.callback;
+		intervalPoll = intervalCallbacks.find(
+			item => item.delay === 30000,
+		)?.callback;
 	});
 
 	afterEach(() => {
@@ -2310,12 +2316,27 @@ describe('APIServer TD review polling', () => {
 		mockTdReaderListIssues.mockImplementation((dbPath: string) => {
 			if (dbPath.includes('/repo-a/')) {
 				return [
-					{id: 'td-a1', title: 'Repo A review', priority: 'P1', status: 'in_review'},
+					{
+						id: 'td-a1',
+						title: 'Repo A review',
+						priority: 'P1',
+						status: 'in_review',
+					},
 				];
 			}
 			return [
-				{id: 'td-b1', title: 'Repo B review', priority: 'P2', status: 'in_review'},
-				{id: 'td-b2', title: 'Repo B follow-up', priority: 'P0', status: 'in_review'},
+				{
+					id: 'td-b1',
+					title: 'Repo B review',
+					priority: 'P2',
+					status: 'in_review',
+				},
+				{
+					id: 'td-b2',
+					title: 'Repo B follow-up',
+					priority: 'P0',
+					status: 'in_review',
+				},
 			];
 		});
 
@@ -2349,18 +2370,38 @@ describe('APIServer TD review polling', () => {
 			if (phase === 'initial') {
 				if (dbPath.includes('/repo-a/')) {
 					return [
-						{id: 'td-a1', title: 'Repo A review', priority: 'P1', status: 'in_review'},
+						{
+							id: 'td-a1',
+							title: 'Repo A review',
+							priority: 'P1',
+							status: 'in_review',
+						},
 					];
 				}
 				return [
-					{id: 'td-b1', title: 'Repo B review', priority: 'P2', status: 'in_review'},
+					{
+						id: 'td-b1',
+						title: 'Repo B review',
+						priority: 'P2',
+						status: 'in_review',
+					},
 				];
 			}
 
 			if (dbPath.includes('/repo-a/')) {
 				return [
-					{id: 'td-a1', title: 'Repo A review', priority: 'P1', status: 'in_review'},
-					{id: 'td-a2', title: 'Repo A new review', priority: 'P0', status: 'in_review'},
+					{
+						id: 'td-a1',
+						title: 'Repo A review',
+						priority: 'P1',
+						status: 'in_review',
+					},
+					{
+						id: 'td-a2',
+						title: 'Repo A new review',
+						priority: 'P0',
+						status: 'in_review',
+					},
 				];
 			}
 			return [];
@@ -2377,9 +2418,7 @@ describe('APIServer TD review polling', () => {
 			count: 2,
 			reviewIssueIds: ['td-a1', 'td-a2'],
 			newIssueIds: ['td-a2'],
-			newIssues: [
-				{id: 'td-a2', title: 'Repo A new review', priority: 'P0'},
-			],
+			newIssues: [{id: 'td-a2', title: 'Repo A new review', priority: 'P0'}],
 		});
 		expect(mockEmit).toHaveBeenCalledWith('td_review_changed', {
 			projectPath: '/repo-b',
@@ -2408,8 +2447,9 @@ describe('APIServer TD project review metadata', () => {
 		vi.clearAllMocks();
 		vi.resetModules();
 
-		const {projectManager: mockedProjectManager} =
-			await import('./projectManager.js');
+		const {projectManager: mockedProjectManager} = await import(
+			'./projectManager.js'
+		);
 		const {coreService: mockedCoreService} = await import('./coreService.js');
 		const {tdService: mockedTdService} = await import('./tdService.js');
 
@@ -2440,23 +2480,25 @@ describe('APIServer TD project review metadata', () => {
 			tdRoot: projectPath,
 		}));
 
-		mockTdReaderListIssues.mockImplementation((dbPath: string, query?: unknown) => {
-			const status = (query as {status?: string} | undefined)?.status;
-			if (status === 'in_review') {
-				if (dbPath.includes('/repo-a/')) {
-					return [{id: 'td-a1', title: 'Repo A review', priority: 'P1'}];
+		mockTdReaderListIssues.mockImplementation(
+			(dbPath: string, query?: unknown) => {
+				const status = (query as {status?: string} | undefined)?.status;
+				if (status === 'in_review') {
+					if (dbPath.includes('/repo-a/')) {
+						return [{id: 'td-a1', title: 'Repo A review', priority: 'P1'}];
+					}
+					return [
+						{id: 'td-b1', title: 'Repo B review', priority: 'P2'},
+						{id: 'td-b2', title: 'Repo B follow-up', priority: 'P0'},
+					];
 				}
-				return [
-					{id: 'td-b1', title: 'Repo B review', priority: 'P2'},
-					{id: 'td-b2', title: 'Repo B follow-up', priority: 'P0'},
-				];
-			}
 
-			if (dbPath.includes('/repo-b/')) {
-				return [{id: 'td-b3', title: 'Repo B open task', priority: 'P2'}];
-			}
-			return [{id: 'td-a2', title: 'Repo A open task', priority: 'P3'}];
-		});
+				if (dbPath.includes('/repo-b/')) {
+					return [{id: 'td-b3', title: 'Repo B open task', priority: 'P2'}];
+				}
+				return [{id: 'td-a2', title: 'Repo A open task', priority: 'P3'}];
+			},
+		);
 
 		const mod = await import('./apiServer.js');
 		apiServer = mod.apiServer as unknown as typeof apiServer;

@@ -82,11 +82,9 @@ export class GenericAdapter extends BaseAgentAdapter {
 				return [];
 			}
 			const record = parsed as Record<string, unknown>;
-			const items =
-				(Array.isArray(record['messages']) && record['messages']) ||
+			const items = (Array.isArray(record['messages']) && record['messages']) ||
 				(Array.isArray(record['events']) && record['events']) ||
-				(Array.isArray(record['entries']) && record['entries']) ||
-				[record];
+				(Array.isArray(record['entries']) && record['entries']) || [record];
 			return parseGenericRows(
 				items.filter(item => item && typeof item === 'object') as Array<
 					Record<string, unknown>
@@ -112,7 +110,9 @@ export class GenericAdapter extends BaseAgentAdapter {
 		sessionFilePath: string,
 	): Promise<SessionFileMetadata> {
 		const messages = await this.parseMessages(sessionFilePath);
-		const firstTimestamp = messages.find(message => message.timestamp)?.timestamp;
+		const firstTimestamp = messages.find(
+			message => message.timestamp,
+		)?.timestamp;
 		const lastTimestamp = [...messages]
 			.reverse()
 			.find(message => message.timestamp)?.timestamp;
