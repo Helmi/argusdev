@@ -1146,10 +1146,9 @@ describe('SessionManager', () => {
 				expect(session.stateMutex.getSnapshot().state).toBe('busy');
 			});
 
-			it('PTY-detected busy must reach session state for partial-hook sessions (pure-thinking gap)', async () => {
-				// Regression for new P2: during pure-thinking turns no tool_call fires,
-				// so hooks do not post busy. PTY spinner detection must still be able to
-				// upgrade the session to busy before agent_end fires.
+			it('turn_start hook delivers busy for pure-thinking turns (no tool_call)', async () => {
+				// Pure-thinking turns: model generates text without calling a tool.
+				// No tool_call fires, so busy must come from turn_start.
 				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 				const session = await Effect.runPromise(
@@ -1168,27 +1167,15 @@ describe('SessionManager', () => {
 
 				expect(session.stateMutex.getSnapshot().state).toBe('idle');
 
-				// Spy on detectTerminalState to simulate the Pi spinner being visible —
-				// setting up a real spinner in the mocked xterm buffer would require
-				// reimplementing the terminal mock, so we inject at the detection boundary.
-				const detectSpy = vi
-					.spyOn(sessionManager, 'detectTerminalState')
-					.mockReturnValue('busy');
-
-				// Wait for STATE_PERSISTENCE_DURATION_MS + margin to let the pending
-				// state expire and be confirmed (same path as non-hook sessions).
-				const {STATE_PERSISTENCE_DURATION_MS} = await import(
-					'../constants/statePersistence.js'
-				);
-				await new Promise(resolve =>
-					setTimeout(
-						resolve,
-						STATE_PERSISTENCE_DURATION_MS + STATE_CHECK_INTERVAL_MS * 3 + 100,
-					),
-				);
-
+				// turn_start fires → hook POSTs busy (same path as tool_call)
+				sessionManager.applyHookStateEvent(session.id, 'busy');
+				await new Promise(resolve => setTimeout(resolve, 10));
 				expect(session.stateMutex.getSnapshot().state).toBe('busy');
-				detectSpy.mockRestore();
+
+				// agent_end fires → hook POSTs idle
+				sessionManager.applyHookStateEvent(session.id, 'idle');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe('idle');
 			});
 
 			it('should call hookCleanup on session exit', async () => {

@@ -1017,12 +1017,16 @@ ${commandTokens.join(' ')}
 			const detectedState = this.detectTerminalState(session);
 			const now = Date.now();
 
-			// Partial-hook sessions (e.g. Pi): hooks cover busy (turn_start, tool_call)
-			// and idle (agent_end, session_shutdown). PTY handles waiting_input and can
-			// also upgrade to busy when the spinner is visible (pure-thinking turns).
-			// Drop only PTY-detected idle — it's the default when no spinner is present
-			// and would clobber hook-delivered busy during fast tool calls.
-			if (session.partialHookDetection && detectedState === 'idle') {
+			// Partial-hook sessions (e.g. Pi): hooks are authoritative for busy/idle.
+			// turn_start + tool_call cover all busy entrances; agent_end +
+			// session_shutdown cover all idle entrances. PTY handles only waiting_input.
+			// Drop PTY-detected busy/idle entirely — stale spinner lines in the 30-line
+			// buffer would otherwise re-apply busy after agent_end fires idle.
+			if (
+				session.partialHookDetection &&
+				detectedState !== 'waiting_input' &&
+				detectedState !== 'pending_auto_approval'
+			) {
 				return;
 			}
 
