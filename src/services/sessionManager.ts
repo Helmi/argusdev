@@ -1017,15 +1017,12 @@ ${commandTokens.join(' ')}
 			const detectedState = this.detectTerminalState(session);
 			const now = Date.now();
 
-			// Partial-hook sessions (e.g. Pi): PTY polling only handles waiting_input.
-			// busy/idle come exclusively from hook events — drop PTY-detected busy/idle
-			// so a fast tool call whose spinner hasn't rendered yet can't clobber the
-			// hook-delivered busy state and cause oscillation.
-			if (
-				session.partialHookDetection &&
-				detectedState !== 'waiting_input' &&
-				detectedState !== 'pending_auto_approval'
-			) {
+			// Partial-hook sessions (e.g. Pi): hooks cover busy (turn_start, tool_call)
+			// and idle (agent_end, session_shutdown). PTY handles waiting_input and can
+			// also upgrade to busy when the spinner is visible (pure-thinking turns).
+			// Drop only PTY-detected idle — it's the default when no spinner is present
+			// and would clobber hook-delivered busy during fast tool calls.
+			if (session.partialHookDetection && detectedState === 'idle') {
 				return;
 			}
 

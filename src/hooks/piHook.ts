@@ -18,6 +18,11 @@ export default function (pi: {
 	const post = (state: string) =>
 		fetch(`${base}/${state}`, {method: 'POST'}).catch(() => {});
 
+	// turn_start covers thinking/generation before the first tool_call
+	pi.on('turn_start', () => {
+		void post('busy');
+	});
+
 	pi.on('tool_call', () => {
 		void post('busy');
 	});

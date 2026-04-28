@@ -1113,9 +1113,9 @@ describe('SessionManager', () => {
 			});
 
 			it('PTY-detected idle must not overwrite hook-delivered busy for partial-hook sessions', async () => {
-				// Regression: detectPiState returns idle when no spinner is visible.
-				// A fast tool_call (hook → busy) followed by a poll cycle must NOT
-				// clobber the busy state via PTY-detected idle.
+				// Regression for original P1: detectPiState returns idle when no spinner
+				// is visible. A fast tool_call (hook → busy) followed by a poll cycle must
+				// NOT clobber the busy state via PTY-detected idle.
 				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 
 				const session = await Effect.runPromise(
@@ -1132,18 +1132,63 @@ describe('SessionManager', () => {
 					),
 				);
 
-				// Hook fires tool_call → busy
+				// Hook fires turn_start/tool_call → busy
 				sessionManager.applyHookStateEvent(session.id, 'busy');
 				await new Promise(resolve => setTimeout(resolve, 10));
 				expect(session.stateMutex.getSnapshot().state).toBe('busy');
 
 				// Wait for multiple poll cycles. The mocked terminal has no spinner so
-				// detectPiState would return idle — but partialHookDetection must suppress
-				// PTY-detected busy/idle and leave the hook-delivered busy in place.
+				// detectPiState returns idle — the guard must drop PTY-idle and leave
+				// hook-delivered busy in place.
 				await new Promise(resolve =>
 					setTimeout(resolve, STATE_CHECK_INTERVAL_MS * 3 + 50),
 				);
 				expect(session.stateMutex.getSnapshot().state).toBe('busy');
+			});
+
+			it('PTY-detected busy must reach session state for partial-hook sessions (pure-thinking gap)', async () => {
+				// Regression for new P2: during pure-thinking turns no tool_call fires,
+				// so hooks do not post busy. PTY spinner detection must still be able to
+				// upgrade the session to busy before agent_end fires.
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						'/test/worktree',
+						'pi',
+						[],
+						'pi',
+						'Pi Thinking Session',
+						'pi',
+						undefined,
+						'agent',
+						{partialHookDetection: true},
+					),
+				);
+
+				expect(session.stateMutex.getSnapshot().state).toBe('idle');
+
+				// Spy on detectTerminalState to simulate the Pi spinner being visible —
+				// setting up a real spinner in the mocked xterm buffer would require
+				// reimplementing the terminal mock, so we inject at the detection boundary.
+				const detectSpy = vi
+					.spyOn(sessionManager, 'detectTerminalState')
+					.mockReturnValue('busy');
+
+				// Wait for STATE_PERSISTENCE_DURATION_MS + margin to let the pending
+				// state expire and be confirmed (same path as non-hook sessions).
+				const {STATE_PERSISTENCE_DURATION_MS} = await import(
+					'../constants/statePersistence.js'
+				);
+				await new Promise(resolve =>
+					setTimeout(
+						resolve,
+						STATE_PERSISTENCE_DURATION_MS + STATE_CHECK_INTERVAL_MS * 3 + 100,
+					),
+				);
+
+				expect(session.stateMutex.getSnapshot().state).toBe('busy');
+				detectSpy.mockRestore();
 			});
 
 			it('should call hookCleanup on session exit', async () => {
