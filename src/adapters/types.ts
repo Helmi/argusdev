@@ -45,10 +45,12 @@ export interface SessionFileMetadata {
 /**
  * Result of generateHookConfig. argsToInject is passed to the agent CLI.
  * cleanup removes any generated files on session end.
+ * partialHook: when true, PTY polling still runs alongside hooks (for waiting_input).
  */
 export interface HookConfigResult {
 	argsToInject: string[];
 	cleanup: () => void;
+	partialHook?: boolean;
 }
 
 export interface AgentAdapter {

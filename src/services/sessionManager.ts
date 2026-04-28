@@ -46,6 +46,7 @@ interface AgentBootstrapOptions {
 	prependCwd?: boolean;
 	sessionIdOverride?: string;
 	hookBasedDetection?: boolean;
+	partialHookDetection?: boolean;
 	hookCleanup?: () => void;
 }
 
@@ -353,7 +354,11 @@ ${commandTokens.join(' ')}
 	 */
 	applyHookStateEvent(sessionId: string, newState: SessionState): void {
 		const session = this.sessions.get(sessionId);
-		if (!session || !session.hookBasedDetection) return;
+		if (
+			!session ||
+			(!session.hookBasedDetection && !session.partialHookDetection)
+		)
+			return;
 
 		// Auto-approval integration: convert waiting_input to pending_auto_approval
 		let resolvedState = newState;
@@ -577,6 +582,7 @@ ${commandTokens.join(' ')}
 			isPrimaryCommand?: boolean;
 			detectionStrategy?: StateDetectionStrategy;
 			hookBasedDetection?: boolean;
+			partialHookDetection?: boolean;
 			hookCleanup?: () => void;
 			devcontainerConfig?: DevcontainerConfig;
 			sessionName?: string;
@@ -607,12 +613,16 @@ ${commandTokens.join(' ')}
 			commandConfig,
 			detectionStrategy: options.detectionStrategy ?? 'claude',
 			hookBasedDetection: options.hookBasedDetection ?? false,
+			partialHookDetection: options.partialHookDetection ?? false,
 			hookCleanup: options.hookCleanup,
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			stateMutex: new Mutex({
 				...createInitialSessionStateData(),
 				// Hook-based sessions start idle — hooks will signal busy
-				state: options.hookBasedDetection ? 'idle' : 'busy',
+				state:
+					options.hookBasedDetection || options.partialHookDetection
+						? 'idle'
+						: 'busy',
 			}),
 		};
 
@@ -772,6 +782,7 @@ ${commandTokens.join(' ')}
 						isPrimaryCommand: true,
 						detectionStrategy: detectionStrategy,
 						hookBasedDetection: bootstrapOptions?.hookBasedDetection,
+						partialHookDetection: bootstrapOptions?.partialHookDetection,
 						hookCleanup: bootstrapOptions?.hookCleanup,
 						sessionName: sessionName,
 						agentId: agentId,
@@ -973,13 +984,19 @@ ${commandTokens.join(' ')}
 		// Setup data handler
 		this.setupDataHandler(session);
 
-		if (session.hookBasedDetection) {
-			// Hook-based sessions receive state from HTTP events — no polling needed.
+		if (session.hookBasedDetection && !session.partialHookDetection) {
+			// Full hook-based sessions receive state from HTTP events — no polling needed.
 			logger.info(
 				`[SessionManager] Session ${session.id} using hook-based state detection, skipping polling`,
 			);
 			this.setupExitHandler(session);
 			return;
+		}
+
+		if (session.partialHookDetection) {
+			logger.info(
+				`[SessionManager] Session ${session.id} using partial hook-based detection (hooks for busy/idle, PTY polling for waiting_input)`,
+			);
 		}
 
 		// Hot reload protection: Clear existing interval if any

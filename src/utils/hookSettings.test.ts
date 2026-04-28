@@ -12,8 +12,14 @@ import {tmpdir} from 'os';
 import {join} from 'path';
 
 let configDirOverride = '';
+let piSettingsDirOverride = '';
+
 vi.mock('./configDir.js', () => ({
 	getConfigDir: () => configDirOverride,
+}));
+
+vi.mock('../adapters/helpers.js', () => ({
+	homePath: (...parts: string[]) => join(piSettingsDirOverride, ...parts),
 }));
 
 const {
@@ -26,6 +32,7 @@ const {
 	writeCodexHookFiles,
 	writeHookSettingsFile,
 	writeOpencodePluginFile,
+	writePiExtensionSettings,
 } = await import('./hookSettings.js');
 
 describe('buildClaudeHookSettings', () => {
@@ -566,5 +573,106 @@ describe('writeOpencodePluginFile', () => {
 		writeFileSync(join(pluginsDir, 'other.js'), '// other');
 		cleanup();
 		expect(existsSync(pluginsDir)).toBe(true);
+	});
+});
+
+// ── Pi extension settings ─────────────────────────────────────────────────────
+
+describe('writePiExtensionSettings', () => {
+	let piHome: string;
+	const hookPath = '/path/to/dist/hooks/piHook.js';
+
+	beforeEach(() => {
+		piHome = mkdtempSync(join(tmpdir(), 'argusdev-pi-test-'));
+		piSettingsDirOverride = piHome;
+	});
+
+	afterEach(() => {
+		rmSync(piHome, {recursive: true, force: true});
+	});
+
+	it('creates settings.json with our hook path when none exists', () => {
+		const settingsPath = join(piHome, '.pi', 'agent', 'settings.json');
+		writePiExtensionSettings(hookPath);
+		expect(existsSync(settingsPath)).toBe(true);
+		const data = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+		expect(data.extensions).toContain(hookPath);
+	});
+
+	it('appends to existing extensions array without removing others', () => {
+		const dir = join(piHome, '.pi', 'agent');
+		mkdirSync(dir, {recursive: true});
+		const settingsPath = join(dir, 'settings.json');
+		writeFileSync(
+			settingsPath,
+			JSON.stringify({extensions: ['/other/ext.js'], theme: 'dark'}),
+		);
+
+		writePiExtensionSettings(hookPath);
+
+		const data = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+		expect(data.extensions).toContain('/other/ext.js');
+		expect(data.extensions).toContain(hookPath);
+		expect(data.theme).toBe('dark');
+	});
+
+	it('does not duplicate our entry when called twice', () => {
+		writePiExtensionSettings(hookPath);
+		writePiExtensionSettings(hookPath);
+		const settingsPath = join(piHome, '.pi', 'agent', 'settings.json');
+		const data = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+		expect(data.extensions.filter((e: string) => e === hookPath)).toHaveLength(
+			1,
+		);
+	});
+
+	it('cleanup removes only our entry and preserves others', () => {
+		const dir = join(piHome, '.pi', 'agent');
+		mkdirSync(dir, {recursive: true});
+		const settingsPath = join(dir, 'settings.json');
+		writeFileSync(
+			settingsPath,
+			JSON.stringify({extensions: ['/other/ext.js']}),
+		);
+
+		const cleanup = writePiExtensionSettings(hookPath);
+		cleanup();
+
+		const data = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+		expect(data.extensions).not.toContain(hookPath);
+		expect(data.extensions).toContain('/other/ext.js');
+	});
+
+	it('cleanup is a no-op if settings.json is gone', () => {
+		const cleanup = writePiExtensionSettings(hookPath);
+		rmSync(join(piHome, '.pi', 'agent', 'settings.json'));
+		expect(() => cleanup()).not.toThrow();
+	});
+
+	it('cleanup leaves file intact when our entry was not present', () => {
+		const dir = join(piHome, '.pi', 'agent');
+		mkdirSync(dir, {recursive: true});
+		const settingsPath = join(dir, 'settings.json');
+		writeFileSync(
+			settingsPath,
+			JSON.stringify({extensions: ['/other/ext.js']}),
+		);
+
+		const cleanup = writePiExtensionSettings(hookPath);
+		// Manually remove our entry before calling cleanup
+		const data = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+		data.extensions = data.extensions.filter((e: string) => e !== hookPath);
+		writeFileSync(settingsPath, JSON.stringify(data));
+
+		cleanup();
+
+		const final = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+		expect(final.extensions).toContain('/other/ext.js');
+	});
+
+	it('writes atomically (no .argusdev-tmp leftover)', () => {
+		writePiExtensionSettings(hookPath);
+		const settingsPath = join(piHome, '.pi', 'agent', 'settings.json');
+		expect(existsSync(`${settingsPath}.argusdev-tmp`)).toBe(false);
 	});
 });

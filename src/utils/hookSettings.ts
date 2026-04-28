@@ -10,7 +10,9 @@ import {
 	existsSync,
 } from 'fs';
 import {join} from 'path';
+import {fileURLToPath} from 'url';
 import {getConfigDir} from './configDir.js';
+import {homePath} from '../adapters/helpers.js';
 
 /**
  * Build Claude Code settings object with HTTP hooks for state detection.
@@ -357,6 +359,87 @@ export function writeOpencodePluginFile(
 			}
 		}
 	};
+}
+
+/**
+ * Resolve the compiled piHook.js path for the current installation.
+ * src/hooks/piHook.ts compiles to dist/hooks/piHook.js; this file
+ * compiles to dist/utils/hookSettings.js, so the hook is one level up.
+ */
+function piHookPath(): string {
+	const thisFile = fileURLToPath(import.meta.url);
+	return join(thisFile, '..', '..', 'hooks', 'piHook.js');
+}
+
+const PI_SETTINGS_PATH = () => homePath('.pi', 'agent', 'settings.json');
+
+/**
+ * Patch ~/.pi/agent/settings.json to include the ArgusDev Pi extension.
+ * Appends our hook path to the existing extensions array surgically —
+ * does not snapshot/restore the whole file, to avoid clobbering concurrent changes.
+ *
+ * Returns a cleanup function that removes only our entry.
+ */
+export function writePiExtensionSettings(hookPath: string): () => void {
+	const settingsPath = PI_SETTINGS_PATH();
+	const dir = join(settingsPath, '..');
+	mkdirSync(dir, {recursive: true});
+
+	let existing: Record<string, unknown> = {};
+	if (existsSync(settingsPath)) {
+		try {
+			existing = JSON.parse(readFileSync(settingsPath, 'utf-8')) as Record<
+				string,
+				unknown
+			>;
+		} catch {
+			// Malformed settings — start fresh
+		}
+	}
+
+	const extensions: string[] = Array.isArray(existing['extensions'])
+		? (existing['extensions'] as string[])
+		: [];
+
+	if (!extensions.includes(hookPath)) {
+		extensions.push(hookPath);
+	}
+
+	const patched = {...existing, extensions};
+	const tmpPath = `${settingsPath}.argusdev-tmp`;
+	writeFileSync(tmpPath, JSON.stringify(patched, null, 2), {
+		encoding: 'utf-8',
+		mode: 0o600,
+	});
+	renameSync(tmpPath, settingsPath);
+
+	return () => {
+		try {
+			const raw = readFileSync(settingsPath, 'utf-8');
+			const current = JSON.parse(raw) as Record<string, unknown>;
+			const currentExtensions: string[] = Array.isArray(current['extensions'])
+				? (current['extensions'] as string[])
+				: [];
+			const filtered = currentExtensions.filter(e => e !== hookPath);
+			const restored = {...current, extensions: filtered};
+			const tmpCleanup = `${settingsPath}.argusdev-tmp`;
+			writeFileSync(tmpCleanup, JSON.stringify(restored, null, 2), {
+				encoding: 'utf-8',
+				mode: 0o600,
+			});
+			renameSync(tmpCleanup, settingsPath);
+		} catch {
+			// Best-effort — if settings.json is gone or unreadable, skip
+		}
+	};
+}
+
+/**
+ * Resolve the absolute path to the compiled piHook.js and call
+ * writePiExtensionSettings. Returns the cleanup fn.
+ */
+export function writePiHookFiles(): () => void {
+	return writePiExtensionSettings(piHookPath());
 }
 
 function patchCodexConfigToml(codexDir: string): void {

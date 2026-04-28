@@ -10,7 +10,12 @@ import {
 	safeReadJsonLines,
 	withinRecentWindow,
 } from './helpers.js';
-import type {ConversationMessage, SessionFileMetadata} from './types.js';
+import {writePiHookFiles} from '../utils/hookSettings.js';
+import type {
+	ConversationMessage,
+	HookConfigResult,
+	SessionFileMetadata,
+} from './types.js';
 
 export class PiAdapter extends BaseAgentAdapter {
 	constructor() {
@@ -22,6 +27,15 @@ export class PiAdapter extends BaseAgentAdapter {
 			detectionStrategy: 'pi',
 			sessionFormat: 'jsonl',
 		});
+	}
+
+	override generateHookConfig(
+		_worktreePath: string,
+		_port: number,
+		_sessionId: string,
+	): HookConfigResult {
+		const cleanup = writePiHookFiles();
+		return {argsToInject: [], cleanup, partialHook: true};
 	}
 
 	override async findSessionFile(

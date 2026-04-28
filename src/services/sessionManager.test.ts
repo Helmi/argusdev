@@ -1081,6 +1081,36 @@ describe('SessionManager', () => {
 				expect(session.stateMutex.getSnapshot().state).toBe(stateBefore);
 			});
 
+			it('should accept hook events when partialHookDetection is true', async () => {
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						'/test/worktree',
+						'pi',
+						[],
+						'pi',
+						'Pi Session',
+						'pi',
+						undefined,
+						'agent',
+						{partialHookDetection: true},
+					),
+				);
+
+				expect(session.partialHookDetection).toBe(true);
+				expect(session.hookBasedDetection).toBe(false);
+				expect(session.stateMutex.getSnapshot().state).toBe('idle');
+
+				sessionManager.applyHookStateEvent(session.id, 'busy');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe('busy');
+
+				sessionManager.applyHookStateEvent(session.id, 'idle');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe('idle');
+			});
+
 			it('should call hookCleanup on session exit', async () => {
 				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
 

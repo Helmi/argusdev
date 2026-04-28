@@ -757,6 +757,7 @@ export class APIServer {
 			// Hook-based state detection for recovery sessions
 			const recoveryArgs = [...codexArgsPlan.args];
 			let recoveryHookBased = false;
+			let recoveryPartialHook = false;
 			let recoveryHookCleanup: (() => void) | undefined;
 			const isRecoveryClaudeAgent =
 				agent.id === 'claude' ||
@@ -781,10 +782,23 @@ export class APIServer {
 						);
 						if (hookResult) {
 							recoveryArgs.push(...hookResult.argsToInject);
-							recoveryHookBased = true;
+							if (hookResult.partialHook) {
+								recoveryPartialHook = true;
+							} else {
+								recoveryHookBased = true;
+							}
 							recoveryHookCleanup = hookResult.cleanup;
 						}
 					}
+				}
+			}
+
+			// Partial hook sessions (e.g. Pi) read session context from env vars
+			if (recoveryPartialHook) {
+				const port = configurationManager.getPort();
+				if (port) {
+					extraEnv['ARGUSDEV_SESSION_ID'] = record.id;
+					extraEnv['ARGUSDEV_PORT'] = String(port);
 				}
 			}
 
@@ -803,6 +817,7 @@ export class APIServer {
 					sessionIdOverride: record.id,
 					initialPrompt: canInjectFallbackPrompt ? fallbackPrompt : undefined,
 					hookBasedDetection: recoveryHookBased,
+					partialHookDetection: recoveryPartialHook,
 					hookCleanup: recoveryHookCleanup,
 				},
 			);
@@ -2888,6 +2903,7 @@ export class APIServer {
 
 			// Hook-based state detection: inject hooks for supported agents.
 			let hookBasedDetection = false;
+			let partialHookDetection = false;
 			let hookCleanup: (() => void) | undefined;
 			const preGeneratedSessionId =
 				coreService.sessionManager.createSessionId();
@@ -2916,7 +2932,11 @@ export class APIServer {
 						);
 						if (hookResult) {
 							args.push(...hookResult.argsToInject);
-							hookBasedDetection = true;
+							if (hookResult.partialHook) {
+								partialHookDetection = true;
+							} else {
+								hookBasedDetection = true;
+							}
 							hookCleanup = hookResult.cleanup;
 							logger.info(
 								`API: Injecting hook-based state detection for session ${preGeneratedSessionId} via adapter ${adapterForHook?.id}`,
@@ -2927,6 +2947,15 @@ export class APIServer {
 					logger.warn(
 						'API: No port configured — skipping hook-based state detection',
 					);
+				}
+			}
+
+			// Partial hook sessions (e.g. Pi) read session context from env vars
+			if (partialHookDetection) {
+				const port = configurationManager.getPort();
+				if (port) {
+					extraEnv['ARGUSDEV_SESSION_ID'] = preGeneratedSessionId;
+					extraEnv['ARGUSDEV_PORT'] = String(port);
 				}
 			}
 
@@ -2946,10 +2975,12 @@ export class APIServer {
 						: undefined,
 					promptArg: normalizedPromptArg,
 					prependCwd: agent.prependCwd,
-					sessionIdOverride: hookBasedDetection
-						? preGeneratedSessionId
-						: undefined,
+					sessionIdOverride:
+						hookBasedDetection || partialHookDetection
+							? preGeneratedSessionId
+							: undefined,
 					hookBasedDetection,
+					partialHookDetection,
 					hookCleanup,
 				},
 			);
