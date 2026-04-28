@@ -2,6 +2,7 @@ import {
 	writeFileSync,
 	unlinkSync,
 	mkdirSync,
+	rmdirSync,
 	readdirSync,
 	renameSync,
 	chmodSync,
@@ -264,6 +265,91 @@ export function cleanupCodexHookFiles(worktreePath: string): void {
 	} catch {
 		// File already gone — fine
 	}
+}
+
+const OPENCODE_PLUGIN_FILENAME = 'argusdev-state.js';
+
+/**
+ * Generate the ArgusDev state-detection plugin for OpenCode.
+ *
+ * Port and sessionId are baked into the file so no extra env vars or CLI args
+ * are needed. The plugin:
+ *   - tool.execute.before  → POST busy
+ *   - event(session.idle)  → POST idle
+ *   - event(session.status, type=idle) → POST idle
+ *
+ * waiting_input is intentionally not covered here — PTY regex fallback handles
+ * it (no clean signal is available from the plugin API without core changes).
+ */
+export function buildOpencodePluginContent(
+	port: number,
+	sessionId: string,
+): string {
+	const base = `http://127.0.0.1:${port}/api/internal/sessions/${encodeURIComponent(sessionId)}/hook-state`;
+
+	return `// ArgusDev state-detection plugin — auto-generated, do not edit
+export const server = async () => ({
+  "tool.execute.before": async (_input, output) => {
+    fetch("${base}/busy", { method: "POST" }).catch(() => {});
+    return output;
+  },
+  event: async ({ event }) => {
+    if (
+      event.type === "session.idle" ||
+      (event.type === "session.status" && event.properties?.status?.type === "idle")
+    ) {
+      fetch("${base}/idle", { method: "POST" }).catch(() => {});
+    }
+  },
+});
+`;
+}
+
+/**
+ * Write the ArgusDev plugin to <worktreePath>/.opencode/plugins/ and return
+ * a cleanup function that removes the file (and the directory if ArgusDev
+ * created it).
+ *
+ * Surgical: the plugin filename (argusdev-state.js) is unique to ArgusDev so
+ * no user file is ever overwritten. No opencode.json patching needed — OpenCode
+ * auto-loads all .js/.ts files from .opencode/plugins/.
+ */
+export function writeOpencodePluginFile(
+	worktreePath: string,
+	port: number,
+	sessionId: string,
+): () => void {
+	const pluginsDir = join(worktreePath, '.opencode', 'plugins');
+	const pluginPath = join(pluginsDir, OPENCODE_PLUGIN_FILENAME);
+	const dirExisted = existsSync(pluginsDir);
+
+	mkdirSync(pluginsDir, {recursive: true});
+
+	const tmpPath = `${pluginPath}.tmp`;
+	writeFileSync(tmpPath, buildOpencodePluginContent(port, sessionId), {
+		encoding: 'utf-8',
+		mode: 0o600,
+	});
+	renameSync(tmpPath, pluginPath);
+
+	return () => {
+		try {
+			unlinkSync(pluginPath);
+		} catch {
+			// File already gone — fine
+		}
+		if (!dirExisted) {
+			// Only remove the directory if ArgusDev created it and it is now empty
+			try {
+				const remaining = readdirSync(pluginsDir);
+				if (remaining.length === 0) {
+					rmdirSync(pluginsDir);
+				}
+			} catch {
+				// Best-effort
+			}
+		}
+	};
 }
 
 function patchCodexConfigToml(codexDir: string): void {

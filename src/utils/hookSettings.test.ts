@@ -19,11 +19,13 @@ vi.mock('./configDir.js', () => ({
 const {
 	buildClaudeHookSettings,
 	buildCodexHookConfig,
+	buildOpencodePluginContent,
 	cleanupCodexHookFiles,
 	cleanupHookSettingsFile,
 	sweepOrphanHookSettings,
 	writeCodexHookFiles,
 	writeHookSettingsFile,
+	writeOpencodePluginFile,
 } = await import('./hookSettings.js');
 
 describe('buildClaudeHookSettings', () => {
@@ -400,5 +402,146 @@ describe('writeCodexHookFiles', () => {
 		cleanupCodexHookFiles(worktree);
 		expect(existsSync(hooksPath)).toBe(false);
 		expect(() => cleanupCodexHookFiles(worktree)).not.toThrow();
+	});
+});
+
+// ── OpenCode plugin ───────────────────────────────────────────────────────────
+
+describe('buildOpencodePluginContent', () => {
+	it('returns valid JS with a named server export', () => {
+		const content = buildOpencodePluginContent(8080, 'ses-oc');
+		expect(content).toContain('export const server');
+	});
+
+	it('embeds port and session ID in fetch URLs', () => {
+		const content = buildOpencodePluginContent(54321, 'ses-oc-123');
+		expect(content).toContain('127.0.0.1:54321');
+		expect(content).toContain('/sessions/ses-oc-123/');
+	});
+
+	it('encodes session IDs with special characters', () => {
+		const content = buildOpencodePluginContent(8080, 'session with spaces');
+		expect(content).toContain('session%20with%20spaces');
+	});
+
+	it('includes tool.execute.before mapping to busy', () => {
+		const content = buildOpencodePluginContent(8080, 'ses');
+		expect(content).toContain('"tool.execute.before"');
+		expect(content).toContain('/hook-state/busy');
+	});
+
+	it('includes event handler mapping session.idle to idle', () => {
+		const content = buildOpencodePluginContent(8080, 'ses');
+		expect(content).toContain('event');
+		expect(content).toContain('session.idle');
+		expect(content).toContain('/hook-state/idle');
+	});
+
+	it('includes session.status idle mapping', () => {
+		const content = buildOpencodePluginContent(8080, 'ses');
+		expect(content).toContain('session.status');
+	});
+});
+
+describe('writeOpencodePluginFile', () => {
+	let worktree: string;
+
+	beforeEach(() => {
+		worktree = mkdtempSync(join(tmpdir(), 'argusdev-opencode-test-'));
+	});
+
+	afterEach(() => {
+		rmSync(worktree, {recursive: true, force: true});
+	});
+
+	it('writes plugin file in <worktree>/.opencode/plugins/', () => {
+		writeOpencodePluginFile(worktree, 8080, 'ses-1');
+		const pluginPath = join(
+			worktree,
+			'.opencode',
+			'plugins',
+			'argusdev-state.js',
+		);
+		expect(existsSync(pluginPath)).toBe(true);
+		expect(readFileSync(pluginPath, 'utf-8')).toContain('export const server');
+	});
+
+	it('writes plugin file with mode 0600', () => {
+		writeOpencodePluginFile(worktree, 8080, 'ses-mode');
+		const pluginPath = join(
+			worktree,
+			'.opencode',
+			'plugins',
+			'argusdev-state.js',
+		);
+		const mode = statSync(pluginPath).mode & 0o777;
+		expect(mode).toBe(0o600);
+	});
+
+	it('creates .opencode/plugins/ when absent', () => {
+		expect(existsSync(join(worktree, '.opencode', 'plugins'))).toBe(false);
+		writeOpencodePluginFile(worktree, 8080, 'ses-dir');
+		expect(existsSync(join(worktree, '.opencode', 'plugins'))).toBe(true);
+	});
+
+	it('cleanup fn removes plugin file', () => {
+		const cleanup = writeOpencodePluginFile(worktree, 8080, 'ses-clean');
+		const pluginPath = join(
+			worktree,
+			'.opencode',
+			'plugins',
+			'argusdev-state.js',
+		);
+		expect(existsSync(pluginPath)).toBe(true);
+		cleanup();
+		expect(existsSync(pluginPath)).toBe(false);
+	});
+
+	it('cleanup fn removes plugins dir when ArgusDev created it', () => {
+		const cleanup = writeOpencodePluginFile(worktree, 8080, 'ses-rmdir');
+		cleanup();
+		expect(existsSync(join(worktree, '.opencode', 'plugins'))).toBe(false);
+	});
+
+	it('cleanup fn leaves plugins dir when it pre-existed', () => {
+		const pluginsDir = join(worktree, '.opencode', 'plugins');
+		mkdirSync(pluginsDir, {recursive: true});
+		writeFileSync(join(pluginsDir, 'user-plugin.js'), '// user plugin');
+
+		const cleanup = writeOpencodePluginFile(worktree, 8080, 'ses-keep');
+		cleanup();
+
+		expect(existsSync(pluginsDir)).toBe(true);
+		expect(existsSync(join(pluginsDir, 'user-plugin.js'))).toBe(true);
+	});
+
+	it('does not stomp user plugins when dir pre-existed', () => {
+		const pluginsDir = join(worktree, '.opencode', 'plugins');
+		mkdirSync(pluginsDir, {recursive: true});
+		const userPlugin = join(pluginsDir, 'my-plugin.js');
+		writeFileSync(userPlugin, '// mine');
+
+		writeOpencodePluginFile(worktree, 8080, 'ses-nostop');
+
+		expect(readFileSync(userPlugin, 'utf-8')).toBe('// mine');
+	});
+
+	it('is idempotent — second call overwrites with new session params', () => {
+		writeOpencodePluginFile(worktree, 8080, 'ses-first');
+		writeOpencodePluginFile(worktree, 9090, 'ses-second');
+		const content = readFileSync(
+			join(worktree, '.opencode', 'plugins', 'argusdev-state.js'),
+			'utf-8',
+		);
+		expect(content).toContain(':9090');
+		expect(content).toContain('ses-second');
+	});
+
+	it('cleanup does not remove non-empty plugins dir it created', () => {
+		const cleanup = writeOpencodePluginFile(worktree, 8080, 'ses-nonempty');
+		const pluginsDir = join(worktree, '.opencode', 'plugins');
+		writeFileSync(join(pluginsDir, 'other.js'), '// other');
+		cleanup();
+		expect(existsSync(pluginsDir)).toBe(true);
 	});
 });

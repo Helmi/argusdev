@@ -12,7 +12,12 @@ import {
 	safeReadJsonLines,
 	withinRecentWindow,
 } from './helpers.js';
-import type {ConversationMessage, SessionFileMetadata} from './types.js';
+import {writeOpencodePluginFile} from '../utils/hookSettings.js';
+import type {
+	ConversationMessage,
+	HookConfigResult,
+	SessionFileMetadata,
+} from './types.js';
 
 function parseOpencodeMessages(sessionFilePath: string): ConversationMessage[] {
 	const ext = path.extname(sessionFilePath).toLowerCase();
@@ -89,6 +94,15 @@ export class OpencodeAdapter extends BaseAgentAdapter {
 			command: 'opencode',
 			sessionFormat: 'multi-file',
 		});
+	}
+
+	override generateHookConfig(
+		worktreePath: string,
+		port: number,
+		sessionId: string,
+	): HookConfigResult {
+		const cleanup = writeOpencodePluginFile(worktreePath, port, sessionId);
+		return {argsToInject: [], cleanup};
 	}
 
 	override async findSessionFile(
