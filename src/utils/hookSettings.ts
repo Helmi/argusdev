@@ -368,7 +368,10 @@ export function writeOpencodePluginFile(
  */
 function piHookPath(): string {
 	const thisFile = fileURLToPath(import.meta.url);
-	return join(thisFile, '..', '..', 'hooks', 'piHook.js');
+	const jsCandidate = join(thisFile, '..', '..', 'hooks', 'piHook.js');
+	if (existsSync(jsCandidate)) return jsCandidate;
+	// Dev mode: running from src/ via tsx — jiti can load .ts directly
+	return join(thisFile, '..', '..', 'hooks', 'piHook.ts');
 }
 
 const PI_SETTINGS_PATH = () => homePath('.pi', 'agent', 'settings.json');

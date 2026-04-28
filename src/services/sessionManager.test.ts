@@ -9,6 +9,7 @@ import {join} from 'path';
 import {tmpdir} from 'os';
 import {mkdtemp, rm, readFile} from 'fs/promises';
 import * as startupScript from '../utils/startupScript.js';
+import {STATE_CHECK_INTERVAL_MS} from '../constants/statePersistence.js';
 
 // Mock node-pty
 vi.mock('node-pty', () => ({
@@ -1109,6 +1110,40 @@ describe('SessionManager', () => {
 				sessionManager.applyHookStateEvent(session.id, 'idle');
 				await new Promise(resolve => setTimeout(resolve, 10));
 				expect(session.stateMutex.getSnapshot().state).toBe('idle');
+			});
+
+			it('PTY-detected idle must not overwrite hook-delivered busy for partial-hook sessions', async () => {
+				// Regression: detectPiState returns idle when no spinner is visible.
+				// A fast tool_call (hook → busy) followed by a poll cycle must NOT
+				// clobber the busy state via PTY-detected idle.
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						'/test/worktree',
+						'pi',
+						[],
+						'pi',
+						'Pi Partial Hook Session',
+						'pi',
+						undefined,
+						'agent',
+						{partialHookDetection: true},
+					),
+				);
+
+				// Hook fires tool_call → busy
+				sessionManager.applyHookStateEvent(session.id, 'busy');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe('busy');
+
+				// Wait for multiple poll cycles. The mocked terminal has no spinner so
+				// detectPiState would return idle — but partialHookDetection must suppress
+				// PTY-detected busy/idle and leave the hook-delivered busy in place.
+				await new Promise(resolve =>
+					setTimeout(resolve, STATE_CHECK_INTERVAL_MS * 3 + 50),
+				);
+				expect(session.stateMutex.getSnapshot().state).toBe('busy');
 			});
 
 			it('should call hookCleanup on session exit', async () => {

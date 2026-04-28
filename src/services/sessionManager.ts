@@ -1017,6 +1017,18 @@ ${commandTokens.join(' ')}
 			const detectedState = this.detectTerminalState(session);
 			const now = Date.now();
 
+			// Partial-hook sessions (e.g. Pi): PTY polling only handles waiting_input.
+			// busy/idle come exclusively from hook events — drop PTY-detected busy/idle
+			// so a fast tool call whose spinner hasn't rendered yet can't clobber the
+			// hook-delivered busy state and cause oscillation.
+			if (
+				session.partialHookDetection &&
+				detectedState !== 'waiting_input' &&
+				detectedState !== 'pending_auto_approval'
+			) {
+				return;
+			}
+
 			// If detected state is different from current state
 			if (detectedState !== oldState) {
 				// If this is a new pending state or the pending state changed
