@@ -202,46 +202,67 @@ describe('buildCodexHookConfig', () => {
 		expect(cfg.hooks.Stop).toHaveLength(1);
 	});
 
-	it('uses command type with curl (not http type)', () => {
+	it('uses nested wrapper shape with type:command (not flat command field)', () => {
+		// Codex schema: EventName: [{ hooks: [{ type: "command", command: "..." }] }]
 		const cfg = JSON.parse(buildCodexHookConfig(8080, 'ses-x'));
 		const entry = cfg.hooks.Stop[0];
-		expect(entry.command).toBeDefined();
-		expect(entry.command).toContain('curl');
-		expect(entry.type).toBeUndefined();
+		expect(entry.command).toBeUndefined();
+		expect(entry.hooks).toHaveLength(1);
+		expect(entry.hooks[0].type).toBe('command');
+		expect(entry.hooks[0].command).toContain('curl');
+	});
+
+	it('PreToolUse has matcher:Bash and correct nested shape', () => {
+		const cfg = JSON.parse(buildCodexHookConfig(8080, 'ses-x'));
+		const entry = cfg.hooks.PreToolUse[0];
+		expect(entry.matcher).toBe('Bash');
+		expect(entry.hooks[0].type).toBe('command');
+		expect(entry.hooks[0].command).toContain('/hook-state/busy');
 	});
 
 	it('maps UserPromptSubmit to busy', () => {
 		const cfg = JSON.parse(buildCodexHookConfig(8080, 'ses-x'));
-		expect(cfg.hooks.UserPromptSubmit[0].command).toContain('/hook-state/busy');
-	});
-
-	it('maps PreToolUse to busy', () => {
-		const cfg = JSON.parse(buildCodexHookConfig(8080, 'ses-x'));
-		expect(cfg.hooks.PreToolUse[0].command).toContain('/hook-state/busy');
+		expect(cfg.hooks.UserPromptSubmit[0].hooks[0].command).toContain(
+			'/hook-state/busy',
+		);
 	});
 
 	it('maps PermissionRequest to waiting_input', () => {
 		const cfg = JSON.parse(buildCodexHookConfig(8080, 'ses-x'));
-		expect(cfg.hooks.PermissionRequest[0].command).toContain(
+		expect(cfg.hooks.PermissionRequest[0].hooks[0].command).toContain(
 			'/hook-state/waiting_input',
 		);
 	});
 
 	it('maps Stop to idle', () => {
 		const cfg = JSON.parse(buildCodexHookConfig(8080, 'ses-x'));
-		expect(cfg.hooks.Stop[0].command).toContain('/hook-state/idle');
+		expect(cfg.hooks.Stop[0].hooks[0].command).toContain('/hook-state/idle');
+	});
+
+	it('matches exact nested shape for Stop event', () => {
+		const cfg = JSON.parse(buildCodexHookConfig(8080, 'ses-x'));
+		expect(cfg.hooks.Stop).toEqual([
+			{
+				hooks: [
+					{
+						type: 'command',
+						command: expect.stringContaining('/hook-state/idle'),
+					},
+				],
+			},
+		]);
 	});
 
 	it('embeds port and session ID in commands', () => {
 		const cfg = JSON.parse(buildCodexHookConfig(54321, 'session-test-xyz'));
-		const cmd = cfg.hooks.Stop[0].command;
+		const cmd = cfg.hooks.Stop[0].hooks[0].command;
 		expect(cmd).toContain('127.0.0.1:54321');
 		expect(cmd).toContain('/sessions/session-test-xyz/');
 	});
 
 	it('encodes session IDs with special characters', () => {
 		const cfg = JSON.parse(buildCodexHookConfig(8080, 'session with spaces'));
-		const cmd = cfg.hooks.Stop[0].command;
+		const cmd = cfg.hooks.Stop[0].hooks[0].command;
 		expect(cmd).toContain('session%20with%20spaces');
 	});
 });
@@ -313,11 +334,67 @@ describe('writeCodexHookFiles', () => {
 			join(worktree, '.codex', 'hooks.json'),
 			'utf-8',
 		);
-		expect(JSON.parse(content).hooks.Stop[0].command).toContain(':9090');
+		expect(JSON.parse(content).hooks.Stop[0].hooks[0].command).toContain(
+			':9090',
+		);
 	});
 
-	it('cleanup removes hooks.json and tolerates missing file', () => {
-		writeCodexHookFiles(worktree, 8080, 'ses-clean');
+	it('cleanup fn removes hooks.json when none pre-existed', () => {
+		const cleanup = writeCodexHookFiles(worktree, 8080, 'ses-clean');
+		const hooksPath = join(worktree, '.codex', 'hooks.json');
+		expect(existsSync(hooksPath)).toBe(true);
+		cleanup();
+		expect(existsSync(hooksPath)).toBe(false);
+	});
+
+	it('cleanup fn restores pre-existing hooks.json', () => {
+		const codexDir = join(worktree, '.codex');
+		mkdirSync(codexDir, {recursive: true});
+		const originalHooks = JSON.stringify({
+			hooks: {MyEvent: [{command: 'echo hi'}]},
+		});
+		writeFileSync(join(codexDir, 'hooks.json'), originalHooks, {
+			encoding: 'utf-8',
+		});
+
+		const cleanup = writeCodexHookFiles(worktree, 8080, 'ses-restore');
+		// ArgusDev hooks are now active
+		const active = readFileSync(join(codexDir, 'hooks.json'), 'utf-8');
+		expect(JSON.parse(active).hooks.Stop).toBeDefined();
+
+		cleanup();
+		// Original file is restored
+		const restored = readFileSync(join(codexDir, 'hooks.json'), 'utf-8');
+		expect(restored).toBe(originalHooks);
+		// Backup file is gone
+		expect(existsSync(join(codexDir, 'hooks.json.argusdev-backup'))).toBe(
+			false,
+		);
+	});
+
+	it('cleanup fn removes config.toml when it did not exist before', () => {
+		const cleanup = writeCodexHookFiles(worktree, 8080, 'ses-cfg-clean');
+		const configPath = join(worktree, '.codex', 'config.toml');
+		expect(existsSync(configPath)).toBe(true);
+		cleanup();
+		expect(existsSync(configPath)).toBe(false);
+	});
+
+	it('cleanup fn restores original config.toml content', () => {
+		const codexDir = join(worktree, '.codex');
+		mkdirSync(codexDir, {recursive: true});
+		const originalConfig = 'model = "gpt-4o"\n';
+		writeFileSync(join(codexDir, 'config.toml'), originalConfig);
+
+		const cleanup = writeCodexHookFiles(worktree, 8080, 'ses-cfg-restore');
+		cleanup();
+		expect(readFileSync(join(codexDir, 'config.toml'), 'utf-8')).toBe(
+			originalConfig,
+		);
+	});
+
+	it('cleanupCodexHookFiles removes hooks.json and tolerates missing file', () => {
+		writeCodexHookFiles(worktree, 8080, 'ses-legacy-clean');
 		const hooksPath = join(worktree, '.codex', 'hooks.json');
 		expect(existsSync(hooksPath)).toBe(true);
 		cleanupCodexHookFiles(worktree);

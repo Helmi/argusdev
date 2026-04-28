@@ -149,47 +149,67 @@ function hookSettingsPath(sessionId: string): string {
  * Build Codex hooks.json content wiring lifecycle events to ArgusDev's
  * internal hook-state endpoint via curl.
  *
- * Codex only supports `command` hook type (no native http type).
+ * Uses the nested wrapper shape Codex requires:
+ *   EventName: [{ hooks: [{ type: "command", command: "..." }] }]
+ * PreToolUse is scoped to Bash only via matcher to avoid spurious busy signals.
  *
  * Hook → State mapping:
- *   SessionStart     → ack only (no state change, but confirms hooks are wired)
+ *   SessionStart     → idle  (confirms hooks are wired on session start)
  *   UserPromptSubmit → busy
- *   PreToolUse       → busy  (Bash tool only — re-asserts busy during tool use)
+ *   PreToolUse       → busy  (Bash tool only)
  *   PermissionRequest → waiting_input
  *   Stop             → idle
  */
 export function buildCodexHookConfig(port: number, sessionId: string): string {
 	const base = `http://127.0.0.1:${port}/api/internal/sessions/${encodeURIComponent(sessionId)}/hook-state`;
 
-	const curlCmd = (state: string) =>
-		`curl -s -X POST ${base}/${state} > /dev/null 2>&1 || true`;
+	const hook = (state: string) => ({
+		type: 'command' as const,
+		command: `curl -s -X POST ${base}/${state} > /dev/null 2>&1 || true`,
+	});
 
 	const config = {
 		hooks: {
-			SessionStart: [{command: curlCmd('idle')}],
-			UserPromptSubmit: [{command: curlCmd('busy')}],
-			PreToolUse: [{command: curlCmd('busy')}],
-			PermissionRequest: [{command: curlCmd('waiting_input')}],
-			Stop: [{command: curlCmd('idle')}],
+			SessionStart: [{hooks: [hook('idle')]}],
+			UserPromptSubmit: [{hooks: [hook('busy')]}],
+			PreToolUse: [{matcher: 'Bash', hooks: [hook('busy')]}],
+			PermissionRequest: [{hooks: [hook('waiting_input')]}],
+			Stop: [{hooks: [hook('idle')]}],
 		},
 	};
 
 	return JSON.stringify(config, null, 2);
 }
 
+const ARGUSDEV_BACKUP_SUFFIX = '.argusdev-backup';
+
 /**
  * Write .codex/hooks.json and patch .codex/config.toml (codex_hooks = true)
- * in the given worktree. Idempotent — safe to call on session recovery.
+ * in the given worktree.
+ *
+ * If a hooks.json already exists that ArgusDev did not create, it is
+ * snapshotted to hooks.json.argusdev-backup before being overwritten.
+ * Similarly, if config.toml does not exist we record that so cleanup can
+ * remove the file we created.
+ *
+ * Returns a cleanup function that restores the pre-session state.
  */
 export function writeCodexHookFiles(
 	worktreePath: string,
 	port: number,
 	sessionId: string,
-): void {
+): () => void {
 	const codexDir = join(worktreePath, '.codex');
 	mkdirSync(codexDir, {recursive: true});
 
+	// --- hooks.json ---
 	const hooksPath = join(codexDir, 'hooks.json');
+	const hooksBackupPath = `${hooksPath}${ARGUSDEV_BACKUP_SUFFIX}`;
+	const hadExistingHooks = existsSync(hooksPath);
+	if (hadExistingHooks) {
+		// Snapshot before overwriting so cleanup can restore it
+		writeFileSync(hooksBackupPath, readFileSync(hooksPath), {mode: 0o600});
+	}
 	const tmpPath = `${hooksPath}.tmp`;
 	writeFileSync(tmpPath, buildCodexHookConfig(port, sessionId), {
 		encoding: 'utf-8',
@@ -197,13 +217,46 @@ export function writeCodexHookFiles(
 	});
 	renameSync(tmpPath, hooksPath);
 
+	// --- config.toml ---
+	const configPath = join(codexDir, 'config.toml');
+	const hadExistingConfig = existsSync(configPath);
+	const originalConfig = hadExistingConfig
+		? readFileSync(configPath, 'utf-8')
+		: null;
 	patchCodexConfigToml(codexDir);
+
+	return () => {
+		// Restore hooks.json
+		if (hadExistingHooks && existsSync(hooksBackupPath)) {
+			writeFileSync(hooksPath, readFileSync(hooksBackupPath), {mode: 0o600});
+			try {
+				unlinkSync(hooksBackupPath);
+			} catch {
+				// best-effort
+			}
+		} else {
+			try {
+				unlinkSync(hooksPath);
+			} catch {
+				// File already gone — fine
+			}
+		}
+		// Restore config.toml
+		if (originalConfig !== null) {
+			writeFileSync(configPath, originalConfig, {encoding: 'utf-8'});
+		} else if (!hadExistingConfig) {
+			try {
+				unlinkSync(configPath);
+			} catch {
+				// File already gone — fine
+			}
+		}
+	};
 }
 
 /**
  * Remove the generated hooks.json from .codex/ in the worktree.
- * Does not revert config.toml — codex_hooks = true is harmless when no
- * hooks.json is present and the worktree may persist across sessions.
+ * Kept for callers that don't use the cleanup fn returned by writeCodexHookFiles.
  */
 export function cleanupCodexHookFiles(worktreePath: string): void {
 	try {

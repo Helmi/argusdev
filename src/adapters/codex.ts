@@ -10,10 +10,7 @@ import {
 	safeReadJsonLines,
 	withinRecentWindow,
 } from './helpers.js';
-import {
-	writeCodexHookFiles,
-	cleanupCodexHookFiles,
-} from '../utils/hookSettings.js';
+import {writeCodexHookFiles} from '../utils/hookSettings.js';
 import type {
 	ConversationMessage,
 	HookConfigResult,
@@ -165,11 +162,8 @@ export class CodexAdapter extends BaseAgentAdapter {
 		port: number,
 		sessionId: string,
 	): HookConfigResult {
-		writeCodexHookFiles(worktreePath, port, sessionId);
-		return {
-			argsToInject: [],
-			cleanup: () => cleanupCodexHookFiles(worktreePath),
-		};
+		const cleanup = writeCodexHookFiles(worktreePath, port, sessionId);
+		return {argsToInject: [], cleanup};
 	}
 
 	override async findSessionFile(
