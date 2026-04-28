@@ -1026,6 +1026,87 @@ describe('SessionManager', () => {
 			expect(result).toBe(true);
 			expect(createdSession.name).toBeUndefined();
 		});
+
+		describe('applyHookStateEvent', () => {
+			it('should transition state when hookBasedDetection is true', async () => {
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						'/test/worktree',
+						'codex',
+						[],
+						'codex',
+						'Codex Session',
+						'codex',
+						undefined,
+						'agent',
+						{hookBasedDetection: true},
+					),
+				);
+
+				expect(session.hookBasedDetection).toBe(true);
+				expect(session.stateMutex.getSnapshot().state).toBe('idle');
+
+				sessionManager.applyHookStateEvent(session.id, 'busy');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe('busy');
+
+				sessionManager.applyHookStateEvent(session.id, 'idle');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe('idle');
+
+				sessionManager.applyHookStateEvent(session.id, 'waiting_input');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe('waiting_input');
+			});
+
+			it('should ignore hook events when hookBasedDetection is false', async () => {
+				vi.mocked(configurationManager.getDefaultPreset).mockReturnValue({
+					id: '1',
+					name: 'Main',
+					command: 'claude',
+				});
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithPresetEffect('/test/worktree'),
+				);
+
+				expect(session.hookBasedDetection).toBe(false);
+				const stateBefore = session.stateMutex.getSnapshot().state;
+
+				sessionManager.applyHookStateEvent(session.id, 'busy');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe(stateBefore);
+			});
+
+			it('should call hookCleanup on session exit', async () => {
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const cleanup = vi.fn();
+				await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						'/test/worktree',
+						'codex',
+						[],
+						'codex',
+						'Codex Session',
+						'codex',
+						undefined,
+						'agent',
+						{hookBasedDetection: true, hookCleanup: cleanup},
+					),
+				);
+
+				setTimeout(() => {
+					mockPty.emit('exit', {exitCode: 0});
+				}, 600);
+
+				await new Promise(resolve => setTimeout(resolve, 700));
+				expect(cleanup).toHaveBeenCalledOnce();
+			});
+		});
 	});
 
 	describe('createSessionWithDevcontainerEffect', () => {

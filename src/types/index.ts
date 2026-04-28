@@ -47,6 +47,7 @@ export interface Session {
 	commandConfig: CommandConfig | undefined; // Store command config for fallback
 	detectionStrategy: StateDetectionStrategy | undefined; // State detection strategy for this session
 	hookBasedDetection?: boolean; // When true, state updates arrive via HTTP hooks, not buffer polling
+	hookCleanup?: () => void; // Called on session end to remove generated hook config files
 	devcontainerConfig: DevcontainerConfig | undefined; // Devcontainer configuration if session runs in container
 	/**
 	 * Mutex-protected session state data.

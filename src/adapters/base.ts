@@ -8,6 +8,7 @@ import {detectStateForStrategy} from './stateDetection.js';
 import type {
 	AgentAdapter,
 	ConversationMessage,
+	HookConfigResult,
 	SessionFileMetadata,
 	SessionFormat,
 } from './types.js';
@@ -51,6 +52,14 @@ export abstract class BaseAgentAdapter implements AgentAdapter {
 		this.baseArgs = config.baseArgs;
 		this.detectionStrategy = config.detectionStrategy;
 		this.sessionFormat = config.sessionFormat || 'none';
+	}
+
+	generateHookConfig(
+		_worktreePath: string,
+		_port: number,
+		_sessionId: string,
+	): HookConfigResult | null {
+		return null;
 	}
 
 	detectState(terminal: Terminal, currentState: SessionState): SessionState {

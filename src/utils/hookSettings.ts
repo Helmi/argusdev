@@ -5,6 +5,8 @@ import {
 	readdirSync,
 	renameSync,
 	chmodSync,
+	readFileSync,
+	existsSync,
 } from 'fs';
 import {join} from 'path';
 import {getConfigDir} from './configDir.js';
@@ -141,4 +143,94 @@ function hooksDir(): string {
 
 function hookSettingsPath(sessionId: string): string {
 	return join(hooksDir(), `${sessionId}.json`);
+}
+
+/**
+ * Build Codex hooks.json content wiring lifecycle events to ArgusDev's
+ * internal hook-state endpoint via curl.
+ *
+ * Codex only supports `command` hook type (no native http type).
+ *
+ * Hook → State mapping:
+ *   SessionStart     → ack only (no state change, but confirms hooks are wired)
+ *   UserPromptSubmit → busy
+ *   PreToolUse       → busy  (Bash tool only — re-asserts busy during tool use)
+ *   PermissionRequest → waiting_input
+ *   Stop             → idle
+ */
+export function buildCodexHookConfig(port: number, sessionId: string): string {
+	const base = `http://127.0.0.1:${port}/api/internal/sessions/${encodeURIComponent(sessionId)}/hook-state`;
+
+	const curlCmd = (state: string) =>
+		`curl -s -X POST ${base}/${state} > /dev/null 2>&1 || true`;
+
+	const config = {
+		hooks: {
+			SessionStart: [{command: curlCmd('idle')}],
+			UserPromptSubmit: [{command: curlCmd('busy')}],
+			PreToolUse: [{command: curlCmd('busy')}],
+			PermissionRequest: [{command: curlCmd('waiting_input')}],
+			Stop: [{command: curlCmd('idle')}],
+		},
+	};
+
+	return JSON.stringify(config, null, 2);
+}
+
+/**
+ * Write .codex/hooks.json and patch .codex/config.toml (codex_hooks = true)
+ * in the given worktree. Idempotent — safe to call on session recovery.
+ */
+export function writeCodexHookFiles(
+	worktreePath: string,
+	port: number,
+	sessionId: string,
+): void {
+	const codexDir = join(worktreePath, '.codex');
+	mkdirSync(codexDir, {recursive: true});
+
+	const hooksPath = join(codexDir, 'hooks.json');
+	const tmpPath = `${hooksPath}.tmp`;
+	writeFileSync(tmpPath, buildCodexHookConfig(port, sessionId), {
+		encoding: 'utf-8',
+		mode: 0o600,
+	});
+	renameSync(tmpPath, hooksPath);
+
+	patchCodexConfigToml(codexDir);
+}
+
+/**
+ * Remove the generated hooks.json from .codex/ in the worktree.
+ * Does not revert config.toml — codex_hooks = true is harmless when no
+ * hooks.json is present and the worktree may persist across sessions.
+ */
+export function cleanupCodexHookFiles(worktreePath: string): void {
+	try {
+		unlinkSync(join(worktreePath, '.codex', 'hooks.json'));
+	} catch {
+		// File already gone — fine
+	}
+}
+
+function patchCodexConfigToml(codexDir: string): void {
+	const configPath = join(codexDir, 'config.toml');
+	let content = '';
+	if (existsSync(configPath)) {
+		content = readFileSync(configPath, 'utf-8');
+	}
+
+	if (/^\s*codex_hooks\s*=/m.test(content)) {
+		// Already present — ensure it's true
+		content = content.replace(/^(\s*codex_hooks\s*=\s*).+$/m, '$1true');
+	} else if (/^\s*\[features\]/m.test(content)) {
+		// [features] section exists — append under it
+		content = content.replace(/^(\s*\[features\])/m, '$1\ncodex_hooks = true');
+	} else {
+		// No [features] section — append one
+		const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+		content = `${content}${separator}\n[features]\ncodex_hooks = true\n`;
+	}
+
+	writeFileSync(configPath, content, {encoding: 'utf-8'});
 }

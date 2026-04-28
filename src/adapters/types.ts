@@ -42,6 +42,15 @@ export interface SessionFileMetadata {
 	options?: Record<string, unknown>;
 }
 
+/**
+ * Result of generateHookConfig. argsToInject is passed to the agent CLI.
+ * cleanup removes any generated files on session end.
+ */
+export interface HookConfigResult {
+	argsToInject: string[];
+	cleanup: () => void;
+}
+
 export interface AgentAdapter {
 	readonly id: string;
 	readonly name: string;
@@ -56,6 +65,17 @@ export interface AgentAdapter {
 	readonly detectionStrategy?: StateDetectionStrategy;
 
 	readonly sessionFormat: SessionFormat;
+
+	/**
+	 * Generate hook config for state detection. Returns args to inject into
+	 * the agent CLI and a cleanup function for session end.
+	 * Returns null when the adapter does not support hook-based detection.
+	 */
+	generateHookConfig(
+		worktreePath: string,
+		port: number,
+		sessionId: string,
+	): HookConfigResult | null;
 
 	detectState(terminal: Terminal, currentState: SessionState): SessionState;
 	findSessionFile(

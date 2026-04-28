@@ -54,6 +54,7 @@ import type {SessionManager} from './sessionManager.js';
 import {cleanupStartupScriptsInWorktree} from '../utils/startupScript.js';
 import {
 	writeHookSettingsFile,
+	cleanupHookSettingsFile,
 	sweepOrphanHookSettings,
 } from '../utils/hookSettings.js';
 import type {
@@ -753,23 +754,37 @@ export class APIServer {
 				promptArg?.toLowerCase() !== 'none';
 			const fallbackPrompt = this.buildRestartFallbackPrompt(record);
 
-			// Hook-based state detection for Claude Code recovery sessions
+			// Hook-based state detection for recovery sessions
 			const recoveryArgs = [...codexArgsPlan.args];
 			let recoveryHookBased = false;
+			let recoveryHookCleanup: (() => void) | undefined;
 			const isRecoveryClaudeAgent =
 				agent.id === 'claude' ||
 				agent.command === 'claude' ||
 				agent.detectionStrategy === 'claude';
-			if (
-				isRecoveryClaudeAgent &&
-				agent.kind !== 'terminal' &&
-				agent.sessionType !== 'sdk'
-			) {
+			if (agent.kind !== 'terminal' && agent.sessionType !== 'sdk') {
 				const port = configurationManager.getPort();
 				if (port) {
-					const settingsPath = writeHookSettingsFile(port, record.id);
-					recoveryArgs.push('--settings', settingsPath);
-					recoveryHookBased = true;
+					if (isRecoveryClaudeAgent) {
+						const settingsPath = writeHookSettingsFile(port, record.id);
+						recoveryArgs.push('--settings', settingsPath);
+						recoveryHookBased = true;
+						recoveryHookCleanup = () => cleanupHookSettingsFile(record.id);
+					} else {
+						const recoveryAdapter =
+							adapterRegistry.getById(agent.id) ||
+							adapterRegistry.getByAgentType(inferAgentType(agent));
+						const hookResult = recoveryAdapter?.generateHookConfig(
+							record.worktreePath,
+							port,
+							record.id,
+						);
+						if (hookResult) {
+							recoveryArgs.push(...hookResult.argsToInject);
+							recoveryHookBased = true;
+							recoveryHookCleanup = hookResult.cleanup;
+						}
+					}
 				}
 			}
 
@@ -788,6 +803,7 @@ export class APIServer {
 					sessionIdOverride: record.id,
 					initialPrompt: canInjectFallbackPrompt ? fallbackPrompt : undefined,
 					hookBasedDetection: recoveryHookBased,
+					hookCleanup: recoveryHookCleanup,
 				},
 			);
 			const result = await Effect.runPromise(Effect.either(effect));
@@ -2870,27 +2886,43 @@ export class APIServer {
 				startupPromptToInject && normalizedPromptArg?.toLowerCase() !== 'none'
 			);
 
-			// Hook-based state detection for Claude Code agents:
-			// Inject --settings with HTTP hooks that POST state transitions to ArgusDev.
+			// Hook-based state detection: inject hooks for supported agents.
 			let hookBasedDetection = false;
+			let hookCleanup: (() => void) | undefined;
 			const preGeneratedSessionId =
 				coreService.sessionManager.createSessionId();
-			if (
-				isClaudeAgent &&
-				agent.kind !== 'terminal' &&
-				agent.sessionType !== 'sdk'
-			) {
+			if (agent.kind !== 'terminal' && agent.sessionType !== 'sdk') {
 				const port = configurationManager.getPort();
 				if (port) {
-					const settingsPath = writeHookSettingsFile(
-						port,
-						preGeneratedSessionId,
-					);
-					args.push('--settings', settingsPath);
-					hookBasedDetection = true;
-					logger.info(
-						`API: Injecting hook-based state detection for session ${preGeneratedSessionId} via ${settingsPath}`,
-					);
+					if (isClaudeAgent) {
+						const settingsPath = writeHookSettingsFile(
+							port,
+							preGeneratedSessionId,
+						);
+						args.push('--settings', settingsPath);
+						hookBasedDetection = true;
+						hookCleanup = () => cleanupHookSettingsFile(preGeneratedSessionId);
+						logger.info(
+							`API: Injecting hook-based state detection for session ${preGeneratedSessionId} via ${settingsPath}`,
+						);
+					} else {
+						const adapterForHook =
+							adapterRegistry.getById(agent.id) ||
+							adapterRegistry.getByAgentType(inferAgentType(agent));
+						const hookResult = adapterForHook?.generateHookConfig(
+							worktreePath,
+							port,
+							preGeneratedSessionId,
+						);
+						if (hookResult) {
+							args.push(...hookResult.argsToInject);
+							hookBasedDetection = true;
+							hookCleanup = hookResult.cleanup;
+							logger.info(
+								`API: Injecting hook-based state detection for session ${preGeneratedSessionId} via adapter ${adapterForHook?.id}`,
+							);
+						}
+					}
 				} else {
 					logger.warn(
 						'API: No port configured — skipping hook-based state detection',
@@ -2918,6 +2950,7 @@ export class APIServer {
 						? preGeneratedSessionId
 						: undefined,
 					hookBasedDetection,
+					hookCleanup,
 				},
 			);
 			const result = await Effect.runPromise(Effect.either(effect));

@@ -46,6 +46,7 @@ interface AgentBootstrapOptions {
 	prependCwd?: boolean;
 	sessionIdOverride?: string;
 	hookBasedDetection?: boolean;
+	hookCleanup?: () => void;
 }
 
 export class SessionManager extends EventEmitter implements ISessionManager {
@@ -576,6 +577,7 @@ ${commandTokens.join(' ')}
 			isPrimaryCommand?: boolean;
 			detectionStrategy?: StateDetectionStrategy;
 			hookBasedDetection?: boolean;
+			hookCleanup?: () => void;
 			devcontainerConfig?: DevcontainerConfig;
 			sessionName?: string;
 			agentId?: string;
@@ -605,6 +607,7 @@ ${commandTokens.join(' ')}
 			commandConfig,
 			detectionStrategy: options.detectionStrategy ?? 'claude',
 			hookBasedDetection: options.hookBasedDetection ?? false,
+			hookCleanup: options.hookCleanup,
 			devcontainerConfig: options.devcontainerConfig ?? undefined,
 			stateMutex: new Mutex({
 				...createInitialSessionStateData(),
@@ -769,6 +772,7 @@ ${commandTokens.join(' ')}
 						isPrimaryCommand: true,
 						detectionStrategy: detectionStrategy,
 						hookBasedDetection: bootstrapOptions?.hookBasedDetection,
+						hookCleanup: bootstrapOptions?.hookCleanup,
 						sessionName: sessionName,
 						agentId: agentId,
 						sessionId: bootstrapOptions?.sessionIdOverride,
@@ -1091,8 +1095,11 @@ ${commandTokens.join(' ')}
 			session.stateCheckInterval = undefined;
 		}
 
-		// Clean up hook settings temp file
-		if (session.hookBasedDetection) {
+		// Clean up hook config files on session end
+		if (session.hookCleanup) {
+			session.hookCleanup();
+		} else if (session.hookBasedDetection) {
+			// Legacy path: Claude sessions without a stored cleanup fn
 			cleanupHookSettingsFile(session.id);
 		}
 

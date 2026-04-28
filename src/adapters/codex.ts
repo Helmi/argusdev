@@ -10,8 +10,13 @@ import {
 	safeReadJsonLines,
 	withinRecentWindow,
 } from './helpers.js';
+import {
+	writeCodexHookFiles,
+	cleanupCodexHookFiles,
+} from '../utils/hookSettings.js';
 import type {
 	ConversationMessage,
+	HookConfigResult,
 	SessionFileMetadata,
 	ToolCallData,
 	ThinkingBlockData,
@@ -153,6 +158,18 @@ export class CodexAdapter extends BaseAgentAdapter {
 			detectionStrategy: 'codex',
 			sessionFormat: 'jsonl',
 		});
+	}
+
+	override generateHookConfig(
+		worktreePath: string,
+		port: number,
+		sessionId: string,
+	): HookConfigResult {
+		writeCodexHookFiles(worktreePath, port, sessionId);
+		return {
+			argsToInject: [],
+			cleanup: () => cleanupCodexHookFiles(worktreePath),
+		};
 	}
 
 	override async findSessionFile(
