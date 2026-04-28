@@ -274,12 +274,11 @@ const OPENCODE_PLUGIN_FILENAME = 'argusdev-state.js';
  *
  * Port and sessionId are baked into the file so no extra env vars or CLI args
  * are needed. The plugin:
- *   - tool.execute.before  → POST busy
- *   - event(session.idle)  → POST idle
- *   - event(session.status, type=idle) → POST idle
- *
- * waiting_input is intentionally not covered here — PTY regex fallback handles
- * it (no clean signal is available from the plugin API without core changes).
+ *   - tool.execute.before           → POST busy
+ *   - permission.ask                → POST waiting_input
+ *   - event(session.idle)           → POST idle
+ *   - event(session.status, idle)   → POST idle
+ *   - event(session.status, busy)   → POST busy  (pure-chat responses with no tool calls)
  */
 export function buildOpencodePluginContent(
 	port: number,
@@ -291,6 +290,9 @@ export function buildOpencodePluginContent(
 export const server = async () => ({
   "tool.execute.before": async (_input, output) => {
     fetch("${base}/busy", { method: "POST" }).catch(() => {});
+  },
+  "permission.ask": async (_input, output) => {
+    fetch("${base}/waiting_input", { method: "POST" }).catch(() => {});
     return output;
   },
   event: async ({ event }) => {
@@ -299,6 +301,11 @@ export const server = async () => ({
       (event.type === "session.status" && event.properties?.status?.type === "idle")
     ) {
       fetch("${base}/idle", { method: "POST" }).catch(() => {});
+    } else if (
+      event.type === "session.status" &&
+      event.properties?.status?.type === "busy"
+    ) {
+      fetch("${base}/busy", { method: "POST" }).catch(() => {});
     }
   },
 });

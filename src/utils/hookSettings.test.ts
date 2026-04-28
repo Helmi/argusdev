@@ -430,6 +430,21 @@ describe('buildOpencodePluginContent', () => {
 		expect(content).toContain('/hook-state/busy');
 	});
 
+	it('tool.execute.before does not return output (void)', () => {
+		const content = buildOpencodePluginContent(8080, 'ses');
+		const toolBlock = content.slice(
+			content.indexOf('"tool.execute.before"'),
+			content.indexOf('"permission.ask"'),
+		);
+		expect(toolBlock).not.toContain('return output');
+	});
+
+	it('includes permission.ask mapping to waiting_input', () => {
+		const content = buildOpencodePluginContent(8080, 'ses');
+		expect(content).toContain('"permission.ask"');
+		expect(content).toContain('/hook-state/waiting_input');
+	});
+
 	it('includes event handler mapping session.idle to idle', () => {
 		const content = buildOpencodePluginContent(8080, 'ses');
 		expect(content).toContain('event');
@@ -440,6 +455,14 @@ describe('buildOpencodePluginContent', () => {
 	it('includes session.status idle mapping', () => {
 		const content = buildOpencodePluginContent(8080, 'ses');
 		expect(content).toContain('session.status');
+		expect(content).toContain('"idle"');
+	});
+
+	it('includes session.status busy mapping for pure-chat responses', () => {
+		const content = buildOpencodePluginContent(8080, 'ses');
+		expect(content).toContain('"busy"');
+		const busyCount = (content.match(/hook-state\/busy/g) || []).length;
+		expect(busyCount).toBeGreaterThanOrEqual(2);
 	});
 });
 
