@@ -4109,14 +4109,11 @@ export class APIServer {
 			projectPath: string,
 			count: number,
 			reviewIssueIds: string[],
-			newReviews: Array<{id: string; title: string; priority: string}>,
 		) => {
 			this.io?.emit('td_review_changed', {
 				projectPath,
 				count,
 				reviewIssueIds,
-				newIssueIds: newReviews.map(issue => issue.id),
-				newIssues: newReviews,
 			});
 		};
 		const clearTrackedReviews = (projectPath: string) => {
@@ -4124,7 +4121,7 @@ export class APIServer {
 			if (!knownReviewIds) return;
 			knownReviewIdsByProject.delete(projectPath);
 			if (knownReviewIds.size > 0) {
-				emitTdReviewChanged(projectPath, 0, [], []);
+				emitTdReviewChanged(projectPath, 0, []);
 			}
 		};
 		const pollTdReviews = () => {
@@ -4153,37 +4150,24 @@ export class APIServer {
 						if (!knownReviewIds) {
 							knownReviewIdsByProject.set(project.path, reviewIds);
 							if (reviewIssues.length > 0) {
-								emitTdReviewChanged(
-									project.path,
-									reviewIssues.length,
-									[...reviewIds],
-									[],
-								);
+								emitTdReviewChanged(project.path, reviewIssues.length, [
+									...reviewIds,
+								]);
 							}
 							continue;
 						}
 
-						const newReviews = reviewIssues
-							.filter(issue => !knownReviewIds.has(issue.id))
-							.map(issue => ({
-								id: issue.id,
-								title: issue.title,
-								priority: issue.priority,
-							}));
+						const newReviewCount = reviewIssues.filter(
+							issue => !knownReviewIds.has(issue.id),
+						).length;
 
-						if (
-							newReviews.length > 0 ||
-							knownReviewIds.size !== reviewIds.size
-						) {
-							emitTdReviewChanged(
-								project.path,
-								reviewIssues.length,
-								[...reviewIds],
-								newReviews,
-							);
-							if (newReviews.length > 0) {
+						if (newReviewCount > 0 || knownReviewIds.size !== reviewIds.size) {
+							emitTdReviewChanged(project.path, reviewIssues.length, [
+								...reviewIds,
+							]);
+							if (newReviewCount > 0) {
 								logger.info(
-									`API: ${newReviews.length} new task(s) ready for review in ${project.path}`,
+									`API: ${newReviewCount} new task(s) ready for review in ${project.path}`,
 								);
 							}
 						}

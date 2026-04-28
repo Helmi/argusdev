@@ -2351,15 +2351,11 @@ describe('APIServer TD review polling', () => {
 			projectPath: '/repo-a',
 			count: 1,
 			reviewIssueIds: ['td-a1'],
-			newIssueIds: [],
-			newIssues: [],
 		});
 		expect(mockEmit).toHaveBeenCalledWith('td_review_changed', {
 			projectPath: '/repo-b',
 			count: 2,
 			reviewIssueIds: ['td-b1', 'td-b2'],
-			newIssueIds: [],
-			newIssues: [],
 		});
 	});
 
@@ -2422,15 +2418,11 @@ describe('APIServer TD review polling', () => {
 			projectPath: '/repo-a',
 			count: 2,
 			reviewIssueIds: ['td-a1', 'td-a2'],
-			newIssueIds: ['td-a2'],
-			newIssues: [{id: 'td-a2', title: 'Repo A new review', priority: 'P0'}],
 		});
 		expect(mockEmit).toHaveBeenCalledWith('td_review_changed', {
 			projectPath: '/repo-b',
 			count: 0,
 			reviewIssueIds: [],
-			newIssueIds: [],
-			newIssues: [],
 		});
 	});
 });

@@ -34,7 +34,6 @@ import {
 } from './configMapper';
 import {resolveTdIssueWorktreePath} from './tdWorktreeResolver';
 import {
-	mergeIncomingReviewNotifications,
 	reconcileProjectReviewState,
 	reconcileReviewNotifications,
 	type TdReviewNotification,
@@ -69,8 +68,6 @@ interface TdReviewChangedPayload {
 	projectPath: string;
 	count: number;
 	reviewIssueIds: string[];
-	newIssueIds: string[];
-	newIssues: TdReviewNotification[];
 }
 
 interface TdIssueQueryOptions {
@@ -1191,16 +1188,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 						reconciled.notifications,
 					),
 				);
-				if (data.newIssues.length > 0) {
-					setTdReviewNotificationsByProject(prev => {
-						const next = mergeIncomingReviewNotifications(
-							prev[data.projectPath] || [],
-							data.newIssues,
-							reconciled.dismissedIds,
-						);
-						return updateProjectListState(prev, data.projectPath, next);
-					});
-				}
 				if (currentProjectRef.current?.path === data.projectPath) {
 					fetchTdBoardRef.current();
 					fetchTdIssuesRef.current({
