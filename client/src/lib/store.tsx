@@ -33,11 +33,6 @@ import {
 	getDefaultConfig,
 } from './configMapper';
 import {resolveTdIssueWorktreePath} from './tdWorktreeResolver';
-import {
-	reconcileProjectReviewState,
-	reconcileReviewNotifications,
-	type TdReviewNotification,
-} from './tdReviewNotifications';
 
 // Debounce utility
 function debounce<T extends (...args: Parameters<T>) => void>(
@@ -68,6 +63,7 @@ interface TdReviewChangedPayload {
 	projectPath: string;
 	count: number;
 	reviewIssueIds: string[];
+	newIssueIds: string[];
 }
 
 interface TdIssueQueryOptions {
@@ -75,21 +71,6 @@ interface TdIssueQueryOptions {
 	status?: string;
 	type?: string;
 	parentId?: string;
-}
-
-function updateProjectListState<T>(
-	previous: Record<string, T[]>,
-	projectPath: string,
-	next: T[],
-): Record<string, T[]> {
-	const current = previous[projectPath] || [];
-	if (next.length === 0) {
-		if (!(projectPath in previous)) return previous;
-		const {[projectPath]: _removed, ...rest} = previous;
-		return rest;
-	}
-	if (current === next) return previous;
-	return {...previous, [projectPath]: next};
 }
 
 function updateProjectCountState(
@@ -195,7 +176,6 @@ interface AppState {
 	conversationViewOpen: boolean;
 	conversationInitialSessionId: string | null;
 	conversationTaskFilterId: string | null;
-	tdReviewNotifications: TdReviewNotification[];
 	tdReviewCountsByProject: Record<string, number>;
 	projectConfig: ProjectConfig | null;
 	projectConfigPath: string | null;
@@ -362,8 +342,6 @@ interface AppActions {
 		taskId?: string;
 	}) => void;
 	closeConversationView: () => void;
-	dismissTdReviewNotification: (issueId: string) => void;
-	dismissAllTdReviewNotifications: () => void;
 
 	// Error handling
 	clearError: () => void;
@@ -543,10 +521,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const [conversationTaskFilterId, setConversationTaskFilterId] = useState<
 		string | null
 	>(null);
-	const [tdReviewNotificationsByProject, setTdReviewNotificationsByProject] =
-		useState<Record<string, TdReviewNotification[]>>({});
-	const [tdDismissedReviewIdsByProject, setTdDismissedReviewIdsByProject] =
-		useState<Record<string, string[]>>({});
 	const [tdReviewCountsByProject, setTdReviewCountsByProject] = useState<
 		Record<string, number>
 	>({});
@@ -555,13 +529,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 	);
 	const [projectConfigPath, setProjectConfigPath] = useState<string | null>(
 		null,
-	);
-	const tdReviewNotifications = useMemo(
-		() =>
-			currentProject
-				? tdReviewNotificationsByProject[currentProject.path] || []
-				: [],
-		[currentProject, tdReviewNotificationsByProject],
 	);
 
 	// Apply theme to document
@@ -976,37 +943,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 		setConversationInitialSessionId(null);
 		setConversationTaskFilterId(null);
 	}, []);
-	const dismissTdReviewNotification = useCallback((issueId: string) => {
-		const projectPath = currentProject?.path;
-		if (!projectPath) return;
-		setTdReviewNotificationsByProject(prev =>
-			updateProjectListState(
-				prev,
-				projectPath,
-				(prev[projectPath] || []).filter(notification => notification.id !== issueId),
-			),
-		);
-		setTdDismissedReviewIdsByProject(prev => {
-			const currentDismissed = prev[projectPath] || [];
-			if (currentDismissed.includes(issueId)) return prev;
-			return updateProjectListState(prev, projectPath, [
-				...currentDismissed,
-				issueId,
-			]);
-		});
-	}, [currentProject?.path]);
-	const dismissAllTdReviewNotifications = useCallback(() => {
-		const projectPath = currentProject?.path;
-		if (!projectPath) return;
-		setTdDismissedReviewIdsByProject(prev => {
-			const merged = new Set(prev[projectPath] || []);
-			tdReviewNotifications.forEach(notification => merged.add(notification.id));
-			return updateProjectListState(prev, projectPath, [...merged]);
-		});
-		setTdReviewNotificationsByProject(prev =>
-			updateProjectListState(prev, projectPath, []),
-		);
-	}, [currentProject?.path, tdReviewNotifications]);
 
 	// Save (create or update) an agent
 	const saveAgent = async (agent: AgentConfig): Promise<boolean> => {
@@ -1124,8 +1060,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const fetchTdBoardRef = useRef(fetchTdBoard);
 	const fetchTdIssuesRef = useRef(fetchTdIssues);
 	const currentProjectRef = useRef(currentProject);
-	const tdDismissedReviewIdsByProjectRef = useRef(tdDismissedReviewIdsByProject);
-	const tdReviewNotificationsByProjectRef = useRef(tdReviewNotificationsByProject);
 	useEffect(() => {
 		fetchDataRef.current = fetchData;
 		fetchAgentsRef.current = fetchAgents;
@@ -1134,8 +1068,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 		fetchTdBoardRef.current = fetchTdBoard;
 		fetchTdIssuesRef.current = fetchTdIssues;
 		currentProjectRef.current = currentProject;
-		tdDismissedReviewIdsByProjectRef.current = tdDismissedReviewIdsByProject;
-		tdReviewNotificationsByProjectRef.current = tdReviewNotificationsByProject;
 	});
 
 	// Socket.IO event handlers — runs once on mount, uses refs for latest callbacks
@@ -1166,27 +1098,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 			(data: TdReviewChangedPayload) => {
 				setTdReviewCountsByProject(prev =>
 					updateProjectCountState(prev, data.projectPath, data.count),
-				);
-				const reconciled = reconcileProjectReviewState({
-					previousNotifications:
-						tdReviewNotificationsByProjectRef.current[data.projectPath] || [],
-					dismissedIds:
-						tdDismissedReviewIdsByProjectRef.current[data.projectPath] || [],
-					reviewIssueIds: data.reviewIssueIds,
-				});
-				setTdDismissedReviewIdsByProject(prev =>
-					updateProjectListState(
-						prev,
-						data.projectPath,
-						reconciled.dismissedIds,
-					),
-				);
-				setTdReviewNotificationsByProject(prev =>
-					updateProjectListState(
-						prev,
-						data.projectPath,
-						reconciled.notifications,
-					),
 				);
 				if (currentProjectRef.current?.path === data.projectPath) {
 					fetchTdBoardRef.current();
@@ -1270,26 +1181,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 			status: 'open,in_progress,in_review,blocked',
 		});
 	}, [currentProject?.path, fetchTdIssues, currentProject]);
-
-	useEffect(() => {
-		const projectPath = currentProject?.path;
-		if (!projectPath) return;
-
-		const reconciled = reconcileReviewNotifications({
-			issues: tdIssues,
-			previousNotifications:
-				tdReviewNotificationsByProjectRef.current[projectPath] || [],
-			dismissedIds:
-				tdDismissedReviewIdsByProjectRef.current[projectPath] || [],
-		});
-
-		setTdReviewNotificationsByProject(prev =>
-			updateProjectListState(prev, projectPath, reconciled.notifications),
-		);
-		setTdDismissedReviewIdsByProject(prev =>
-			updateProjectListState(prev, projectPath, reconciled.dismissedIds),
-		);
-	}, [currentProject?.path, tdIssues]);
 
 	// Clean up stale sessions from sidebar preferences and tab state
 	useEffect(() => {
@@ -2015,9 +1906,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 		closeTaskBoard,
 		openConversationView,
 		closeConversationView,
-		tdReviewNotifications,
-		dismissTdReviewNotification,
-		dismissAllTdReviewNotifications,
 	};
 
 	return <AppContext.Provider value={store}>{children}</AppContext.Provider>;
