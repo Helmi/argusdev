@@ -1153,8 +1153,8 @@ export class APIServer {
 					// Return 200 for unknown sessions — the session may have been
 					// destroyed during a daemon restart while the agent process is
 					// still shutting down and firing its final Stop hook.
-					logger.debug(
-						`[HookState] Ignoring hook for unknown session: ${request.params.id}`,
+					logger.warn(
+						`[HookState] Ignoring hook for unknown session: session=${request.params.id} attemptedState=${request.params.state} (likely an agent process surviving a daemon restart)`,
 					);
 					return reply.code(200).send({ignored: true});
 				}
