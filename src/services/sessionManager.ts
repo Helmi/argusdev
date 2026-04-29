@@ -1026,15 +1026,20 @@ ${commandTokens.join(' ')}
 			// session_shutdown cover all idle entrances. PTY handles only waiting_input.
 			// Drop PTY-detected busy/idle entirely — stale spinner lines in the 30-line
 			// buffer would otherwise re-apply busy after agent_end fires idle.
-			// Exception: allow PTY through when current OR detected state is
-			// waiting_input/pending_auto_approval — PTY is the only mechanism to enter
-			// or exit those states (e.g. user answers prompt → spinner → PTY detects busy).
+			// Exception: when session is in waiting_input/pending_auto_approval and PTY
+			// detects busy, allow it through — PTY spinner is the only signal that the
+			// user answered and the tool resumed. Never allow PTY-idle through from those
+			// states: Pi's detector returns idle as default when no regex matches, so a
+			// flickering or partially-rendered prompt would clobber the hook-delivered state.
 			if (
 				session.partialHookDetection &&
-				oldState !== 'waiting_input' &&
-				oldState !== 'pending_auto_approval' &&
 				detectedState !== 'waiting_input' &&
-				detectedState !== 'pending_auto_approval'
+				detectedState !== 'pending_auto_approval' &&
+				!(
+					(oldState === 'waiting_input' ||
+						oldState === 'pending_auto_approval') &&
+					detectedState === 'busy'
+				)
 			) {
 				return;
 			}

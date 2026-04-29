@@ -1309,6 +1309,50 @@ describe('SessionManager', () => {
 				);
 				expect(session.stateMutex.getSnapshot().state).toBe('busy');
 			});
+
+			it('PTY-idle must not clobber hook-delivered waiting_input in partial-hook sessions', async () => {
+				// Regression for the asymmetric guard: when Pi's detector returns idle
+				// (no spinner, no prompt regex match — the default), PTY must NOT commit
+				// idle over hook-delivered waiting_input. A flickering or partially-rendered
+				// prompt would otherwise hide the required user action and cancel any
+				// in-flight auto-approval verification.
+				vi.mocked(configurationManager.isAutoApprovalEnabled).mockReturnValue(
+					false,
+				);
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						'/test/worktree',
+						'pi',
+						[],
+						'pi',
+						'Pi Session',
+						'pi',
+						undefined,
+						'agent',
+						{partialHookDetection: true},
+					),
+				);
+
+				// Hook delivers waiting_input (permission prompt appeared)
+				sessionManager.applyHookStateEvent(session.id, 'waiting_input');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe('waiting_input');
+
+				// Terminal buffer is empty — Pi's detector returns idle (default when no match).
+				// The guard must drop this PTY signal and leave waiting_input in place.
+
+				// Wait well past STATE_PERSISTENCE_DURATION_MS to let any erroneous
+				// idle transition commit if the guard is broken.
+				await new Promise(resolve =>
+					setTimeout(
+						resolve,
+						STATE_PERSISTENCE_DURATION_MS + STATE_CHECK_INTERVAL_MS * 3,
+					),
+				);
+				expect(session.stateMutex.getSnapshot().state).toBe('waiting_input');
+			});
 		});
 	});
 
