@@ -1041,6 +1041,16 @@ ${commandTokens.join(' ')}
 					detectedState === 'busy'
 				)
 			) {
+				// Clear any in-flight pending state so the next allowed signal starts
+				// a fresh continuous-detection window rather than inheriting a stale
+				// pendingStateStart from a previous tick.
+				if (stateData.pendingState !== undefined) {
+					void session.stateMutex.update(d => ({
+						...d,
+						pendingState: undefined,
+						pendingStateStart: undefined,
+					}));
+				}
 				return;
 			}
 

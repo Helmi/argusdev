@@ -1353,6 +1353,70 @@ describe('SessionManager', () => {
 				);
 				expect(session.stateMutex.getSnapshot().state).toBe('waiting_input');
 			});
+
+			it('dropped idle tick must clear pendingState so next busy tick starts a fresh window (gap 2 persistence window)', async () => {
+				// Regression for the pending-state leak: busy tick A sets pendingState=busy +
+				// pendingStateStart=t_A. The guard early-returns on idle tick B (dropped) but
+				// left pendingState alive — tick C (busy) inherits t_A and can exceed
+				// STATE_PERSISTENCE_DURATION_MS without continuous detection.
+				// Fix: guard clears pendingState on early-return.
+				// Test: assert pendingState is undefined after the dropped idle tick.
+				vi.mocked(configurationManager.isAutoApprovalEnabled).mockReturnValue(
+					false,
+				);
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						'/test/worktree',
+						'pi',
+						[],
+						'pi',
+						'Pi Session',
+						'pi',
+						undefined,
+						'agent',
+						{partialHookDetection: true},
+					),
+				);
+
+				sessionManager.applyHookStateEvent(session.id, 'waiting_input');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe('waiting_input');
+
+				// Tick A: make terminal show busy spinner so PTY detects busy.
+				const busyLine = {translateToString: vi.fn(() => '⠸ working...')};
+				vi.mocked(session.terminal.buffer.active.getLine).mockReturnValue(
+					busyLine as unknown as ReturnType<
+						typeof session.terminal.buffer.active.getLine
+					>,
+				);
+				Object.defineProperty(session.terminal.buffer.active, 'length', {
+					value: 1,
+					configurable: true,
+				});
+				// Wait one poll cycle for tick A (busy) to set pendingState.
+				await new Promise(resolve =>
+					setTimeout(resolve, STATE_CHECK_INTERVAL_MS + 20),
+				);
+				expect(session.stateMutex.getSnapshot().pendingState).toBe('busy');
+
+				// Tick B: empty terminal — Pi detector returns idle — guard drops it.
+				// With the fix, pendingState must be cleared on this early-return.
+				vi.mocked(session.terminal.buffer.active.getLine).mockReturnValue(
+					undefined,
+				);
+				Object.defineProperty(session.terminal.buffer.active, 'length', {
+					value: 0,
+					configurable: true,
+				});
+				await new Promise(resolve =>
+					setTimeout(resolve, STATE_CHECK_INTERVAL_MS + 20),
+				);
+				// pendingState cleared — stale t_A anchor gone, no stale window to exploit.
+				expect(session.stateMutex.getSnapshot().pendingState).toBeUndefined();
+				expect(session.stateMutex.getSnapshot().state).toBe('waiting_input');
+			});
 		});
 	});
 
