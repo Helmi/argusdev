@@ -179,6 +179,8 @@ interface AppState {
 	conversationViewOpen: boolean;
 	conversationInitialSessionId: string | null;
 	conversationTaskFilterId: string | null;
+	conversationViewProjectPath: string | null;
+	settingsProjectPath: string | null;
 	tdReviewCountsByProject: Record<string, number>;
 	tdRejectLoopByProject: Record<string, RejectLoopItem[]>;
 	projectConfig: ProjectConfig | null;
@@ -286,6 +288,7 @@ interface AppActions {
 			| 'worktree-hooks'
 			| 'td'
 			| 'project',
+		opts?: {projectPath?: string},
 	) => void;
 	closeSettings: () => void;
 	navigateSettings: (
@@ -320,8 +323,8 @@ interface AppActions {
 
 	// TD Integration
 	fetchTdStatus: () => Promise<void>;
-	fetchProjectConfig: () => Promise<void>;
-	saveProjectConfig: (config: ProjectConfig) => Promise<boolean>;
+	fetchProjectConfig: (projectPath?: string) => Promise<void>;
+	saveProjectConfig: (config: ProjectConfig, projectPath?: string) => Promise<boolean>;
 	initializeTdProject: () => Promise<boolean>;
 	fetchTdPrompts: (
 		scope?: 'project' | 'global' | 'effective' | 'all',
@@ -347,6 +350,7 @@ interface AppActions {
 	openConversationView: (context?: {
 		sessionId?: string;
 		taskId?: string;
+		projectPath?: string;
 	}) => void;
 	closeConversationView: () => void;
 
@@ -532,6 +536,11 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const [conversationTaskFilterId, setConversationTaskFilterId] = useState<
 		string | null
 	>(null);
+	const [conversationViewProjectPath, setConversationViewProjectPath] =
+		useState<string | null>(null);
+	const [settingsProjectPath, setSettingsProjectPath] = useState<string | null>(
+		null,
+	);
 	const [tdReviewCountsByProject, setTdReviewCountsByProject] = useState<
 		Record<string, number>
 	>({});
@@ -734,9 +743,12 @@ export function AppProvider({children}: {children: ReactNode}) {
 		}
 	}, [normalizeTdStatus]);
 
-	const fetchProjectConfig = useCallback(async () => {
+	const fetchProjectConfig = useCallback(async (projectPath?: string) => {
 		try {
-			const res = await apiFetch('/api/project/config');
+			const url = projectPath
+				? `/api/project/config?projectPath=${encodeURIComponent(projectPath)}`
+				: '/api/project/config';
+			const res = await apiFetch(url);
 			if (res.ok) {
 				const data = await res.json();
 				setProjectConfig(data.config || {});
@@ -753,12 +765,12 @@ export function AppProvider({children}: {children: ReactNode}) {
 	}, []);
 
 	const saveProjectConfigAction = useCallback(
-		async (nextConfig: ProjectConfig): Promise<boolean> => {
+		async (nextConfig: ProjectConfig, projectPath?: string): Promise<boolean> => {
 			try {
 				const res = await apiFetch('/api/project/config', {
 					method: 'POST',
 					headers: {'Content-Type': 'application/json'},
-					body: JSON.stringify({config: nextConfig}),
+					body: JSON.stringify({config: nextConfig, ...(projectPath ? {projectPath} : {})}),
 				});
 
 				if (!res.ok) {
@@ -953,12 +965,13 @@ export function AppProvider({children}: {children: ReactNode}) {
 		sessionsWithSidebarOpen,
 	]);
 	const openConversationView = useCallback(
-		(context?: {sessionId?: string; taskId?: string}) => {
+		(context?: {sessionId?: string; taskId?: string; projectPath?: string}) => {
 			setTaskBoardOpen(false);
 			setTaskBoardReturnSessionId(null);
 			setTaskBoardProjectPath(null);
 			setConversationInitialSessionId(context?.sessionId || null);
 			setConversationTaskFilterId(context?.taskId || null);
+			setConversationViewProjectPath(context?.projectPath || null);
 			setConversationViewOpen(true);
 		},
 		[],
@@ -1613,6 +1626,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 			| 'worktree-hooks'
 			| 'td'
 			| 'project',
+		opts?: {projectPath?: string},
 	) => {
 		const targetSection =
 			section || (settingsSection === 'project' ? 'general' : settingsSection);
@@ -1620,6 +1634,9 @@ export function AppProvider({children}: {children: ReactNode}) {
 			setSettingsSection(targetSection);
 		}
 		localStorage.setItem('argusdev_settings_section', targetSection);
+		if (section === 'project' && opts?.projectPath) {
+			setSettingsProjectPath(opts.projectPath);
+		}
 		setSettingsOpen(true);
 	};
 	const closeSettings = () => setSettingsOpen(false);
@@ -1920,6 +1937,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 		conversationViewOpen,
 		conversationInitialSessionId,
 		conversationTaskFilterId,
+		conversationViewProjectPath,
+		settingsProjectPath,
 		tdReviewCountsByProject,
 		tdRejectLoopByProject,
 		projectConfig,

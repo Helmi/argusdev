@@ -118,7 +118,6 @@ export function Sidebar() {
 		worktrees,
 		sessions,
 		agents,
-		currentProject,
 		selectedSessions,
 		sidebarOpen,
 		sidebarCollapsed,
@@ -134,7 +133,6 @@ export function Sidebar() {
 		openSettings,
 		openTaskBoard,
 		openConversationView,
-		selectProject,
 		updateProject,
 		removeProject,
 		renameSession,
@@ -147,15 +145,6 @@ export function Sidebar() {
 	const formatName = useCallback(
 		(path: string) => path.split('/').pop() || path,
 		[],
-	);
-	const ensureProjectSelected = useCallback(
-		async (projectPath: string) => {
-			if (currentProject?.path === projectPath) {
-				return true;
-			}
-			return selectProject(projectPath);
-		},
-		[currentProject?.path, selectProject],
 	);
 
 	// Helper to get agent config by ID
@@ -951,12 +940,8 @@ export function Sidebar() {
 														</DropdownMenuItem>
 													)}
 													<DropdownMenuItem
-														onClick={async () => {
-															const selected = await ensureProjectSelected(
-																project.path,
-															);
-															if (!selected) return;
-															openConversationView();
+														onClick={() => {
+															openConversationView({projectPath: project.path});
 														}}
 														disabled={isInvalid}
 													>
@@ -987,12 +972,8 @@ export function Sidebar() {
 														Rename
 													</DropdownMenuItem>
 													<DropdownMenuItem
-														onClick={async () => {
-															const selected = await ensureProjectSelected(
-																project.path,
-															);
-															if (!selected) return;
-															openSettings('project');
+														onClick={() => {
+															openSettings('project', {projectPath: project.path});
 														}}
 														disabled={isInvalid}
 													>
@@ -1034,12 +1015,8 @@ export function Sidebar() {
 											</ContextMenuItem>
 										)}
 										<ContextMenuItem
-											onClick={async () => {
-												const selected = await ensureProjectSelected(
-													project.path,
-												);
-												if (!selected) return;
-												openConversationView();
+											onClick={() => {
+												openConversationView({projectPath: project.path});
 											}}
 											disabled={isInvalid}
 										>
@@ -1068,12 +1045,8 @@ export function Sidebar() {
 											Rename
 										</ContextMenuItem>
 										<ContextMenuItem
-											onClick={async () => {
-												const selected = await ensureProjectSelected(
-													project.path,
-												);
-												if (!selected) return;
-												openSettings('project');
+											onClick={() => {
+												openSettings('project', {projectPath: project.path});
 											}}
 											disabled={isInvalid}
 										>

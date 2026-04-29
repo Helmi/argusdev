@@ -43,6 +43,23 @@ describe('Board UX regression checks', () => {
     expect(source).toContain('Show {hiddenClosedCount} older')
   })
 
+  it('threads projectPath explicitly through openConversationView and sidebar context menu', () => {
+    const storeSource = readSource('client/src/lib/store.tsx')
+    const sidebarSource = readSource('client/src/components/layout/Sidebar.tsx')
+    const conversationSource = readSource('client/src/components/ConversationView.tsx')
+
+    // store must expose conversationViewProjectPath
+    expect(storeSource).toContain('conversationViewProjectPath')
+    // openConversationView must accept projectPath in context arg
+    expect(storeSource).toContain('context?.projectPath')
+    // sidebar must pass project.path directly, not call ensureProjectSelected
+    expect(sidebarSource).toContain('openConversationView({projectPath: project.path})')
+    expect(sidebarSource).not.toContain('ensureProjectSelected')
+    // ConversationView must read conversationViewProjectPath, not currentProject
+    expect(conversationSource).toContain('conversationViewProjectPath')
+    expect(conversationSource).not.toContain('currentProject')
+  })
+
   it('uses per-project tdIssues store to eliminate last-write-wins race', () => {
     const storeSource = readSource('client/src/lib/store.tsx')
     const boardSource = readSource('client/src/components/TaskBoard.tsx')

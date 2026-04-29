@@ -1385,31 +1385,33 @@ export class APIServer {
 			},
 		);
 
-		this.app.post<{Body: {config: Record<string, unknown>}}>(
-			'/api/project/config',
-			async (request, reply) => {
-				const project = coreService.getSelectedProject();
-				if (!project) {
-					return reply.code(400).send({error: 'No project selected'});
-				}
+		this.app.post<{
+			Body: {config: Record<string, unknown>; projectPath?: string};
+		}>('/api/project/config', async (request, reply) => {
+			const requestedPath = request.body?.projectPath?.trim();
+			let project = requestedPath
+				? projectManager.instance.getProject(requestedPath)
+				: coreService.getSelectedProject();
+			if (!project) {
+				return reply.code(400).send({error: 'No project selected'});
+			}
 
-				const nextConfig = request.body?.config;
-				if (!nextConfig || typeof nextConfig !== 'object') {
-					return reply.code(400).send({error: 'config object is required'});
-				}
+			const nextConfig = request.body?.config;
+			if (!nextConfig || typeof nextConfig !== 'object') {
+				return reply.code(400).send({error: 'config object is required'});
+			}
 
-				try {
-					const configPath = saveProjectConfig(
-						project.path,
-						nextConfig as ProjectConfig,
-					);
-					return {success: true, configPath};
-				} catch (error) {
-					logger.warn(`API: Failed to save project config: ${error}`);
-					return reply.code(500).send({error: 'Failed to save project config'});
-				}
-			},
-		);
+			try {
+				const configPath = saveProjectConfig(
+					project.path,
+					nextConfig as ProjectConfig,
+				);
+				return {success: true, configPath};
+			} catch (error) {
+				logger.warn(`API: Failed to save project config: ${error}`);
+				return reply.code(500).send({error: 'Failed to save project config'});
+			}
+		});
 
 		// --- Directory Browser (for Add Project) ---
 

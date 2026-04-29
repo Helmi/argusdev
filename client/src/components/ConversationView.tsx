@@ -244,11 +244,13 @@ function SessionEntry({ session, selected, onSelect }: SessionEntryProps) {
 
 export function ConversationView() {
   const {
-    currentProject,
+    projects,
+    conversationViewProjectPath,
     closeConversationView,
     conversationInitialSessionId,
     conversationTaskFilterId,
   } = useAppStore()
+  const projectName = projects.find(p => p.path === conversationViewProjectPath)?.name
   const [sessions, setSessions] = useState<ConversationSession[]>([])
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -272,7 +274,7 @@ export function ConversationView() {
   const listRef = useRef<HTMLDivElement>(null)
 
   const fetchSessions = useCallback(async (reset = false) => {
-    if (!currentProject?.path) return
+    if (!conversationViewProjectPath) return
 
     const nextOffset = reset ? 0 : offset
     if (reset) {
@@ -284,7 +286,7 @@ export function ConversationView() {
 
     try {
       const params = new URLSearchParams({
-        projectPath: currentProject.path,
+        projectPath: conversationViewProjectPath,
         limit: String(SESSION_PAGE_SIZE),
         offset: String(nextOffset),
       })
@@ -345,7 +347,7 @@ export function ConversationView() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [conversationInitialSessionId, conversationTaskFilterId, currentProject?.path, offset, search])
+  }, [conversationInitialSessionId, conversationTaskFilterId, conversationViewProjectPath, offset, search])
 
   const fetchMessages = useCallback(async (sessionId: string, reset = false, nextOffset = 0) => {
     if (reset) {
@@ -395,7 +397,7 @@ export function ConversationView() {
   useEffect(() => {
     setOffset(0)
     void fetchSessions(true)
-  }, [conversationTaskFilterId, currentProject?.path, search])
+  }, [conversationTaskFilterId, conversationViewProjectPath, search])
 
   useEffect(() => {
     if (conversationInitialSessionId) {
@@ -570,8 +572,8 @@ export function ConversationView() {
         <div className="flex items-center gap-2 text-sm">
           <MessageSquare className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium">Conversations</span>
-          {currentProject && (
-            <span className="text-xs text-muted-foreground">{currentProject.name}</span>
+          {projectName && (
+            <span className="text-xs text-muted-foreground">{projectName}</span>
           )}
         </div>
         <div className="flex items-center gap-1">

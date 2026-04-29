@@ -19,7 +19,7 @@ export function SettingsProject() {
   const {
     projects,
     currentProject,
-    selectProject,
+    settingsProjectPath,
     tdStatus,
     config,
     agents,
@@ -32,6 +32,10 @@ export function SettingsProject() {
     saveTdPrompt,
     deleteTdPrompt,
   } = useAppStore()
+
+  const [selectedPath, setSelectedPath] = useState<string>(
+    settingsProjectPath ?? currentProject?.path ?? '',
+  )
 
   const [localConfig, setLocalConfig] = useState<ProjectConfig>({})
   const [rawJson, setRawJson] = useState('{}')
@@ -60,11 +64,11 @@ export function SettingsProject() {
   }
 
   useEffect(() => {
-    if (!currentProject) return
-    fetchProjectConfig()
+    if (!selectedPath) return
+    fetchProjectConfig(selectedPath)
     refreshPromptData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProject?.path])
+  }, [selectedPath])
 
   useEffect(() => {
     const cfg = projectConfig || {}
@@ -88,7 +92,7 @@ export function SettingsProject() {
   const validProjects = projects.filter(p => p.isValid !== false)
   const enabledAgents = agents.filter(agent => agent.enabled !== false)
 
-  if (!currentProject) {
+  if (!selectedPath) {
     return (
       <div className="space-y-4">
         <div>
@@ -99,7 +103,7 @@ export function SettingsProject() {
         </div>
         <div className="space-y-2">
           <Label className="text-muted-foreground">Project</Label>
-          <Select onValueChange={(path) => selectProject(path)}>
+          <Select onValueChange={(path) => setSelectedPath(path)}>
             <SelectTrigger className="h-9">
               <SelectValue placeholder="Select a project..." />
             </SelectTrigger>
@@ -179,7 +183,7 @@ export function SettingsProject() {
 
   const handleSaveConfig = async () => {
     setSavingConfig(true)
-    await saveProjectConfig(localConfig)
+    await saveProjectConfig(localConfig, selectedPath)
     setSavingConfig(false)
     setSavedConfig(true)
     setTimeout(() => setSavedConfig(false), 2000)
@@ -279,7 +283,7 @@ export function SettingsProject() {
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Project</Label>
-          <Select value={currentProject.path} onValueChange={(path) => selectProject(path)}>
+          <Select value={selectedPath} onValueChange={(path) => setSelectedPath(path)}>
             <SelectTrigger className="h-9">
               <SelectValue />
             </SelectTrigger>
