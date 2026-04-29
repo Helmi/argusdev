@@ -261,6 +261,25 @@ export class CodexAdapter extends BaseAgentAdapter {
 							? `agent_message|${content}`
 							: null;
 				if (key && eventMsgKeys.has(key)) return;
+
+				// Drop prompt-blob noise that leaks through in legacy transcripts:
+				// - developer/system roles are always preamble (permissions, sandbox config).
+				//   system: defensive filter — spec calls it out but no live examples found
+				//   in a 15-file sample; harmless if Codex emits these in future.
+				// - user rows whose content starts with known injection markers are AGENTS.md
+				//   or environment_context blobs, not real user turns.
+				const PROMPT_BLOB_PREFIXES = [
+					'<user_instructions>',
+					'<environment_context>',
+					'<permissions instructions>',
+					'# AGENTS.md instructions for',
+				] as const;
+				if (role === 'developer' || role === 'system') return;
+				if (
+					role === 'user' &&
+					PROMPT_BLOB_PREFIXES.some(p => content.startsWith(p))
+				)
+					return;
 			}
 
 			const payload = getCodexPayload(row);

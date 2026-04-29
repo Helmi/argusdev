@@ -263,6 +263,148 @@ describe('conversation transcript adapters', () => {
 		});
 	});
 
+	it('filters prompt-blob noise from legacy Codex response_item/message rows', async () => {
+		// developer/system roles and known user prompt-blob prefixes must be dropped.
+		// Real user turns — including ones starting with '<' — must pass through.
+		const filePath = makeTempFile(
+			'rollout-legacy-prompts.jsonl',
+			[
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:00.000Z',
+					type: 'session_meta',
+					payload: {id: 'legacy-prompts', cwd: '/repo'},
+				}),
+				// developer role — permissions preamble, must be filtered
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:01.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'developer',
+						content: [
+							{
+								type: 'input_text',
+								text: '<permissions instructions>sandbox_mode is danger-full-access',
+							},
+						],
+					},
+				}),
+				// system role — defensive filter, must be filtered
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:02.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'system',
+						content: [
+							{type: 'input_text', text: 'You are a helpful assistant.'},
+						],
+					},
+				}),
+				// user row: <user_instructions> blob, must be filtered
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:03.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'user',
+						content: [
+							{
+								type: 'input_text',
+								text: '<user_instructions>\n# Project guidelines\n',
+							},
+						],
+					},
+				}),
+				// user row: <environment_context> blob, must be filtered
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:04.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'user',
+						content: [
+							{
+								type: 'input_text',
+								text: '<environment_context>\n  <cwd>/repo</cwd>\n',
+							},
+						],
+					},
+				}),
+				// user row: <permissions instructions> blob, must be filtered
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:05.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'user',
+						content: [
+							{
+								type: 'input_text',
+								text: '<permissions instructions>workspace-write sandbox',
+							},
+						],
+					},
+				}),
+				// user row: AGENTS.md blob, must be filtered
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:06.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'user',
+						content: [
+							{
+								type: 'input_text',
+								text: '# AGENTS.md instructions for /repo\n\n<INSTRUCTIONS>',
+							},
+						],
+					},
+				}),
+				// real user turn starting with '<' — must NOT be filtered (discriminator safety)
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:07.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'user',
+						content: [
+							{
+								type: 'input_text',
+								text: '<MyComponent> renders incorrectly — can you fix it?',
+							},
+						],
+					},
+				}),
+				// real assistant reply
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:20.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'assistant',
+						content: [
+							{type: 'output_text', text: 'Fixed the component render.'},
+						],
+					},
+				}),
+			].join('\n'),
+		);
+
+		const adapter = new CodexAdapter();
+		const messages = await adapter.parseMessages(filePath);
+
+		expect(messages).toHaveLength(2);
+		expect(messages[0]).toMatchObject({
+			role: 'user',
+			content: '<MyComponent> renders incorrectly — can you fix it?',
+		});
+		expect(messages[1]).toMatchObject({
+			role: 'assistant',
+			content: 'Fixed the component render.',
+		});
+	});
+
 	it('parses Gemini CLI JSONL transcripts with thoughts as thinking blocks', async () => {
 		const filePath = makeTempFile(
 			'session-2026-04-25T18-59-abcd1234.jsonl',
