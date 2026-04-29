@@ -183,7 +183,7 @@ interface TaskDetailModalProps {
 }
 
 export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, onStartReview, onRefresh }: TaskDetailModalProps) {
-  const { openConversationView, currentProject, tdRejectLoopByProject, setNudgePending, openAddSession } = useAppStore()
+  const { openConversationView, taskBoardProjectPath, tdRejectLoopByProject, setNudgePending, openAddSession } = useAppStore()
   const [issue, setIssue] = useState<TdIssueWithChildren | null>(null)
   const [loading, setLoading] = useState(true)
   const [isVisible, setIsVisible] = useState(false)
@@ -252,10 +252,10 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
     : { overview: 0, activity: 0, details: 0 }
 
   const rejectLoopItem = useMemo(() => {
-    if (!issue || !currentProject?.path) return null
-    const items = tdRejectLoopByProject[currentProject.path] ?? []
+    if (!issue || !taskBoardProjectPath) return null
+    const items = tdRejectLoopByProject[taskBoardProjectPath] ?? []
     return items.find(i => i.issue.id === issue.id) ?? null
-  }, [issue, currentProject?.path, tdRejectLoopByProject])
+  }, [issue, taskBoardProjectPath, tdRejectLoopByProject])
 
   const resolveConversationSessionId = useCallback(async (tdSessionId: string): Promise<string | null> => {
     if (!issue?.id) return null
@@ -264,8 +264,8 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
         tdSessionId,
         taskId: issue.id,
       })
-      if (currentProject?.path) {
-        params.set('projectPath', currentProject.path)
+      if (taskBoardProjectPath) {
+        params.set('projectPath', taskBoardProjectPath)
       }
       const res = await apiFetch(`/api/conversations/resolve-linked-session?${params.toString()}`)
       if (!res.ok) return null
@@ -274,7 +274,7 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
     } catch {
       return null
     }
-  }, [currentProject?.path, issue?.id])
+  }, [taskBoardProjectPath, issue?.id])
 
   return (
     <>
@@ -342,7 +342,7 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                           setNudgePending({ sessionId: rejectLoopItem.sessionId, text: rejectLoopItem.nudgeText, purpose: 'review-rejected' })
                         } else {
                           handleClose()
-                          openAddSession(undefined, currentProject?.path ?? undefined, issue.id, {
+                          openAddSession(undefined, taskBoardProjectPath ?? undefined, issue.id, {
                             intent: rejectLoopItem.intent,
                             createdBranch: issue.created_branch || undefined,
                           })

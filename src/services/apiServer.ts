@@ -2018,6 +2018,8 @@ export class APIServer {
 				Number.parseInt(request.query.offset || '0', 10) || 0,
 			);
 
+			// Fallback to selectedProject when caller omits projectPath (pre-614d6f clients).
+			// Do not expand: conversation view now passes projectPath explicitly.
 			const selectedProjectPath = coreService.getSelectedProject()?.path;
 			const effectiveProjectPath = projectPath || selectedProjectPath;
 			const parsedDateFrom =
@@ -2131,6 +2133,8 @@ export class APIServer {
 				};
 			}
 
+			// Fallback to selectedProject when caller omits projectPath (pre-614d6f clients).
+			// Do not expand: TaskDetailModal now passes projectPath explicitly.
 			const selectedProjectPath = coreService.getSelectedProject()?.path;
 			const effectiveProjectPath =
 				request.query.projectPath || selectedProjectPath;
