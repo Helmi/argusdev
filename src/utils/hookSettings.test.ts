@@ -424,9 +424,9 @@ describe('writeCodexHookFiles', () => {
 		const originalHooks = JSON.stringify({
 			hooks: {MyEvent: [{command: 'echo original'}]},
 		});
-		const survivedHooks = JSON.stringify({
-			hooks: {MyEvent: [{command: 'echo survived'}]},
-		});
+		// The surviving hooks.json must contain the ArgusDev marker so the new
+		// guard recognises it as ours (backup exists AND file is ours → keep backup).
+		const survivedHooks = buildCodexHookConfig(8080, 'ses-dead-session');
 
 		// Pre-existing backup contains the user's original file
 		writeFileSync(backupPath, originalHooks, {encoding: 'utf-8'});
@@ -478,6 +478,41 @@ describe('writeCodexHookFiles', () => {
 		// File must survive — user edits take precedence over cleanup unlink
 		expect(existsSync(configPath)).toBe(true);
 		expect(readFileSync(configPath, 'utf-8')).toBe(userEdited);
+	});
+
+	it('td-f397d9: refreshes backup when user re-edits hooks.json after a crash', () => {
+		// Session 1 starts → backup snapshot of user's original
+		const codexDir = join(worktree, '.codex');
+		mkdirSync(codexDir, {recursive: true});
+		const hooksPath = join(codexDir, 'hooks.json');
+		const backupPath = `${hooksPath}.argusdev-backup`;
+		const originalHooks = JSON.stringify({
+			hooks: {MyEvent: [{command: 'echo original'}]},
+		});
+		writeFileSync(hooksPath, originalHooks, {encoding: 'utf-8'});
+
+		const cleanup1 = writeCodexHookFiles(worktree, 8080, 'ses-crash-1');
+		// Daemon crashes — no cleanup runs. backup holds original, hooks.json has ArgusDev content.
+
+		// User notices the dead daemon and manually edits hooks.json with their own config.
+		const userReEdited = JSON.stringify({
+			hooks: {MyEvent: [{command: 'echo user-edited'}]},
+		});
+		writeFileSync(hooksPath, userReEdited, {encoding: 'utf-8'});
+
+		// Session 2 starts — must detect that current file is user-owned and refresh backup.
+		const cleanup2 = writeCodexHookFiles(worktree, 9090, 'ses-crash-2');
+
+		// Backup must now hold user's re-edited content, not the stale original.
+		expect(readFileSync(backupPath, 'utf-8')).toBe(userReEdited);
+
+		cleanup2();
+		// Cleanup restores user's re-edited content, not the stale original snapshot.
+		expect(readFileSync(hooksPath, 'utf-8')).toBe(userReEdited);
+		expect(existsSync(backupPath)).toBe(false);
+
+		// cleanup1 is orphaned (crash simulation) — suppress unused-var lint.
+		void cleanup1;
 	});
 });
 
@@ -1041,5 +1076,33 @@ describe('writeGeminiHookFiles', () => {
 			'utf-8',
 		);
 		expect(backupContent).toBe(pristine);
+	});
+
+	it('td-fd13f1: fresh-worktree crash recovery — cleanup unlinks rather than restoring stale ArgusDev content', () => {
+		// No pre-existing settings.json in a fresh worktree.
+		// Session 1 starts — creates settings.json (ArgusDev-owned), no backup.
+		const cleanup1 = writeGeminiHookFiles(worktree, 8080, 'session-fresh-1');
+		const geminiDir = join(worktree, '.gemini');
+		const settingsPath = join(geminiDir, 'settings.json');
+		const backupPath = `${settingsPath}.argusdev-backup`;
+
+		expect(existsSync(settingsPath)).toBe(true);
+		expect(existsSync(backupPath)).toBe(false);
+
+		// Daemon crashes — cleanup1 never runs. settings.json has ArgusDev content, no backup.
+
+		// Session 2 starts on same fresh worktree.
+		// Must detect that the existing file is ArgusDev-owned (no user pristine to save).
+		const cleanup2 = writeGeminiHookFiles(worktree, 9090, 'session-fresh-2');
+
+		// Still no backup — we recognised the file as ours, no snapshot needed.
+		expect(existsSync(backupPath)).toBe(false);
+
+		// Cleanup must unlink (we own it), not attempt to restore a non-existent backup.
+		cleanup2();
+		expect(existsSync(settingsPath)).toBe(false);
+		expect(existsSync(backupPath)).toBe(false);
+
+		void cleanup1;
 	});
 });

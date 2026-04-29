@@ -1,4 +1,6 @@
 import path from 'path';
+import {createHash} from 'crypto';
+import {readFileSync} from 'fs';
 import {BaseAgentAdapter} from './base.js';
 import {
 	buildPreview,
@@ -64,19 +66,35 @@ export class GeminiAdapter extends BaseAgentAdapter {
 	}
 
 	override async findSessionFile(
-		_worktreePath: string,
+		worktreePath: string,
 		afterTimestamp?: Date,
 	): Promise<string | null> {
-		// Gemini writes to ~/.gemini/tmp/<projectName>/chats/session-*.jsonl
+		// Gemini scopes transcripts by projectHash = sha256(worktreePath).
+		// The directory name under ~/.gemini/tmp/ varies by Gemini version
+		// (hash-named in older versions, basename-named in newer ones), but the
+		// projectHash field in the first line of each .jsonl is always consistent.
+		// Filtering by this hash ensures multi-project sessions don't cross-attach.
+		const expectedHash = createHash('sha256')
+			.update(worktreePath)
+			.digest('hex');
+
 		const root = homePath('.gemini', 'tmp');
 		const candidates = recursiveFindFiles(
 			root,
 			fileName =>
 				fileName.startsWith('session-') && fileName.endsWith('.jsonl'),
 			200,
-		).filter(candidate =>
-			withinRecentWindow(candidate, afterTimestamp, 300000),
-		);
+		).filter(candidate => {
+			if (!withinRecentWindow(candidate, afterTimestamp, 300000)) return false;
+			try {
+				const firstLine = readFileSync(candidate, 'utf-8').split('\n')[0];
+				if (!firstLine) return false;
+				const meta = JSON.parse(firstLine) as Record<string, unknown>;
+				return meta['projectHash'] === expectedHash;
+			} catch {
+				return false;
+			}
+		});
 
 		return candidates[0] || null;
 	}

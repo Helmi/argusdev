@@ -186,6 +186,18 @@ export function buildCodexHookConfig(port: number, sessionId: string): string {
 }
 
 const ARGUSDEV_BACKUP_SUFFIX = '.argusdev-backup';
+const ARGUSDEV_HOOK_MARKER = '/api/internal/sessions/';
+
+// Returns true when a raw config file string contains ArgusDev hook URLs.
+// Used to detect "we created/owned this file" vs "user owns it" when deciding
+// whether to trust an existing backup or refresh it.
+// Constraint: raw-string match is coarser than full JSON parse, but false
+// positives (user config accidentally containing this URL fragment) are
+// vanishingly unlikely, and the consequence is only "refresh backup" not
+// data loss.
+function isArgusdevOwnedContent(raw: string): boolean {
+	return raw.includes(ARGUSDEV_HOOK_MARKER);
+}
 
 /**
  * Write .codex/hooks.json and patch .codex/config.toml (codex_hooks = true)
@@ -210,11 +222,19 @@ export function writeCodexHookFiles(
 	const hooksPath = join(codexDir, 'hooks.json');
 	const hooksBackupPath = `${hooksPath}${ARGUSDEV_BACKUP_SUFFIX}`;
 	const hadExistingHooks = existsSync(hooksPath);
-	if (hadExistingHooks && !existsSync(hooksBackupPath)) {
-		// Snapshot before overwriting so cleanup can restore it.
-		// Guard: if backup already exists (daemon crashed mid-session), don't
-		// overwrite it — the original pre-session content is already there.
-		writeFileSync(hooksBackupPath, readFileSync(hooksPath), {mode: 0o600});
+	if (hadExistingHooks) {
+		const backupExists = existsSync(hooksBackupPath);
+		const currentRaw = readFileSync(hooksPath);
+		const currentIsOurs = isArgusdevOwnedContent(currentRaw.toString('utf-8'));
+		if (!backupExists || !currentIsOurs) {
+			// Refresh backup when:
+			// - No backup yet (first session start): snapshot user's file.
+			// - Backup exists but current file is NOT ours: user re-edited
+			//   hooks.json after a crash; treat their edits as the new pristine.
+			// Skip when backup exists AND current file is ours (crash-recovery):
+			// the existing backup already holds the real pre-session original.
+			writeFileSync(hooksBackupPath, currentRaw, {mode: 0o600});
+		}
 	}
 	const tmpPath = `${hooksPath}.tmp`;
 	writeFileSync(tmpPath, buildCodexHookConfig(port, sessionId), {
@@ -522,8 +542,6 @@ export function buildGeminiHookConfig(port: number, sessionId: string): string {
 	return JSON.stringify(config, null, 2);
 }
 
-const ARGUSDEV_HOOK_MARKER = '/api/internal/sessions/';
-
 function isArgusdevHookEntry(entry: unknown): boolean {
 	if (!entry || typeof entry !== 'object') return false;
 	const hooks = (entry as {hooks?: unknown}).hooks;
@@ -562,15 +580,28 @@ export function writeGeminiHookFiles(
 	const hadExisting = existsSync(settingsPath);
 
 	let existing: Record<string, unknown> = {};
+	// weCreatedIt tracks whether cleanup should unlink (we own the file) or
+	// restore from backup (user owned it pre-session).
+	let weCreatedIt = !hadExisting;
 	if (hadExisting) {
 		const raw = readFileSync(settingsPath);
-		// Only snapshot when no backup exists — crash-recovery re-runs must not
-		// overwrite the pristine original with a session-polluted intermediate.
-		if (!existsSync(backupPath)) {
+		const rawStr = raw.toString('utf-8');
+		const backupExists = existsSync(backupPath);
+
+		if (backupExists) {
+			// Existing backup is canonical — crash-recovery must not overwrite it
+			// with a session-polluted intermediate.
+		} else if (isArgusdevOwnedContent(rawStr)) {
+			// No backup AND current file is ours: we created it on a prior crashed
+			// session. Treat as fresh-create — skip snapshotting, cleanup unlinks.
+			weCreatedIt = true;
+		} else {
+			// No backup, current file is user's — snapshot it as pristine.
 			writeFileSync(backupPath, raw, {mode: 0o600});
 		}
+
 		try {
-			existing = JSON.parse(raw.toString('utf-8')) as Record<string, unknown>;
+			existing = JSON.parse(rawStr) as Record<string, unknown>;
 		} catch {
 			// Malformed settings — treat as empty, backup still restores it
 		}
@@ -604,7 +635,7 @@ export function writeGeminiHookFiles(
 	renameSync(tmpPath, settingsPath);
 
 	return () => {
-		if (hadExisting && existsSync(backupPath)) {
+		if (!weCreatedIt && existsSync(backupPath)) {
 			writeFileSync(settingsPath, readFileSync(backupPath), {mode: 0o600});
 			try {
 				unlinkSync(backupPath);

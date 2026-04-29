@@ -1,12 +1,26 @@
-import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {ClaudeAdapter} from './claude.js';
 import {ClineAdapter} from './cline.js';
 import {CodexAdapter} from './codex.js';
 import {GeminiAdapter} from './gemini.js';
 import {GenericAdapter} from './generic.js';
+
+let geminiTmpRoot = '';
+
+vi.mock('./helpers.js', async importOriginal => {
+	const original = await importOriginal<typeof import('./helpers.js')>();
+	return {
+		...original,
+		homePath: (...parts: string[]) =>
+			geminiTmpRoot
+				? path.join(geminiTmpRoot, ...parts)
+				: original.homePath(...parts),
+	};
+});
 
 const tempDirs: string[] = [];
 
@@ -514,5 +528,59 @@ describe('conversation transcript adapters', () => {
 		expect(metadata).toMatchObject({
 			messageCount: 2,
 		});
+	});
+});
+
+describe('GeminiAdapter.findSessionFile scoping', () => {
+	let tmpRoot = '';
+
+	afterEach(() => {
+		geminiTmpRoot = '';
+		if (tmpRoot) {
+			rmSync(tmpRoot, {recursive: true, force: true});
+			tmpRoot = '';
+		}
+	});
+
+	it('td-ae12f7: returns only the file whose projectHash matches the worktree path', async () => {
+		tmpRoot = mkdtempSync(path.join(tmpdir(), 'argusdev-gemini-scope-'));
+		geminiTmpRoot = tmpRoot;
+
+		const worktreeA = '/fake/proj-alpha';
+		const worktreeB = '/fake/proj-beta';
+		const hashA = createHash('sha256').update(worktreeA).digest('hex');
+		const hashB = createHash('sha256').update(worktreeB).digest('hex');
+
+		// Create two project dirs under the mocked ~/.gemini/tmp
+		const geminiTmp = path.join(tmpRoot, '.gemini', 'tmp');
+		const dirA = path.join(geminiTmp, 'proj-alpha', 'chats');
+		const dirB = path.join(geminiTmp, 'proj-beta', 'chats');
+		mkdirSync(dirA, {recursive: true});
+		mkdirSync(dirB, {recursive: true});
+
+		// Write session file for worktreeA (older mtime — would lose on global sort)
+		const fileA = path.join(dirA, 'session-2026-01-01T10-00-aabbccdd.jsonl');
+		writeFileSync(
+			fileA,
+			JSON.stringify({projectHash: hashA, kind: 'main'}) + '\n',
+			'utf8',
+		);
+
+		// Write session file for worktreeB (newer mtime — wins on global sort)
+		const fileB = path.join(dirB, 'session-2026-01-01T11-00-eeff0011.jsonl');
+		writeFileSync(
+			fileB,
+			JSON.stringify({projectHash: hashB, kind: 'main'}) + '\n',
+			'utf8',
+		);
+
+		const adapter = new GeminiAdapter();
+		// findSessionFile for worktreeA must return fileA, not fileB (the newer one)
+		const found = await adapter.findSessionFile(worktreeA);
+		expect(found).toBe(fileA);
+
+		// Symmetric: findSessionFile for worktreeB must return fileB
+		const foundB = await adapter.findSessionFile(worktreeB);
+		expect(foundB).toBe(fileB);
 	});
 });
