@@ -13,6 +13,7 @@ import {join} from 'path';
 import {fileURLToPath} from 'url';
 import {getConfigDir} from './configDir.js';
 import {homePath} from '../adapters/helpers.js';
+import {logger} from './logger.js';
 
 /**
  * Build Claude Code settings object with HTTP hooks for state detection.
@@ -209,8 +210,10 @@ export function writeCodexHookFiles(
 	const hooksPath = join(codexDir, 'hooks.json');
 	const hooksBackupPath = `${hooksPath}${ARGUSDEV_BACKUP_SUFFIX}`;
 	const hadExistingHooks = existsSync(hooksPath);
-	if (hadExistingHooks) {
-		// Snapshot before overwriting so cleanup can restore it
+	if (hadExistingHooks && !existsSync(hooksBackupPath)) {
+		// Snapshot before overwriting so cleanup can restore it.
+		// Guard: if backup already exists (daemon crashed mid-session), don't
+		// overwrite it — the original pre-session content is already there.
 		writeFileSync(hooksBackupPath, readFileSync(hooksPath), {mode: 0o600});
 	}
 	const tmpPath = `${hooksPath}.tmp`;
@@ -227,6 +230,9 @@ export function writeCodexHookFiles(
 		? readFileSync(configPath, 'utf-8')
 		: null;
 	patchCodexConfigToml(codexDir);
+	// Capture what we wrote so cleanup can verify the file hasn't been edited
+	// by the user or codex during the session before deciding to restore.
+	const patchedConfig = readFileSync(configPath, 'utf-8');
 
 	return () => {
 		// Restore hooks.json
@@ -244,14 +250,34 @@ export function writeCodexHookFiles(
 				// File already gone — fine
 			}
 		}
-		// Restore config.toml
+		// Restore config.toml — but only if the file hasn't been modified
+		// since we wrote it.  If the user or codex edited it during the
+		// session, leave it alone to avoid silently discarding their changes.
 		if (originalConfig !== null) {
-			writeFileSync(configPath, originalConfig, {encoding: 'utf-8'});
+			const currentConfig = existsSync(configPath)
+				? readFileSync(configPath, 'utf-8')
+				: null;
+			if (currentConfig === patchedConfig) {
+				writeFileSync(configPath, originalConfig, {encoding: 'utf-8'});
+			} else {
+				logger.warn(
+					`config.toml was modified during session; skipping revert to preserve user edits`,
+				);
+			}
 		} else if (!hadExistingConfig) {
-			try {
-				unlinkSync(configPath);
-			} catch {
-				// File already gone — fine
+			const currentConfig = existsSync(configPath)
+				? readFileSync(configPath, 'utf-8')
+				: null;
+			if (currentConfig === null || currentConfig === patchedConfig) {
+				try {
+					unlinkSync(configPath);
+				} catch {
+					// File already gone — fine
+				}
+			} else {
+				logger.warn(
+					`config.toml created by ArgusDev was modified during session; skipping unlink to preserve user edits`,
+				);
 			}
 		}
 	};

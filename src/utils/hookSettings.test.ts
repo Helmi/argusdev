@@ -410,6 +410,72 @@ describe('writeCodexHookFiles', () => {
 		expect(existsSync(hooksPath)).toBe(false);
 		expect(() => cleanupCodexHookFiles(worktree)).not.toThrow();
 	});
+
+	it('td-65c5ff: does not overwrite backup when one already exists (crash-recovery guard)', () => {
+		// Simulate a daemon crash mid-session: backup exists from the first
+		// session start, but hooks.json currently holds ArgusDev content.
+		const codexDir = join(worktree, '.codex');
+		mkdirSync(codexDir, {recursive: true});
+		const hooksPath = join(codexDir, 'hooks.json');
+		const backupPath = `${hooksPath}.argusdev-backup`;
+		const originalHooks = JSON.stringify({
+			hooks: {MyEvent: [{command: 'echo original'}]},
+		});
+		const survivedHooks = JSON.stringify({
+			hooks: {MyEvent: [{command: 'echo survived'}]},
+		});
+
+		// Pre-existing backup contains the user's original file
+		writeFileSync(backupPath, originalHooks, {encoding: 'utf-8'});
+		// hooks.json currently contains the last ArgusDev-written content
+		writeFileSync(hooksPath, survivedHooks, {encoding: 'utf-8'});
+
+		// Second call (new session start after crash) must not clobber the backup
+		const cleanup = writeCodexHookFiles(worktree, 8080, 'ses-crash-recovery');
+
+		expect(readFileSync(backupPath, 'utf-8')).toBe(originalHooks);
+
+		cleanup();
+		// After cleanup, original is restored
+		expect(readFileSync(hooksPath, 'utf-8')).toBe(originalHooks);
+		expect(existsSync(backupPath)).toBe(false);
+	});
+
+	it('td-286f20: skips config.toml revert when file was modified mid-session', () => {
+		const codexDir = join(worktree, '.codex');
+		mkdirSync(codexDir, {recursive: true});
+		const configPath = join(codexDir, 'config.toml');
+		const originalConfig = 'model = "gpt-4o"\n';
+		writeFileSync(configPath, originalConfig);
+
+		const cleanup = writeCodexHookFiles(worktree, 8080, 'ses-mid-edit');
+
+		// User edits config.toml during the session
+		const userEdited = 'model = "o4-mini"\n\n[features]\ncodex_hooks = true\n';
+		writeFileSync(configPath, userEdited, {encoding: 'utf-8'});
+
+		cleanup();
+
+		// Cleanup must preserve the user's mid-session edits
+		expect(readFileSync(configPath, 'utf-8')).toBe(userEdited);
+	});
+
+	it('td-286f20 symmetric: skips config.toml unlink when ArgusDev created it but user modified it', () => {
+		// No pre-existing config.toml — ArgusDev creates it
+		const cleanup = writeCodexHookFiles(worktree, 8080, 'ses-fresh-edit');
+		const configPath = join(worktree, '.codex', 'config.toml');
+		expect(existsSync(configPath)).toBe(true);
+
+		// User adds settings during the session
+		const userEdited = '[features]\ncodex_hooks = true\n\nmodel = "o4-mini"\n';
+		writeFileSync(configPath, userEdited, {encoding: 'utf-8'});
+
+		cleanup();
+
+		// File must survive — user edits take precedence over cleanup unlink
+		expect(existsSync(configPath)).toBe(true);
+		expect(readFileSync(configPath, 'utf-8')).toBe(userEdited);
+	});
 });
 
 // ── OpenCode plugin ───────────────────────────────────────────────────────────
