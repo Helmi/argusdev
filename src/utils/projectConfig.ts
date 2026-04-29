@@ -94,6 +94,8 @@ const GLOBAL_PROMPT_DEFAULTS: Record<string, string> = {
 		'Priority: {{task.priority}}',
 		'',
 		'Start by understanding scope, then implement minimal, correct changes.',
+		'',
+		'If this task is marked minor, self-review and close when done — verify your own work and run `td approve` (or `td close --self-close-exception "minor task"` if required) in this same session.',
 	].join('\n'),
 	'Fix Rejected Work': [
 		'You are continuing work on {{task.id}} - {{task.title}} after a review rejection.',
