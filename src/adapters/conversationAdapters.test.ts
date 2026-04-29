@@ -215,6 +215,54 @@ describe('conversation transcript adapters', () => {
 		});
 	});
 
+	it('renders legacy Codex transcripts that have no event_msg rows', async () => {
+		// Older Codex CLI versions only wrote response_item/message rows.
+		// The dedup logic must not drop them when no event_msg twin exists.
+		const filePath = makeTempFile(
+			'rollout-legacy.jsonl',
+			[
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:00.000Z',
+					type: 'session_meta',
+					payload: {id: 'legacy-session', cwd: '/repo'},
+				}),
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:05.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'user',
+						content: [{type: 'input_text', text: 'Fix the bug in parser.ts'}],
+					},
+				}),
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:20.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'assistant',
+						content: [
+							{type: 'output_text', text: 'Done — fixed the off-by-one.'},
+						],
+					},
+				}),
+			].join('\n'),
+		);
+
+		const adapter = new CodexAdapter();
+		const messages = await adapter.parseMessages(filePath);
+
+		expect(messages).toHaveLength(2);
+		expect(messages[0]).toMatchObject({
+			role: 'user',
+			content: 'Fix the bug in parser.ts',
+		});
+		expect(messages[1]).toMatchObject({
+			role: 'assistant',
+			content: 'Done — fixed the off-by-one.',
+		});
+	});
+
 	it('parses Gemini CLI JSONL transcripts with thoughts as thinking blocks', async () => {
 		const filePath = makeTempFile(
 			'session-2026-04-25T18-59-abcd1234.jsonl',

@@ -213,6 +213,24 @@ export class CodexAdapter extends BaseAgentAdapter {
 		const rows = safeReadJsonLines(sessionFilePath) as CodexLine[];
 		const messages: ConversationMessage[] = [];
 
+		// Pass 1: collect content keys from canonical event_msg turns.
+		// Older Codex CLI versions never wrote event_msg/user_message or
+		// event_msg/agent_message, so we must only drop response_item/message
+		// rows that are confirmed duplicates — not all of them.
+		const eventMsgKeys = new Set<string>();
+		for (const row of rows) {
+			const rt = typeof row.type === 'string' ? row.type : undefined;
+			if (rt !== 'event_msg') continue;
+			const p =
+				row.payload && typeof row.payload === 'object'
+					? (row.payload as Record<string, unknown>)
+					: null;
+			const pt = typeof p?.['type'] === 'string' ? p['type'] : null;
+			if (pt !== 'user_message' && pt !== 'agent_message') continue;
+			const msg = extractString(p?.['message']);
+			if (msg) eventMsgKeys.add(`${pt}|${msg}`);
+		}
+
 		rows.forEach((row, index) => {
 			const rowType = typeof row.type === 'string' ? row.type : undefined;
 
@@ -224,17 +242,25 @@ export class CodexAdapter extends BaseAgentAdapter {
 			const payloadTypePeek =
 				typeof payloadObj?.['type'] === 'string' ? payloadObj['type'] : null;
 
-			if (
-				rowType === 'session_meta' ||
-				rowType === 'turn_context' ||
-				// event_msg/token_count has no conversation value
-				(rowType === 'event_msg' && payloadTypePeek === 'token_count') ||
-				// response_item/message duplicates event_msg/user_message and
-				// event_msg/agent_message — skip to avoid showing each turn twice.
-				// Also skips developer/system prompt blobs.
-				(rowType === 'response_item' && payloadTypePeek === 'message')
-			) {
-				return;
+			if (rowType === 'session_meta' || rowType === 'turn_context') return;
+			// event_msg/token_count has no conversation value
+			if (rowType === 'event_msg' && payloadTypePeek === 'token_count') return;
+
+			// response_item/message is the API-envelope shape that duplicates
+			// event_msg/user_message and event_msg/agent_message in newer Codex CLI
+			// versions. Drop only when a matching event_msg twin exists; fall through
+			// for older transcripts that have no event_msg rows at all.
+			if (rowType === 'response_item' && payloadTypePeek === 'message') {
+				const role =
+					typeof payloadObj?.['role'] === 'string' ? payloadObj['role'] : '';
+				const content = extractString(payloadObj?.['content']);
+				const key =
+					role === 'user'
+						? `user_message|${content}`
+						: role === 'assistant'
+							? `agent_message|${content}`
+							: null;
+				if (key && eventMsgKeys.has(key)) return;
 			}
 
 			const payload = getCodexPayload(row);
