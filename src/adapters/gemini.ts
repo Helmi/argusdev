@@ -11,9 +11,11 @@ import {
 } from './helpers.js';
 import type {
 	ConversationMessage,
+	HookConfigResult,
 	SessionFileMetadata,
 	ThinkingBlockData,
 } from './types.js';
+import {writeGeminiHookFiles} from '../utils/hookSettings.js';
 
 interface GeminiLine extends Record<string, unknown> {
 	id?: string;
@@ -50,6 +52,15 @@ export class GeminiAdapter extends BaseAgentAdapter {
 			detectionStrategy: 'gemini',
 			sessionFormat: 'jsonl',
 		});
+	}
+
+	override generateHookConfig(
+		worktreePath: string,
+		port: number,
+		sessionId: string,
+	): HookConfigResult {
+		const cleanup = writeGeminiHookFiles(worktreePath, port, sessionId);
+		return {argsToInject: [], cleanup, partialHook: true};
 	}
 
 	override async findSessionFile(

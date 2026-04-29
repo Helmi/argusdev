@@ -6,6 +6,7 @@ import {
 	readFileSync,
 	rmSync,
 	statSync,
+	unlinkSync,
 	writeFileSync,
 } from 'fs';
 import {tmpdir} from 'os';
@@ -25,11 +26,13 @@ vi.mock('../adapters/helpers.js', () => ({
 const {
 	buildClaudeHookSettings,
 	buildCodexHookConfig,
+	buildGeminiHookConfig,
 	buildOpencodePluginContent,
 	cleanupCodexHookFiles,
 	cleanupHookSettingsFile,
 	sweepOrphanHookSettings,
 	writeCodexHookFiles,
+	writeGeminiHookFiles,
 	writeHookSettingsFile,
 	writeOpencodePluginFile,
 	writePiExtensionSettings,
@@ -770,5 +773,166 @@ describe('writePiExtensionSettings', () => {
 		writePiExtensionSettings(hookPath);
 		const settingsPath = join(piHome, '.pi', 'agent', 'settings.json');
 		expect(existsSync(`${settingsPath}.argusdev-tmp`)).toBe(false);
+	});
+});
+
+// ── Gemini hook config ────────────────────────────────────────────────────────
+
+describe('buildGeminiHookConfig', () => {
+	it('returns valid JSON', () => {
+		expect(() =>
+			JSON.parse(buildGeminiHookConfig(9999, 'ses-gemini')),
+		).not.toThrow();
+	});
+
+	it('generates all six hook events', () => {
+		const cfg = JSON.parse(buildGeminiHookConfig(9999, 'ses-gemini'));
+		expect(cfg.hooks.SessionStart).toHaveLength(1);
+		expect(cfg.hooks.BeforeAgent).toHaveLength(1);
+		expect(cfg.hooks.BeforeTool).toHaveLength(1);
+		expect(cfg.hooks.AfterAgent).toHaveLength(1);
+		expect(cfg.hooks.Notification).toHaveLength(1);
+		expect(cfg.hooks.SessionEnd).toHaveLength(1);
+	});
+
+	it('uses nested wrapper shape with type:command', () => {
+		const cfg = JSON.parse(buildGeminiHookConfig(8080, 'ses-x'));
+		const entry = cfg.hooks.AfterAgent[0];
+		expect(entry.command).toBeUndefined();
+		expect(entry.hooks).toHaveLength(1);
+		expect(entry.hooks[0].type).toBe('command');
+		expect(entry.hooks[0].command).toContain('curl');
+	});
+
+	it('maps SessionStart to idle', () => {
+		const cfg = JSON.parse(buildGeminiHookConfig(8080, 'ses-x'));
+		expect(cfg.hooks.SessionStart[0].hooks[0].command).toContain(
+			'/hook-state/idle',
+		);
+	});
+
+	it('maps BeforeAgent to busy', () => {
+		const cfg = JSON.parse(buildGeminiHookConfig(8080, 'ses-x'));
+		expect(cfg.hooks.BeforeAgent[0].hooks[0].command).toContain(
+			'/hook-state/busy',
+		);
+	});
+
+	it('maps BeforeTool to busy', () => {
+		const cfg = JSON.parse(buildGeminiHookConfig(8080, 'ses-x'));
+		expect(cfg.hooks.BeforeTool[0].hooks[0].command).toContain(
+			'/hook-state/busy',
+		);
+	});
+
+	it('maps AfterAgent to idle', () => {
+		const cfg = JSON.parse(buildGeminiHookConfig(8080, 'ses-x'));
+		expect(cfg.hooks.AfterAgent[0].hooks[0].command).toContain(
+			'/hook-state/idle',
+		);
+	});
+
+	it('maps Notification(ToolPermission) to waiting_input', () => {
+		const cfg = JSON.parse(buildGeminiHookConfig(8080, 'ses-x'));
+		const entry = cfg.hooks.Notification[0];
+		expect(entry.matcher).toBe('ToolPermission');
+		expect(entry.hooks[0].command).toContain('/hook-state/waiting_input');
+	});
+
+	it('maps SessionEnd to idle', () => {
+		const cfg = JSON.parse(buildGeminiHookConfig(8080, 'ses-x'));
+		expect(cfg.hooks.SessionEnd[0].hooks[0].command).toContain(
+			'/hook-state/idle',
+		);
+	});
+
+	it('embeds port and session ID in commands', () => {
+		const cfg = JSON.parse(buildGeminiHookConfig(54321, 'session-test-xyz'));
+		const cmd = cfg.hooks.AfterAgent[0].hooks[0].command;
+		expect(cmd).toContain('127.0.0.1:54321');
+		expect(cmd).toContain('/sessions/session-test-xyz/');
+	});
+
+	it('encodes session IDs with special characters', () => {
+		const cfg = JSON.parse(buildGeminiHookConfig(8080, 'session with spaces'));
+		const cmd = cfg.hooks.AfterAgent[0].hooks[0].command;
+		expect(cmd).toContain('session%20with%20spaces');
+	});
+});
+
+describe('writeGeminiHookFiles', () => {
+	let worktree: string;
+
+	beforeEach(() => {
+		worktree = mkdtempSync(join(tmpdir(), 'argusdev-gemini-test-'));
+	});
+
+	afterEach(() => {
+		rmSync(worktree, {recursive: true, force: true});
+	});
+
+	it('writes settings.json in <worktree>/.gemini/', () => {
+		writeGeminiHookFiles(worktree, 8080, 'ses-1');
+		const settingsPath = join(worktree, '.gemini', 'settings.json');
+		expect(existsSync(settingsPath)).toBe(true);
+		expect(JSON.parse(readFileSync(settingsPath, 'utf-8')).hooks).toBeDefined();
+	});
+
+	it('writes settings.json with mode 0600', () => {
+		writeGeminiHookFiles(worktree, 8080, 'ses-mode');
+		const mode =
+			statSync(join(worktree, '.gemini', 'settings.json')).mode & 0o777;
+		expect(mode).toBe(0o600);
+	});
+
+	it('is idempotent — second call overwrites with new session params', () => {
+		writeGeminiHookFiles(worktree, 8080, 'ses-first');
+		writeGeminiHookFiles(worktree, 9090, 'ses-second');
+		const content = readFileSync(
+			join(worktree, '.gemini', 'settings.json'),
+			'utf-8',
+		);
+		expect(content).toContain(':9090');
+		expect(content).toContain('ses-second');
+	});
+
+	it('cleanup fn removes settings.json when none pre-existed', () => {
+		const cleanup = writeGeminiHookFiles(worktree, 8080, 'ses-clean');
+		const settingsPath = join(worktree, '.gemini', 'settings.json');
+		expect(existsSync(settingsPath)).toBe(true);
+		cleanup();
+		expect(existsSync(settingsPath)).toBe(false);
+	});
+
+	it('cleanup fn restores pre-existing settings.json', () => {
+		const geminiDir = join(worktree, '.gemini');
+		mkdirSync(geminiDir, {recursive: true});
+		const originalSettings = JSON.stringify({theme: 'dark', someKey: 'value'});
+		writeFileSync(join(geminiDir, 'settings.json'), originalSettings, {
+			encoding: 'utf-8',
+		});
+
+		const cleanup = writeGeminiHookFiles(worktree, 8080, 'ses-restore');
+		const active = readFileSync(join(geminiDir, 'settings.json'), 'utf-8');
+		expect(JSON.parse(active).hooks).toBeDefined();
+
+		cleanup();
+		const restored = readFileSync(join(geminiDir, 'settings.json'), 'utf-8');
+		expect(restored).toBe(originalSettings);
+		expect(
+			existsSync(join(geminiDir, 'settings.json.argusdev-backup')),
+		).toBe(false);
+	});
+
+	it('cleanup is a no-op when settings.json already removed', () => {
+		const cleanup = writeGeminiHookFiles(worktree, 8080, 'ses-gone');
+		unlinkSync(join(worktree, '.gemini', 'settings.json'));
+		expect(() => cleanup()).not.toThrow();
+	});
+
+	it('writes atomically (no .tmp leftover)', () => {
+		writeGeminiHookFiles(worktree, 8080, 'ses-atomic');
+		const settingsPath = join(worktree, '.gemini', 'settings.json');
+		expect(existsSync(`${settingsPath}.tmp`)).toBe(false);
 	});
 });

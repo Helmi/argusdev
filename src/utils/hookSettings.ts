@@ -481,6 +481,93 @@ export function writePiHookFiles(): () => void {
 	return writePiExtensionSettings(piHookPath());
 }
 
+/**
+ * Build Gemini CLI settings.json content wiring lifecycle events to ArgusDev's
+ * internal hook-state endpoint via curl.
+ *
+ * Uses the same nested wrapper shape as Codex:
+ *   EventName: [{ hooks: [{ type: "command", command: "..." }] }]
+ * Notification is scoped to ToolPermission via matcher to avoid false positives.
+ * Interactive shell stdin waiting is NOT covered (upstream issue #19527, unshipped).
+ *
+ * Hook → State mapping:
+ *   SessionStart  → idle  (confirms hooks are wired on session start / resume)
+ *   BeforeAgent   → busy  (after user submission, before planning)
+ *   BeforeTool    → busy  (before tool invocation)
+ *   AfterAgent    → idle  (after model generates response)
+ *   Notification  → waiting_input (ToolPermission events only)
+ *   SessionEnd    → idle  (cleanup signal on exit)
+ */
+export function buildGeminiHookConfig(port: number, sessionId: string): string {
+	const base = `http://127.0.0.1:${port}/api/internal/sessions/${encodeURIComponent(sessionId)}/hook-state`;
+
+	const hook = (state: string) => ({
+		type: 'command' as const,
+		command: `curl -s -X POST ${base}/${state} > /dev/null 2>&1 || true`,
+	});
+
+	const config = {
+		hooks: {
+			SessionStart: [{hooks: [hook('idle')]}],
+			BeforeAgent: [{hooks: [hook('busy')]}],
+			BeforeTool: [{hooks: [hook('busy')]}],
+			AfterAgent: [{hooks: [hook('idle')]}],
+			Notification: [{matcher: 'ToolPermission', hooks: [hook('waiting_input')]}],
+			SessionEnd: [{hooks: [hook('idle')]}],
+		},
+	};
+
+	return JSON.stringify(config, null, 2);
+}
+
+/**
+ * Write .gemini/settings.json in the given worktree with ArgusDev hook config.
+ *
+ * If a settings.json already exists, it is snapshotted to
+ * settings.json.argusdev-backup before being overwritten.
+ * The returned cleanup function restores the pre-session state.
+ */
+export function writeGeminiHookFiles(
+	worktreePath: string,
+	port: number,
+	sessionId: string,
+): () => void {
+	const geminiDir = join(worktreePath, '.gemini');
+	mkdirSync(geminiDir, {recursive: true});
+
+	const settingsPath = join(geminiDir, 'settings.json');
+	const backupPath = `${settingsPath}${ARGUSDEV_BACKUP_SUFFIX}`;
+	const hadExisting = existsSync(settingsPath);
+
+	if (hadExisting) {
+		writeFileSync(backupPath, readFileSync(settingsPath), {mode: 0o600});
+	}
+
+	const tmpPath = `${settingsPath}.tmp`;
+	writeFileSync(tmpPath, buildGeminiHookConfig(port, sessionId), {
+		encoding: 'utf-8',
+		mode: 0o600,
+	});
+	renameSync(tmpPath, settingsPath);
+
+	return () => {
+		if (hadExisting && existsSync(backupPath)) {
+			writeFileSync(settingsPath, readFileSync(backupPath), {mode: 0o600});
+			try {
+				unlinkSync(backupPath);
+			} catch {
+				// best-effort
+			}
+		} else {
+			try {
+				unlinkSync(settingsPath);
+			} catch {
+				// File already gone — fine
+			}
+		}
+	};
+}
+
 function patchCodexConfigToml(codexDir: string): void {
 	const configPath = join(codexDir, 'config.toml');
 	let content = '';
