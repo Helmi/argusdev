@@ -215,6 +215,7 @@ vi.mock('./tdReader.js', () => ({
 		listIssues: vi.fn((query?: unknown) =>
 			mockTdReaderListIssues(dbPath, query),
 		),
+		getRejectedIssueIds: vi.fn(() => new Set<string>()),
 		close: vi.fn(() => mockTdReaderClose(dbPath)),
 	})),
 }));
@@ -2528,7 +2529,14 @@ describe('APIServer TD project review metadata', () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual({
 			projectPath: '/repo-b',
-			issues: [{id: 'td-b3', title: 'Repo B open task', priority: 'P2'}],
+			issues: [
+				expect.objectContaining({
+					id: 'td-b3',
+					title: 'Repo B open task',
+					priority: 'P2',
+					is_rejected: false,
+				}),
+			],
 		});
 	});
 });

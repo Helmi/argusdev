@@ -438,6 +438,32 @@ export class TdReader {
 		}
 	}
 
+	/**
+	 * Batch-query which issue IDs from a given set have ever been rejected.
+	 * Returns a Set of issue IDs that have at least one "Rejected:" log entry.
+	 */
+	getRejectedIssueIds(issueIds: string[]): Set<string> {
+		if (issueIds.length === 0) return new Set();
+		try {
+			const db = this.open();
+			const placeholders = issueIds.map(() => '?').join(',');
+			const rows = db
+				.prepare(
+					`SELECT DISTINCT issue_id FROM logs
+					 WHERE issue_id IN (${placeholders})
+					   AND message LIKE 'Rejected:%'`,
+				)
+				.all(...issueIds) as {issue_id: string}[];
+			return new Set(rows.map(r => r.issue_id));
+		} catch (error) {
+			logger.error(
+				'[TdReader] Failed to batch-query rejected issue IDs',
+				error,
+			);
+			return new Set();
+		}
+	}
+
 	// --- Search ---
 
 	/**

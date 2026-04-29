@@ -58,6 +58,7 @@ export interface Session {
 	agentId?: string;
 	type?: 'pty' | 'sdk';
 	tdTaskId?: string | null;
+	intent?: string | null;
 }
 
 // --- SDK Session Types ---
@@ -349,6 +350,7 @@ export interface TdIssue {
 	defer_until: string | null;
 	due_date: string | null;
 	defer_count: number;
+	is_rejected?: boolean;
 }
 
 export interface TdHandoffParsed {

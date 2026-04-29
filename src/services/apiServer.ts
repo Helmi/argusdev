@@ -1947,33 +1947,41 @@ export class APIServer {
 		this.app.get('/api/sessions', async () => {
 			const ptySessions = globalSessionOrchestrator
 				.getAllActiveSessions()
-				.map(s => ({
-					...toApiSessionPayload(s),
-					type: 'pty' as const,
-					tdTaskId: sessionStore.getSessionById(s.id)?.tdTaskId ?? null,
-				}));
+				.map(s => {
+					const record = sessionStore.getSessionById(s.id);
+					return {
+						...toApiSessionPayload(s),
+						type: 'pty' as const,
+						tdTaskId: record?.tdTaskId ?? null,
+						intent: record?.intent ?? null,
+					};
+				});
 			const sdkSessions = sdkSessionManager
 				.getAllSessions()
 				.filter(s => s.state !== 'closed')
-				.map(s => ({
-					id: s.id,
-					name: s.name,
-					path: s.worktreePath,
-					state:
-						s.state === 'connecting'
-							? ('busy' as const)
-							: s.state === 'closed'
-								? ('idle' as const)
-								: (s.state as SessionState),
-					createdAt: Math.floor(s.createdAt.getTime() / 1000),
-					isActive: s.state !== 'closed' && s.state !== 'error',
-					agentId: s.agentId,
-					type: 'sdk' as const,
-					pid: 0,
-					autoApprovalFailed: false,
-					autoApprovalReason: undefined,
-					tdTaskId: sessionStore.getSessionById(s.id)?.tdTaskId ?? null,
-				}));
+				.map(s => {
+					const record = sessionStore.getSessionById(s.id);
+					return {
+						id: s.id,
+						name: s.name,
+						path: s.worktreePath,
+						state:
+							s.state === 'connecting'
+								? ('busy' as const)
+								: s.state === 'closed'
+									? ('idle' as const)
+									: (s.state as SessionState),
+						createdAt: Math.floor(s.createdAt.getTime() / 1000),
+						isActive: s.state !== 'closed' && s.state !== 'error',
+						agentId: s.agentId,
+						type: 'sdk' as const,
+						pid: 0,
+						autoApprovalFailed: false,
+						autoApprovalReason: undefined,
+						tdTaskId: record?.tdTaskId ?? null,
+						intent: record?.intent ?? null,
+					};
+				});
 			return [...ptySessions, ...sdkSessions];
 		});
 
@@ -3212,7 +3220,12 @@ export class APIServer {
 					type: request.query.type,
 					parentId: request.query.parentId,
 				});
-				return {projectPath: project.path, issues};
+				const rejectedIds = reader.getRejectedIssueIds(issues.map(i => i.id));
+				const enriched = issues.map(i => ({
+					...i,
+					is_rejected: rejectedIds.has(i.id),
+				}));
+				return {projectPath: project.path, issues: enriched};
 			} finally {
 				reader.close();
 			}
@@ -3674,10 +3687,19 @@ export class APIServer {
 				options?: Record<string, boolean | string>;
 				sessionName?: string;
 				initialPrompt?: string;
+				tdTaskId?: string;
+				intent?: SessionIntent;
 			};
 		}>('/api/sdk-session/create', async (request, reply) => {
-			const {worktreePath, agentId, options, sessionName, initialPrompt} =
-				request.body;
+			const {
+				worktreePath,
+				agentId,
+				options,
+				sessionName,
+				initialPrompt,
+				tdTaskId,
+				intent,
+			} = request.body;
 			if (!worktreePath || !agentId) {
 				return reply
 					.code(400)
@@ -3703,6 +3725,18 @@ export class APIServer {
 				initialPrompt,
 				sessionName,
 			);
+
+			sessionStore.createSessionRecord({
+				id: session.id,
+				agentProfileId: agent.id,
+				agentProfileName: agent.name,
+				agentType: 'sdk',
+				agentOptions: options || {},
+				worktreePath,
+				tdTaskId: tdTaskId?.trim() || undefined,
+				sessionName: sessionName || undefined,
+				intent: intent || 'manual',
+			});
 
 			return {success: true, id: session.id, agentId};
 		});

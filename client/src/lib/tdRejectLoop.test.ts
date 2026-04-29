@@ -39,26 +39,31 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 		isActive: true,
 		createdAt: 1000,
 		tdTaskId: null,
+		intent: null,
 		...overrides,
 	};
 }
 
 describe('detectRejectLoopItems', () => {
-	it('returns empty for normal open task with no sessions set', () => {
-		const issue = makeIssue({status: 'open', implementer_session: 'ses_abc', reviewer_session: ''});
+	// Normal open task — no is_rejected flag → not a reject-loop state
+	it('returns empty for normal open task without is_rejected', () => {
+		const issue = makeIssue({status: 'open', is_rejected: false});
 		expect(detectRejectLoopItems([issue], [])).toHaveLength(0);
 	});
 
-	it('returns empty for open task with no reviewer set', () => {
-		const issue = makeIssue({status: 'open', implementer_session: '', reviewer_session: ''});
+	// Normal open task with no is_rejected field at all (undefined)
+	it('returns empty for open task with no is_rejected field', () => {
+		const issue = makeIssue({status: 'open'});
 		expect(detectRejectLoopItems([issue], [])).toHaveLength(0);
 	});
 
-	it('detects rejected state: open + implementer cleared + reviewer set', () => {
+	// Real td reject output: both sessions empty, is_rejected=true
+	it('detects rejected state: open + is_rejected=true (both sessions empty)', () => {
 		const issue = makeIssue({
 			status: 'open',
 			implementer_session: '',
-			reviewer_session: 'ses_reviewer',
+			reviewer_session: '',
+			is_rejected: true,
 		});
 		const items = detectRejectLoopItems([issue], []);
 		expect(items).toHaveLength(1);
@@ -66,11 +71,19 @@ describe('detectRejectLoopItems', () => {
 		expect(items[0]!.intent).toBe('work');
 	});
 
-	it('detects re-review state: in_review + reviewer set', () => {
+	// First-time review (never rejected) — should NOT show re-review pill
+	it('does not flag in_review without prior rejection', () => {
+		const issue = makeIssue({status: 'in_review', is_rejected: false});
+		expect(detectRejectLoopItems([issue], [])).toHaveLength(0);
+	});
+
+	// Re-review: in_review after a prior rejection (is_rejected=true in logs)
+	it('detects re-review state: in_review + is_rejected=true', () => {
 		const issue = makeIssue({
 			status: 'in_review',
 			implementer_session: 'ses_impl',
-			reviewer_session: 'ses_reviewer',
+			reviewer_session: '',
+			is_rejected: true,
 		});
 		const items = detectRejectLoopItems([issue], []);
 		expect(items).toHaveLength(1);
@@ -78,100 +91,69 @@ describe('detectRejectLoopItems', () => {
 		expect(items[0]!.intent).toBe('review');
 	});
 
-	it('does not flag in_review with no reviewer session', () => {
-		const issue = makeIssue({status: 'in_review', reviewer_session: ''});
-		expect(detectRejectLoopItems([issue], [])).toHaveLength(0);
-	});
-
 	it('skips deleted issues', () => {
 		const issue = makeIssue({
 			status: 'open',
-			implementer_session: '',
-			reviewer_session: 'ses_reviewer',
+			is_rejected: true,
 			deleted_at: '2026-01-02T00:00:00Z',
 		});
 		expect(detectRejectLoopItems([issue], [])).toHaveLength(0);
 	});
 
 	it('sessionAlive=false when no matching live session', () => {
-		const issue = makeIssue({
-			id: 'td-abc123',
-			status: 'open',
-			implementer_session: '',
-			reviewer_session: 'ses_reviewer',
-		});
+		const issue = makeIssue({id: 'td-abc123', status: 'open', is_rejected: true});
 		const items = detectRejectLoopItems([issue], []);
 		expect(items[0]!.sessionAlive).toBe(false);
 		expect(items[0]!.sessionId).toBeNull();
 	});
 
-	it('sessionAlive=true when matching live session exists', () => {
-		const issue = makeIssue({
-			id: 'td-abc123',
-			status: 'open',
-			implementer_session: '',
-			reviewer_session: 'ses_reviewer',
-		});
-		const session = makeSession({id: 'session-impl', tdTaskId: 'td-abc123', isActive: true});
+	it('sessionAlive=true when matching live work-intent session exists', () => {
+		const issue = makeIssue({id: 'td-abc123', status: 'open', is_rejected: true});
+		const session = makeSession({id: 'session-impl', tdTaskId: 'td-abc123', isActive: true, intent: 'work'});
 		const items = detectRejectLoopItems([issue], [session]);
 		expect(items[0]!.sessionAlive).toBe(true);
 		expect(items[0]!.sessionId).toBe('session-impl');
 	});
 
 	it('sessionAlive=false for inactive session, but sessionId still returned', () => {
-		const issue = makeIssue({
-			id: 'td-abc123',
-			status: 'open',
-			implementer_session: '',
-			reviewer_session: 'ses_reviewer',
-		});
-		const session = makeSession({id: 'session-old', tdTaskId: 'td-abc123', isActive: false});
+		const issue = makeIssue({id: 'td-abc123', status: 'open', is_rejected: true});
+		const session = makeSession({id: 'session-old', tdTaskId: 'td-abc123', isActive: false, intent: 'work'});
 		const items = detectRejectLoopItems([issue], [session]);
 		expect(items[0]!.sessionAlive).toBe(false);
 		expect(items[0]!.sessionId).toBe('session-old');
 	});
 
 	it('picks most recent session by createdAt', () => {
-		const issue = makeIssue({
-			id: 'td-abc123',
-			status: 'open',
-			implementer_session: '',
-			reviewer_session: 'ses_reviewer',
-		});
-		const older = makeSession({id: 'session-old', tdTaskId: 'td-abc123', isActive: true, createdAt: 1000});
-		const newer = makeSession({id: 'session-new', tdTaskId: 'td-abc123', isActive: true, createdAt: 2000});
+		const issue = makeIssue({id: 'td-abc123', status: 'open', is_rejected: true});
+		const older = makeSession({id: 'session-old', tdTaskId: 'td-abc123', isActive: true, intent: 'work', createdAt: 1000});
+		const newer = makeSession({id: 'session-new', tdTaskId: 'td-abc123', isActive: true, intent: 'work', createdAt: 2000});
 		const items = detectRejectLoopItems([issue], [older, newer]);
 		expect(items[0]!.sessionId).toBe('session-new');
 	});
 
+	it('prefers intent-matched session over any session', () => {
+		const issue = makeIssue({id: 'td-abc123', status: 'open', is_rejected: true});
+		const reviewSession = makeSession({id: 'session-review', tdTaskId: 'td-abc123', isActive: true, intent: 'review', createdAt: 3000});
+		const workSession = makeSession({id: 'session-work', tdTaskId: 'td-abc123', isActive: true, intent: 'work', createdAt: 1000});
+		const items = detectRejectLoopItems([issue], [reviewSession, workSession]);
+		// rejected → wants 'work' intent session, even if older
+		expect(items[0]!.sessionId).toBe('session-work');
+	});
+
 	it('includes rejection reason in nudge text when provided', () => {
-		const issue = makeIssue({
-			id: 'td-abc123',
-			status: 'open',
-			implementer_session: '',
-			reviewer_session: 'ses_reviewer',
-		});
+		const issue = makeIssue({id: 'td-abc123', status: 'open', is_rejected: true});
 		const items = detectRejectLoopItems([issue], [], {'td-abc123': 'Tests are missing'});
 		expect(items[0]!.nudgeText).toContain('Tests are missing');
 	});
 
 	it('nudge text omits rejection reason when not provided', () => {
-		const issue = makeIssue({
-			id: 'td-abc123',
-			status: 'open',
-			implementer_session: '',
-			reviewer_session: 'ses_reviewer',
-		});
+		const issue = makeIssue({id: 'td-abc123', status: 'open', is_rejected: true});
 		const items = detectRejectLoopItems([issue], []);
 		expect(items[0]!.nudgeText).not.toContain('Rejection reason');
 	});
 
 	it('re-review nudge text references approve and reject commands', () => {
-		const issue = makeIssue({
-			id: 'td-abc123',
-			status: 'in_review',
-			reviewer_session: 'ses_reviewer',
-		});
+		const issue = makeIssue({id: 'td-abc123', status: 'in_review', is_rejected: true});
 		const items = detectRejectLoopItems([issue], []);
 		expect(items[0]!.nudgeText).toContain('td approve');
 		expect(items[0]!.nudgeText).toContain('td reject');

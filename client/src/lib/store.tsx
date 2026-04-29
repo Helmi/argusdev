@@ -1442,7 +1442,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 			const isSdk = (agent as unknown as Record<string, unknown> | undefined)?.sessionType === 'sdk';
 			const endpoint = isSdk ? '/api/sdk-session/create' : '/api/session/create-with-agent';
 			const body = isSdk
-				? {worktreePath: path, agentId, options: options || {}, sessionName, initialPrompt: promptTemplate}
+				? {worktreePath: path, agentId, options: options || {}, sessionName, initialPrompt: promptTemplate, tdTaskId, intent}
 				: {path, agentId, options: options || {}, sessionName, taskListName, tdTaskId, promptTemplate, intent};
 
 			const res = await apiFetch(endpoint, {

@@ -12,22 +12,20 @@ export interface RejectLoopItem {
 }
 
 /**
- * Fingerprint: status=open + implementer_session cleared + reviewer_session set.
- * td clears implementer_session on reject; reviewer_session stays as the rejector.
+ * Fingerprint: status=open + is_rejected flag from backend log query.
+ * td clears BOTH sessions on reject; the only reliable indicator is a
+ * "Rejected:" log entry returned by the backend as is_rejected.
  */
 function isRejected(issue: TdIssue): boolean {
-	return (
-		issue.status === 'open' &&
-		!issue.implementer_session &&
-		!!issue.reviewer_session
-	);
+	return issue.status === 'open' && !!issue.is_rejected;
 }
 
 /**
- * Fingerprint: status=in_review + reviewer_session set.
+ * Fingerprint: status=in_review + has been rejected before (is_rejected flag).
+ * A first-time review has no prior rejection log.
  */
 function isReReview(issue: TdIssue): boolean {
-	return issue.status === 'in_review' && !!issue.reviewer_session;
+	return issue.status === 'in_review' && !!issue.is_rejected;
 }
 
 function buildRejectedNudge(issue: TdIssue, rejectionReason?: string): string {
@@ -52,36 +50,16 @@ function findLinkedSession(
 	issue: TdIssue,
 	intent: 'work' | 'review',
 	sessions: Session[],
+	requireAlive: boolean,
 ): Session | null {
-	const candidates = sessions.filter(
-		s => s.tdTaskId === issue.id && s.isActive,
-	);
+	const candidates = sessions.filter(s => {
+		if (s.tdTaskId !== issue.id) return false;
+		if (requireAlive && !s.isActive) return false;
+		return true;
+	});
 	if (candidates.length === 0) return null;
 
-	const byIntent =
-		intent === 'review'
-			? candidates.filter(s => s.name?.toLowerCase().includes('review'))
-			: candidates.filter(s => !s.name?.toLowerCase().includes('review'));
-
-	const pool = byIntent.length > 0 ? byIntent : candidates;
-	return pool.reduce((best, s) =>
-		(s.createdAt ?? 0) > (best.createdAt ?? 0) ? s : best,
-	);
-}
-
-function findAnyLinkedSession(
-	issue: TdIssue,
-	intent: 'work' | 'review',
-	sessions: Session[],
-): Session | null {
-	const candidates = sessions.filter(s => s.tdTaskId === issue.id);
-	if (candidates.length === 0) return null;
-
-	const byIntent =
-		intent === 'review'
-			? candidates.filter(s => s.name?.toLowerCase().includes('review'))
-			: candidates.filter(s => !s.name?.toLowerCase().includes('review'));
-
+	const byIntent = candidates.filter(s => s.intent === intent);
 	const pool = byIntent.length > 0 ? byIntent : candidates;
 	return pool.reduce((best, s) =>
 		(s.createdAt ?? 0) > (best.createdAt ?? 0) ? s : best,
@@ -100,8 +78,8 @@ export function detectRejectLoopItems(
 
 		if (isRejected(issue)) {
 			const intent = 'work';
-			const liveSession = findLinkedSession(issue, intent, sessions);
-			const anySession = liveSession ?? findAnyLinkedSession(issue, intent, sessions);
+			const liveSession = findLinkedSession(issue, intent, sessions, true);
+			const anySession = liveSession ?? findLinkedSession(issue, intent, sessions, false);
 			const reason = rejectionReasonByIssueId?.[issue.id] ?? undefined;
 			items.push({
 				issue,
@@ -113,8 +91,8 @@ export function detectRejectLoopItems(
 			});
 		} else if (isReReview(issue)) {
 			const intent = 'review';
-			const liveSession = findLinkedSession(issue, intent, sessions);
-			const anySession = liveSession ?? findAnyLinkedSession(issue, intent, sessions);
+			const liveSession = findLinkedSession(issue, intent, sessions, true);
+			const anySession = liveSession ?? findLinkedSession(issue, intent, sessions, false);
 			items.push({
 				issue,
 				pill: 're-review',

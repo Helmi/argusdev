@@ -323,14 +323,14 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
               <div className="space-y-2">
                 <h2 className="text-base font-medium leading-snug">{issue.title}</h2>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={cn('text-[11px] rounded-full px-2 py-0.5', status?.bg, status?.color)}>
+                  <span className={cn('text-xs rounded-full px-2 py-0.5', status?.bg, status?.color)}>
                     {status?.label}
                   </span>
-                  <span className={cn('text-[11px] rounded-full px-2 py-0.5', priority?.color)}>
+                  <span className={cn('text-xs rounded-full px-2 py-0.5', priority?.color)}>
                     {issue.priority} — {priority?.label}
                   </span>
                   {issue.type !== 'task' && (
-                    <span className="flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 bg-purple-500/10 text-purple-400">
+                    <span className="flex items-center gap-1 text-xs rounded-full px-2 py-0.5 bg-purple-500/10 text-purple-400">
                       <Layers className="h-3 w-3" />
                       {issue.type}
                     </span>
@@ -349,7 +349,7 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                         }
                       }}
                       className={cn(
-                        'text-[11px] rounded-full px-2 py-0.5 font-medium',
+                        'text-xs rounded-full px-2 py-0.5 font-medium',
                         rejectLoopItem.pill === 'rejected'
                           ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
                           : 'bg-purple-500/15 text-purple-400 hover:bg-purple-500/25',
@@ -655,7 +655,7 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                             key={linkedSession.id}
                             size="sm"
                             variant="outline"
-                            className="h-6 text-[11px] font-mono"
+                            className="h-6 text-xs font-mono"
                             onClick={async () => {
                               const resolvedConversationId = await resolveConversationSessionId(linkedSession.id)
                               openConversationView({
