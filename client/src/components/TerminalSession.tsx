@@ -708,10 +708,12 @@ export const TerminalSession = memo(function TerminalSession({
 		try {
 			const text = await navigator.clipboard.readText();
 			if (text) {
-				socket.emit('input', { sessionId: session.id, data: text });
+				// Use xterm's paste() so bracketed-paste wrapping applies when the
+				// running program has enabled DECSET 2004 (bash/zsh/fish/editors do).
+				// paste() fires onData, which is already wired to socket.emit('input').
+				xtermRef.current?.paste(text);
 			}
 		} catch {
-			// Clipboard access denied or unavailable — write a visible error to terminal
 			xtermRef.current?.write('\r\n[Paste failed: clipboard access denied]\r\n');
 		}
 	};
