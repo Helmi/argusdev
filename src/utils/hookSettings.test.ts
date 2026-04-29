@@ -904,7 +904,54 @@ describe('writeGeminiHookFiles', () => {
 		expect(existsSync(settingsPath)).toBe(false);
 	});
 
-	it('cleanup fn restores pre-existing settings.json', () => {
+	it('preserves pre-existing mcpServers and other keys', () => {
+		const geminiDir = join(worktree, '.gemini');
+		mkdirSync(geminiDir, {recursive: true});
+		const original = {
+			mcpServers: {myServer: {command: 'node', args: ['server.js']}},
+			theme: 'dark',
+		};
+		writeFileSync(join(geminiDir, 'settings.json'), JSON.stringify(original), {
+			encoding: 'utf-8',
+		});
+
+		writeGeminiHookFiles(worktree, 8080, 'ses-merge');
+		const active = JSON.parse(
+			readFileSync(join(geminiDir, 'settings.json'), 'utf-8'),
+		);
+		expect(active.mcpServers).toEqual(original.mcpServers);
+		expect(active.theme).toBe('dark');
+		expect(active.hooks).toBeDefined();
+		expect(active.hooks.AfterAgent).toBeDefined();
+	});
+
+	it('appends ArgusDev hooks alongside user hooks for same event', () => {
+		const geminiDir = join(worktree, '.gemini');
+		mkdirSync(geminiDir, {recursive: true});
+		const userHook = {type: 'command', command: 'user-script'};
+		const original = {
+			hooks: {SessionStart: [{hooks: [userHook]}]},
+		};
+		writeFileSync(join(geminiDir, 'settings.json'), JSON.stringify(original), {
+			encoding: 'utf-8',
+		});
+
+		writeGeminiHookFiles(worktree, 8080, 'ses-append');
+		const active = JSON.parse(
+			readFileSync(join(geminiDir, 'settings.json'), 'utf-8'),
+		);
+		expect(active.hooks.SessionStart).toHaveLength(2);
+		const commands = active.hooks.SessionStart.flatMap(
+			(e: {hooks: Array<{command: string}>}) =>
+				e.hooks.map((h: {command: string}) => h.command),
+		);
+		expect(commands).toContain('user-script');
+		expect(commands.some((c: string) => c.includes('/hook-state/idle'))).toBe(
+			true,
+		);
+	});
+
+	it('cleanup fn restores pre-existing settings.json exactly', () => {
 		const geminiDir = join(worktree, '.gemini');
 		mkdirSync(geminiDir, {recursive: true});
 		const originalSettings = JSON.stringify({theme: 'dark', someKey: 'value'});
@@ -919,9 +966,9 @@ describe('writeGeminiHookFiles', () => {
 		cleanup();
 		const restored = readFileSync(join(geminiDir, 'settings.json'), 'utf-8');
 		expect(restored).toBe(originalSettings);
-		expect(
-			existsSync(join(geminiDir, 'settings.json.argusdev-backup')),
-		).toBe(false);
+		expect(existsSync(join(geminiDir, 'settings.json.argusdev-backup'))).toBe(
+			false,
+		);
 	});
 
 	it('cleanup is a no-op when settings.json already removed', () => {

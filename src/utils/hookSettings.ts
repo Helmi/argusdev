@@ -512,7 +512,9 @@ export function buildGeminiHookConfig(port: number, sessionId: string): string {
 			BeforeAgent: [{hooks: [hook('busy')]}],
 			BeforeTool: [{hooks: [hook('busy')]}],
 			AfterAgent: [{hooks: [hook('idle')]}],
-			Notification: [{matcher: 'ToolPermission', hooks: [hook('waiting_input')]}],
+			Notification: [
+				{matcher: 'ToolPermission', hooks: [hook('waiting_input')]},
+			],
 			SessionEnd: [{hooks: [hook('idle')]}],
 		},
 	};
@@ -521,10 +523,15 @@ export function buildGeminiHookConfig(port: number, sessionId: string): string {
 }
 
 /**
- * Write .gemini/settings.json in the given worktree with ArgusDev hook config.
+ * Write .gemini/settings.json in the given worktree, merging ArgusDev hooks
+ * into any pre-existing user config (mcpServers, theme, custom hooks, etc.).
  *
- * If a settings.json already exists, it is snapshotted to
- * settings.json.argusdev-backup before being overwritten.
+ * Merge strategy: ArgusDev hook entries are appended to each event's array so
+ * user-defined hooks for the same event continue to fire. Pre-existing keys
+ * outside `hooks` (e.g. mcpServers) are preserved verbatim.
+ *
+ * If settings.json already exists, the original is snapshotted to
+ * settings.json.argusdev-backup so cleanup can restore it exactly.
  * The returned cleanup function restores the pre-session state.
  */
 export function writeGeminiHookFiles(
@@ -539,12 +546,36 @@ export function writeGeminiHookFiles(
 	const backupPath = `${settingsPath}${ARGUSDEV_BACKUP_SUFFIX}`;
 	const hadExisting = existsSync(settingsPath);
 
+	let existing: Record<string, unknown> = {};
 	if (hadExisting) {
-		writeFileSync(backupPath, readFileSync(settingsPath), {mode: 0o600});
+		const raw = readFileSync(settingsPath);
+		writeFileSync(backupPath, raw, {mode: 0o600});
+		try {
+			existing = JSON.parse(raw.toString('utf-8')) as Record<string, unknown>;
+		} catch {
+			// Malformed settings — treat as empty, backup still restores it
+		}
 	}
 
+	const argusdevHooks = (
+		JSON.parse(buildGeminiHookConfig(port, sessionId)) as {
+			hooks: Record<string, unknown[]>;
+		}
+	).hooks;
+	const existingHooks =
+		existing['hooks'] && typeof existing['hooks'] === 'object'
+			? (existing['hooks'] as Record<string, unknown>)
+			: {};
+
+	const mergedHooks: Record<string, unknown> = {...existingHooks};
+	for (const [event, entries] of Object.entries(argusdevHooks)) {
+		const prior = Array.isArray(mergedHooks[event]) ? mergedHooks[event] : [];
+		mergedHooks[event] = [...(prior as unknown[]), ...(entries as unknown[])];
+	}
+
+	const merged = {...existing, hooks: mergedHooks};
 	const tmpPath = `${settingsPath}.tmp`;
-	writeFileSync(tmpPath, buildGeminiHookConfig(port, sessionId), {
+	writeFileSync(tmpPath, JSON.stringify(merged, null, 2), {
 		encoding: 'utf-8',
 		mode: 0o600,
 	});
