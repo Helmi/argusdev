@@ -179,7 +179,6 @@ function StatusColumn({ status, issues, onSelect, childCountByEpicId }: {
 
 export function TaskBoard() {
   const {
-    tdStatus,
     tdBoardView,
     fetchTdBoard,
     fetchTdIssues,
@@ -207,8 +206,7 @@ export function TaskBoard() {
   }, [tdIssues])
 
   // Fetch board data whenever the board opens or the project changes.
-  // Not gated on tdStatus — tdStatus may not be loaded yet on first open,
-  // which caused the board to render empty until a second refresh.
+  // Fetch unconditionally when board opens — tdEnabled is checked at render time.
   useEffect(() => {
     if (taskBoardOpen && taskBoardProjectPath) {
       fetchTdBoard(taskBoardProjectPath)
@@ -249,7 +247,7 @@ export function TaskBoard() {
     return filtered
   }, [tdBoardView, searchQuery, filterIssues])
 
-  if (!tdStatus?.projectState?.enabled) {
+  if (!taskBoardProject?.tdEnabled) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 p-8">
         <ListTodo className="h-8 w-8 opacity-30" />

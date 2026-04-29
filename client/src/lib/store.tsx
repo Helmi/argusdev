@@ -873,9 +873,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 				const res = await apiFetch(`/api/td/issues${qs ? `?${qs}` : ''}`);
 				if (res.ok) {
 					const data = await res.json();
-					if ((data.projectPath || projectPath) === currentProjectRef.current?.path) {
-						setTdIssues(data.issues);
-					}
+					setTdIssues(data.issues);
 				}
 			} catch (err) {
 				console.error('Failed to fetch td issues:', err);
