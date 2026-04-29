@@ -419,6 +419,81 @@ describe('conversation transcript adapters', () => {
 		});
 	});
 
+	it('filters prompt-blob noise from legacy Codex response_item top-level shape rows', async () => {
+		// Rows using the row.response_item top-level key (not row.payload) must also
+		// be caught by the filter. getCodexPayload resolves both envelope shapes.
+		const filePath = makeTempFile(
+			'rollout-legacy-ri-toplevel.jsonl',
+			[
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:00.000Z',
+					type: 'session_meta',
+					payload: {id: 'legacy-ri', cwd: '/repo'},
+				}),
+				// response_item top-level shape: developer role — must be filtered
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:01.000Z',
+					type: 'response_item',
+					response_item: {
+						type: 'message',
+						role: 'developer',
+						content: [
+							{type: 'input_text', text: '<permissions instructions>sandbox'},
+						],
+					},
+				}),
+				// response_item top-level shape: user prompt-blob — must be filtered
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:02.000Z',
+					type: 'response_item',
+					response_item: {
+						type: 'message',
+						role: 'user',
+						content: [
+							{
+								type: 'input_text',
+								text: '<user_instructions>\n# Project guidelines\n',
+							},
+						],
+					},
+				}),
+				// response_item top-level shape: real user turn — must pass through
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:03.000Z',
+					type: 'response_item',
+					response_item: {
+						type: 'message',
+						role: 'user',
+						content: [{type: 'input_text', text: 'Fix the parser bug.'}],
+					},
+				}),
+				// payload: shape still works — must pass through (regression guard)
+				JSON.stringify({
+					timestamp: '2026-01-10T09:00:04.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'message',
+						role: 'assistant',
+						content: [{type: 'output_text', text: 'Done.'}],
+					},
+				}),
+			].join('\n'),
+		);
+
+		const adapter = new CodexAdapter();
+		const messages = await adapter.parseMessages(filePath);
+
+		expect(messages).toHaveLength(2);
+		expect(messages[0]).toMatchObject({
+			role: 'user',
+			content: 'Fix the parser bug.',
+		});
+		expect(messages[1]).toMatchObject({
+			role: 'assistant',
+			content: 'Done.',
+		});
+	});
+
 	it('parses Gemini CLI JSONL transcripts with thoughts as thinking blocks', async () => {
 		const filePath = makeTempFile(
 			'session-2026-04-25T18-59-abcd1234.jsonl',

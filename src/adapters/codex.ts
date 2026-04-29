@@ -235,10 +235,7 @@ export class CodexAdapter extends BaseAgentAdapter {
 			const rowType = typeof row.type === 'string' ? row.type : undefined;
 
 			// Skip noise rows that don't carry conversation content
-			const payloadObj =
-				row.payload && typeof row.payload === 'object'
-					? (row.payload as Record<string, unknown>)
-					: null;
+			const payloadObj = getCodexPayload(row);
 			const payloadTypePeek =
 				typeof payloadObj?.['type'] === 'string' ? payloadObj['type'] : null;
 
