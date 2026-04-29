@@ -28,6 +28,7 @@ import {
 	ListTodo,
 	PanelRightOpen,
 	PanelRightClose,
+	ClipboardPaste,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {Session} from '@/lib/types';
@@ -703,6 +704,18 @@ export const TerminalSession = memo(function TerminalSession({
 		}
 	};
 
+	const handleMobilePaste = async () => {
+		try {
+			const text = await navigator.clipboard.readText();
+			if (text) {
+				socket.emit('input', { sessionId: session.id, data: text });
+			}
+		} catch {
+			// Clipboard access denied or unavailable — write a visible error to terminal
+			xtermRef.current?.write('\r\n[Paste failed: clipboard access denied]\r\n');
+		}
+	};
+
 	const handleDeleteSession = async () => {
 		await stopSession(session.id);
 	};
@@ -887,6 +900,19 @@ export const TerminalSession = memo(function TerminalSession({
 							) : (
 								<Maximize2 className="h-3.5 w-3.5" />
 							)}
+						</Button>
+					)}
+
+					{/* Mobile paste button — iOS Safari can't trigger paste event on xterm */}
+					{isMobile && (
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-5 w-5 text-muted-foreground hover:text-foreground"
+							onClick={handleMobilePaste}
+							title="Paste from clipboard"
+						>
+							<ClipboardPaste className="h-3.5 w-3.5" />
 						</Button>
 					)}
 
