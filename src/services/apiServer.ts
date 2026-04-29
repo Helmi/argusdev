@@ -1458,6 +1458,7 @@ export class APIServer {
 					aheadCount: number;
 					behindCount: number;
 					parentBranch: string | null;
+					parentBranchSource: string | null;
 				};
 				gitStatusError?: string;
 			}> = [];

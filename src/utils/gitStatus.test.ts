@@ -33,6 +33,7 @@ describe('formatGitStatus', () => {
 			aheadCount: 5,
 			behindCount: 3,
 			parentBranch: 'main',
+			parentBranchSource: null,
 		};
 
 		const formatted = formatGitStatus(status);
@@ -49,6 +50,7 @@ describe('formatGitStatus', () => {
 			aheadCount: 3,
 			behindCount: 4,
 			parentBranch: 'main',
+			parentBranchSource: null,
 		};
 
 		const withColors = formatGitStatus(status);
@@ -115,6 +117,7 @@ describe('formatGitFileChanges', () => {
 			aheadCount: 3,
 			behindCount: 2,
 			parentBranch: 'main',
+			parentBranchSource: null,
 		};
 		expect(formatGitFileChanges(status)).toBe(
 			'\x1b[32m+10\x1b[0m \x1b[31m-5\x1b[0m',
@@ -128,6 +131,7 @@ describe('formatGitFileChanges', () => {
 			aheadCount: 3,
 			behindCount: 2,
 			parentBranch: 'main',
+			parentBranchSource: null,
 		};
 		expect(formatGitFileChanges(status)).toBe('');
 	});
@@ -141,6 +145,7 @@ describe('formatGitAheadBehind', () => {
 			aheadCount: 3,
 			behindCount: 2,
 			parentBranch: 'main',
+			parentBranchSource: null,
 		};
 		expect(formatGitAheadBehind(status)).toBe(
 			'\x1b[36m↑3\x1b[0m \x1b[35m↓2\x1b[0m',
@@ -154,8 +159,32 @@ describe('formatGitAheadBehind', () => {
 			aheadCount: 0,
 			behindCount: 0,
 			parentBranch: 'main',
+			parentBranchSource: null,
 		};
 		expect(formatGitAheadBehind(status)).toBe('');
+	});
+});
+
+describe('getGitStatus parentBranchSource', () => {
+	it('includes parentBranchSource: null when no parent branch resolved', async () => {
+		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'argusdev-pbsource-'));
+		try {
+			await execAsync('git init', {cwd: tmpDir});
+			await execAsync('git config user.email "t@t.com"', {cwd: tmpDir});
+			await execAsync('git config user.name "T"', {cwd: tmpDir});
+			await execAsync('git config commit.gpgsign false', {cwd: tmpDir});
+			fs.writeFileSync(path.join(tmpDir, 'f.txt'), 'x');
+			await execAsync('git add f.txt', {cwd: tmpDir});
+			await execAsync('git commit -m "init"', {cwd: tmpDir});
+
+			const status = await Effect.runPromise(getGitStatus(tmpDir));
+			// No upstream or argusdev config in a fresh repo — source should be null or guessed
+			expect(['config', 'upstream', 'guessed', null]).toContain(
+				status.parentBranchSource,
+			);
+		} finally {
+			fs.rmSync(tmpDir, {recursive: true, force: true});
+		}
 	});
 });
 

@@ -54,6 +54,7 @@ import {
 	FolderGit2,
 	FolderPlus,
 	GitBranch,
+	GitMerge,
 	GripVertical,
 	ListTodo,
 	MessageSquare,
@@ -64,6 +65,11 @@ import {
 	RotateCcw,
 	X,
 } from 'lucide-react';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {useIsMobile} from '@/hooks/useIsMobile';
 
 const areSetsEqual = (a: Set<string>, b: Set<string>) => {
@@ -154,7 +160,6 @@ export function Sidebar() {
 		if (!agentId) return undefined;
 		return agents.find(a => a.id === agentId);
 	};
-
 
 	// Separate dialog states for different actions
 	const [removeProjectDialog, setRemoveProjectDialog] = useState<{
@@ -1115,6 +1120,25 @@ export function Sidebar() {
 																<span className="truncate flex-1 text-left text-muted-foreground">
 																	{worktree.branch || formatName(worktree.path)}
 																</span>
+																{/* Unmerged commits pill */}
+																{worktree.gitStatus &&
+																	worktree.gitStatus.aheadCount > 0 &&
+																	worktree.gitStatus.parentBranch && (
+																		<Tooltip>
+																			<TooltipTrigger asChild>
+																				<span className="shrink-0 flex items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-400">
+																					<GitMerge className="h-2.5 w-2.5" />
+																					{worktree.gitStatus.aheadCount > 1
+																						? worktree.gitStatus.aheadCount
+																						: null}
+																				</span>
+																			</TooltipTrigger>
+																			<TooltipContent side="right" className="text-xs">
+																				{worktree.gitStatus.aheadCount} unmerged commit{worktree.gitStatus.aheadCount !== 1 ? 's' : ''} — ready to integrate into{' '}
+																				{worktree.gitStatus.parentBranch}
+																			</TooltipContent>
+																		</Tooltip>
+																	)}
 																{/* Visible menu button */}
 																<DropdownMenu>
 																	<DropdownMenuTrigger asChild>
@@ -1253,7 +1277,7 @@ export function Sidebar() {
 																								formatName(session.path)}
 																						</span>
 																					)}
-																					{/* Visible menu button */}
+{/* Visible menu button */}
 																					<DropdownMenu>
 																						<DropdownMenuTrigger asChild>
 																							<div
