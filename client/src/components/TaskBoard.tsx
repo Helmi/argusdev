@@ -186,9 +186,12 @@ export function TaskBoard() {
     tdIssues,
     openAddSession,
     closeTaskBoard,
-    currentProject,
     taskBoardOpen,
+    taskBoardProjectPath,
+    projects,
   } = useAppStore()
+
+  const taskBoardProject = projects.find(p => p.path === taskBoardProjectPath) ?? null
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
@@ -207,11 +210,11 @@ export function TaskBoard() {
   // Not gated on tdStatus — tdStatus may not be loaded yet on first open,
   // which caused the board to render empty until a second refresh.
   useEffect(() => {
-    if (taskBoardOpen) {
-      fetchTdBoard()
-      fetchTdIssues()
+    if (taskBoardOpen && taskBoardProjectPath) {
+      fetchTdBoard(taskBoardProjectPath)
+      fetchTdIssues({ projectPath: taskBoardProjectPath })
     }
-  }, [taskBoardOpen, currentProject?.path, fetchTdBoard, fetchTdIssues])
+  }, [taskBoardOpen, taskBoardProjectPath, fetchTdBoard, fetchTdIssues])
 
   // Escape key handler to close task board
   useEffect(() => {
@@ -316,10 +319,10 @@ export function TaskBoard() {
         </div>
 
         {/* Project indicator */}
-        {currentProject && (
+        {taskBoardProject && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
             <FolderGit2 className="h-3 w-3" />
-            <span className="font-medium truncate max-w-[120px]">{currentProject.name}</span>
+            <span className="font-medium truncate max-w-[120px]">{taskBoardProject.name}</span>
           </div>
         )}
 
@@ -393,7 +396,7 @@ export function TaskBoard() {
           onStartWorking={(taskId, intent = 'work') => {
             const issue = tdIssues.find(i => i.id === taskId)
             closeTaskBoard()
-            openAddSession(undefined, currentProject?.path, taskId, {
+            openAddSession(undefined, taskBoardProjectPath ?? undefined, taskId, {
               intent: intent || 'work',
               createdBranch: issue?.created_branch || undefined,
             })
@@ -401,7 +404,7 @@ export function TaskBoard() {
           onStartReview={(taskId, createdBranch) => {
             const issue = tdIssues.find(i => i.id === taskId)
             closeTaskBoard()
-            openAddSession(undefined, currentProject?.path, taskId, {
+            openAddSession(undefined, taskBoardProjectPath ?? undefined, taskId, {
               intent: 'review',
               sessionName: `Review: ${taskId}`,
               createdBranch: issue?.created_branch || createdBranch,

@@ -30,6 +30,7 @@ import {apiFetch} from '@/lib/apiFetch';
 import type {Session, SdkMessage, SdkUsage} from '@/lib/types';
 import {mapSessionState} from '@/lib/types';
 import {useIsMobile} from '@/hooks/useIsMobile';
+import {resolveProjectPathForWorktree} from '@/lib/tdWorktreeResolver';
 
 interface SdkSessionProps {
 	session: Session;
@@ -54,6 +55,7 @@ export const SdkSession = memo(
 			renameSession,
 			selectedSessions,
 			agents,
+			projects,
 			openTaskBoard,
 			tdStatus,
 		} = useAppStore();
@@ -324,7 +326,14 @@ export const SdkSession = memo(
 								variant="ghost"
 								size="icon"
 								className="h-5 w-5 text-muted-foreground hover:text-foreground"
-								onClick={openTaskBoard}
+								onClick={() => {
+									const projectPath = resolveProjectPathForWorktree(session.path, projects.map(p => p.path));
+									if (!projectPath) {
+										console.warn('[TaskBoard] cannot resolve project for session', session.id);
+										return;
+									}
+									openTaskBoard(projectPath);
+								}}
 								title="Task board"
 							>
 								<ListTodo className="h-3.5 w-3.5" />

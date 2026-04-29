@@ -10,6 +10,7 @@ import {
 } from '@/lib/tdLinkedIssue';
 import {cn} from '@/lib/utils';
 import {TaskDetailModal} from '@/components/TaskDetailModal';
+import {resolveProjectPathForWorktree} from '@/lib/tdWorktreeResolver';
 import {
 	ListTodo,
 	Circle,
@@ -51,7 +52,10 @@ interface TaskContextCardProps {
 }
 
 export function TaskContextCard({worktreePath}: TaskContextCardProps) {
-	const {currentProject, tdStatus, worktrees} = useAppStore();
+	const {projects, tdStatus, worktrees} = useAppStore();
+	const resolvedProjectPath = worktreePath
+		? resolveProjectPathForWorktree(worktreePath, projects.map(p => p.path))
+		: undefined;
 	const [task, setTask] = useState<TdIssue | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
@@ -115,7 +119,7 @@ export function TaskContextCard({worktreePath}: TaskContextCardProps) {
 					issues,
 					worktrees,
 					worktreePath,
-					currentProject?.path,
+					resolvedProjectPath,
 				);
 
 				if (cancelled) return;
@@ -143,7 +147,7 @@ export function TaskContextCard({worktreePath}: TaskContextCardProps) {
 			cancelled = true;
 		};
 	}, [
-		currentProject?.path,
+		resolvedProjectPath,
 		tdStatus?.projectState?.enabled,
 		worktreePath,
 		worktrees,

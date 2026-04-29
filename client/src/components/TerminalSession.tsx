@@ -36,6 +36,7 @@ import type {Session} from '@/lib/types';
 import {mapSessionState} from '@/lib/types';
 import {useIsMobile} from '@/hooks/useIsMobile';
 import {createFilePathLinkProvider} from '@/lib/filePathLinkProvider';
+import {resolveProjectPathForWorktree} from '@/lib/tdWorktreeResolver';
 
 // Debounced fit function to prevent layout thrashing
 function createDebouncedFit(delay = 100) {
@@ -136,6 +137,7 @@ export const TerminalSession = memo(function TerminalSession({
 		selectedSessions,
 		worktrees,
 		agents,
+		projects,
 		openTaskBoard,
 		tdStatus,
 		openFilePreview,
@@ -858,7 +860,14 @@ export const TerminalSession = memo(function TerminalSession({
 							variant="ghost"
 							size="icon"
 							className="h-5 w-5 text-muted-foreground hover:text-foreground"
-							onClick={openTaskBoard}
+							onClick={() => {
+								const projectPath = resolveProjectPathForWorktree(session.path, projects.map(p => p.path));
+								if (!projectPath) {
+									console.warn('[TaskBoard] cannot resolve project for session', session.id);
+									return;
+								}
+								openTaskBoard(projectPath);
+							}}
 							title="Task board"
 						>
 							<ListTodo className="h-3.5 w-3.5" />

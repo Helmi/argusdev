@@ -173,6 +173,7 @@ interface AppState {
 	tdIssues: TdIssue[];
 	tdBoardView: Record<string, TdIssue[]>;
 	taskBoardOpen: boolean;
+	taskBoardProjectPath: string | null;
 	conversationViewOpen: boolean;
 	conversationInitialSessionId: string | null;
 	conversationTaskFilterId: string | null;
@@ -337,8 +338,8 @@ interface AppActions {
 		type?: string;
 		parentId?: string;
 	}) => Promise<void>;
-	fetchTdBoard: () => Promise<void>;
-	openTaskBoard: () => void;
+	fetchTdBoard: (projectPath: string) => Promise<void>;
+	openTaskBoard: (projectPath: string) => void;
 	closeTaskBoard: () => void;
 	openConversationView: (context?: {
 		sessionId?: string;
@@ -518,6 +519,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const [tdIssues, setTdIssues] = useState<TdIssue[]>([]);
 	const [tdBoardView, setTdBoardView] = useState<Record<string, TdIssue[]>>({});
 	const [taskBoardOpen, setTaskBoardOpen] = useState(false);
+	const [taskBoardProjectPath, setTaskBoardProjectPath] = useState<string | null>(null);
 	const [taskBoardReturnSessionId, setTaskBoardReturnSessionId] = useState<
 		string | null
 	>(null);
@@ -882,29 +884,27 @@ export function AppProvider({children}: {children: ReactNode}) {
 		[currentProject?.path],
 	);
 
-	const fetchTdBoard = useCallback(async () => {
+	const fetchTdBoard = useCallback(async (projectPath: string) => {
+		if (!projectPath) return;
 		try {
-			const projectPath = currentProject?.path;
-			if (!projectPath) return;
 			const res = await apiFetch(
 				`/api/td/board?projectPath=${encodeURIComponent(projectPath)}`,
 			);
 			if (res.ok) {
 				const data = await res.json();
-				if ((data.projectPath || projectPath) === currentProjectRef.current?.path) {
-					setTdBoardView(data.board);
-				}
+				setTdBoardView(data.board);
 			}
 		} catch (err) {
 			console.error('Failed to fetch td board:', err);
 		}
-	}, [currentProject?.path]);
+	}, []);
 
-	const openTaskBoard = useCallback(() => {
+	const openTaskBoard = useCallback((projectPath: string) => {
 		// Remember the active session so closing the board can return to it.
 		setTaskBoardReturnSessionId(
 			focusedSessionId || selectedSessions[0] || null,
 		);
+		setTaskBoardProjectPath(projectPath);
 		setConversationViewOpen(false);
 		setConversationInitialSessionId(null);
 		setConversationTaskFilterId(null);
@@ -933,6 +933,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		}
 
 		setTaskBoardReturnSessionId(null);
+		setTaskBoardProjectPath(null);
 	}, [
 		selectedSessions.length,
 		taskBoardReturnSessionId,
@@ -943,6 +944,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		(context?: {sessionId?: string; taskId?: string}) => {
 			setTaskBoardOpen(false);
 			setTaskBoardReturnSessionId(null);
+			setTaskBoardProjectPath(null);
 			setConversationInitialSessionId(context?.sessionId || null);
 			setConversationTaskFilterId(context?.taskId || null);
 			setConversationViewOpen(true);
@@ -1263,6 +1265,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		// Close task board and conversation view when selecting a session
 		setTaskBoardOpen(false);
 		setTaskBoardReturnSessionId(null);
+		setTaskBoardProjectPath(null);
 		setConversationViewOpen(false);
 		setConversationInitialSessionId(null);
 		setConversationTaskFilterId(null);
@@ -1898,6 +1901,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		tdIssues,
 		tdBoardView,
 		taskBoardOpen,
+		taskBoardProjectPath,
 		conversationViewOpen,
 		conversationInitialSessionId,
 		conversationTaskFilterId,

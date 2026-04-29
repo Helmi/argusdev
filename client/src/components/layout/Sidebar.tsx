@@ -705,14 +705,10 @@ export function Sidebar() {
 										<button
 											type="button"
 											disabled={isInvalid}
-											onClick={async e => {
+											onClick={e => {
 												e.stopPropagation();
 												if (isInvalid) return;
-												const selected = await ensureProjectSelected(
-													project.path,
-												);
-												if (!selected) return;
-												openTaskBoard();
+												openTaskBoard(project.path);
 											}}
 											className={cn(
 												'rounded-full bg-purple-500 px-1.5 py-0 text-xs font-medium text-white leading-4',
@@ -813,7 +809,6 @@ export function Sidebar() {
 					{(() => {
 						const projectList = filteredData.projects.map((project, projectIndex) => {
 							const projectWorktrees = getWorktreesForProject(project.path);
-							const isCurrentProject = currentProject?.path === project.path;
 							const isInvalid = project.isValid === false;
 							const reviewCount = tdReviewCountsByProject[project.path] || 0;
 
@@ -829,7 +824,6 @@ export function Sidebar() {
 											className={cn(
 												'group flex w-full min-w-0 items-center gap-2 px-2 py-2 text-sm cursor-pointer',
 												'bg-muted/50 hover:bg-muted transition-colors',
-												isCurrentProject && 'bg-muted',
 												isMobile && 'min-h-[44px]',
 											)}
 											onClick={() => {
@@ -867,14 +861,10 @@ export function Sidebar() {
 												<button
 													type="button"
 													disabled={isInvalid}
-													onClick={async e => {
+													onClick={e => {
 														e.stopPropagation();
 														if (isInvalid) return;
-														const selected = await ensureProjectSelected(
-															project.path,
-														);
-														if (!selected) return;
-														openTaskBoard();
+														openTaskBoard(project.path);
 													}}
 													className={cn(
 														'shrink-0 rounded-full bg-purple-500/15 px-1.5 py-0.5 text-xs font-medium text-purple-400 transition-colors',
@@ -931,12 +921,9 @@ export function Sidebar() {
 													)}
 													{project.tdEnabled && (
 														<DropdownMenuItem
-															onClick={async () => {
-																const selected = await ensureProjectSelected(
-																	project.path,
-																);
-																if (!selected) return;
-																openTaskBoard();
+															onClick={() => {
+																if (isInvalid) return;
+																openTaskBoard(project.path);
 															}}
 															disabled={isInvalid}
 														>
@@ -1017,12 +1004,9 @@ export function Sidebar() {
 										)}
 										{project.tdEnabled && (
 											<ContextMenuItem
-												onClick={async () => {
-													const selected = await ensureProjectSelected(
-														project.path,
-													);
-													if (!selected) return;
-													openTaskBoard();
+												onClick={() => {
+													if (isInvalid) return;
+													openTaskBoard(project.path);
 												}}
 												disabled={isInvalid}
 											>
