@@ -1105,4 +1105,53 @@ describe('writeGeminiHookFiles', () => {
 
 		void cleanup1;
 	});
+
+	it('td-fd13f1: fresh-worktree crash + user adds own keys — cleanup strips hooks, preserves user keys', () => {
+		// Session 1 on fresh worktree — creates ArgusDev-only settings.json, no backup.
+		const cleanup1 = writeGeminiHookFiles(worktree, 8080, 'session-crash-1');
+		const geminiDir = join(worktree, '.gemini');
+		const settingsPath = join(geminiDir, 'settings.json');
+		const backupPath = `${settingsPath}.argusdev-backup`;
+
+		// Daemon crashes. User opens settings.json and adds their own mcpServers
+		// alongside the surviving ArgusDev hooks.
+		const withUserKeys = {
+			...JSON.parse(readFileSync(settingsPath, 'utf-8')),
+			mcpServers: {myServer: {command: 'node', args: ['server.js']}},
+			theme: 'dark',
+		};
+		writeFileSync(settingsPath, JSON.stringify(withUserKeys, null, 2), {
+			encoding: 'utf-8',
+		});
+
+		// Session 2 starts. ArgusDev marker is still present → stripOnCleanup=true, no snapshot.
+		const cleanup2 = writeGeminiHookFiles(worktree, 9090, 'session-crash-2');
+		expect(existsSync(backupPath)).toBe(false);
+
+		// Cleanup: strips ArgusDev hooks, preserves user's mcpServers and theme.
+		cleanup2();
+
+		expect(existsSync(settingsPath)).toBe(true);
+		expect(existsSync(backupPath)).toBe(false);
+
+		const after = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+		expect(after['mcpServers']).toEqual({
+			myServer: {command: 'node', args: ['server.js']},
+		});
+		expect(after['theme']).toBe('dark');
+		// All ArgusDev hook entries must be gone.
+		if (after['hooks']) {
+			for (const entries of Object.values(
+				after['hooks'] as Record<string, unknown[]>,
+			)) {
+				for (const entry of entries) {
+					expect(JSON.stringify(entry)).not.toContain(
+						'/api/internal/sessions/',
+					);
+				}
+			}
+		}
+
+		void cleanup1;
+	});
 });

@@ -580,9 +580,12 @@ export function writeGeminiHookFiles(
 	const hadExisting = existsSync(settingsPath);
 
 	let existing: Record<string, unknown> = {};
-	// weCreatedIt tracks whether cleanup should unlink (we own the file) or
-	// restore from backup (user owned it pre-session).
-	let weCreatedIt = !hadExisting;
+	// stripOnCleanup: no pristine backup to restore from — cleanup must strip
+	// our hooks from whatever is on disk rather than restoring or unlinking blindly.
+	// true when: (a) fresh worktree with no prior settings.json, or (b) the
+	// existing file was ArgusDev-owned with no backup (post-crash re-enter).
+	// false when: a backup was snapshotted (either now or in a prior session).
+	let stripOnCleanup = !hadExisting;
 	if (hadExisting) {
 		const raw = readFileSync(settingsPath);
 		const rawStr = raw.toString('utf-8');
@@ -592,9 +595,10 @@ export function writeGeminiHookFiles(
 			// Existing backup is canonical — crash-recovery must not overwrite it
 			// with a session-polluted intermediate.
 		} else if (isArgusdevOwnedContent(rawStr)) {
-			// No backup AND current file is ours: we created it on a prior crashed
-			// session. Treat as fresh-create — skip snapshotting, cleanup unlinks.
-			weCreatedIt = true;
+			// No backup AND current file is ArgusDev-owned: prior crashed session
+			// created this file. Skip snapshotting — there is no pristine to save.
+			// Cleanup will strip our hooks (unlink only if nothing user-owned remains).
+			stripOnCleanup = true;
 		} else {
 			// No backup, current file is user's — snapshot it as pristine.
 			writeFileSync(backupPath, raw, {mode: 0o600});
@@ -635,12 +639,57 @@ export function writeGeminiHookFiles(
 	renameSync(tmpPath, settingsPath);
 
 	return () => {
-		if (!weCreatedIt && existsSync(backupPath)) {
+		if (!stripOnCleanup && existsSync(backupPath)) {
+			// Pristine backup exists — restore it verbatim.
 			writeFileSync(settingsPath, readFileSync(backupPath), {mode: 0o600});
 			try {
 				unlinkSync(backupPath);
 			} catch {
 				// best-effort
+			}
+		} else if (stripOnCleanup) {
+			// No pristine to restore. Strip our hooks from whatever is on disk.
+			// If nothing user-owned remains, unlink. Otherwise write back the
+			// stripped content so user's mcpServers/theme/etc. are preserved.
+			try {
+				const current = existsSync(settingsPath)
+					? (JSON.parse(readFileSync(settingsPath, 'utf-8')) as Record<
+							string,
+							unknown
+						>)
+					: null;
+				if (current === null) return;
+
+				const currentHooks =
+					current['hooks'] && typeof current['hooks'] === 'object'
+						? (current['hooks'] as Record<string, unknown>)
+						: {};
+
+				const strippedHooks: Record<string, unknown> = {};
+				for (const [event, entries] of Object.entries(currentHooks)) {
+					const kept = Array.isArray(entries)
+						? entries.filter(e => !isArgusdevHookEntry(e))
+						: [];
+					if (kept.length > 0) strippedHooks[event] = kept;
+				}
+
+				const stripped: Record<string, unknown> = {...current};
+				if (Object.keys(strippedHooks).length === 0) {
+					delete stripped['hooks'];
+				} else {
+					stripped['hooks'] = strippedHooks;
+				}
+
+				if (Object.keys(stripped).length === 0) {
+					unlinkSync(settingsPath);
+				} else {
+					writeFileSync(settingsPath, JSON.stringify(stripped, null, 2), {
+						encoding: 'utf-8',
+						mode: 0o600,
+					});
+				}
+			} catch {
+				// best-effort — file may already be gone
 			}
 		} else {
 			try {
