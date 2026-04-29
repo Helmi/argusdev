@@ -471,6 +471,36 @@ describe('buildOpencodePluginContent', () => {
 		const busyCount = (content.match(/hook-state\/busy/g) || []).length;
 		expect(busyCount).toBeGreaterThanOrEqual(2);
 	});
+
+	it('maps question.asked bus event to waiting_input', () => {
+		const content = buildOpencodePluginContent(8080, 'ses');
+		expect(content).toContain('question.asked');
+		expect(content).toContain('/hook-state/waiting_input');
+		// Verify it appears inside the event handler (after "event:")
+		const eventIdx = content.indexOf('event: async');
+		const questionAskedIdx = content.indexOf('question.asked');
+		expect(questionAskedIdx).toBeGreaterThan(eventIdx);
+	});
+
+	it('maps question.replied bus event to busy', () => {
+		const content = buildOpencodePluginContent(8080, 'ses');
+		expect(content).toContain('question.replied');
+	});
+
+	it('maps question.rejected bus event to busy', () => {
+		const content = buildOpencodePluginContent(8080, 'ses');
+		expect(content).toContain('question.rejected');
+	});
+
+	it('question.replied and question.rejected both post to busy', () => {
+		const content = buildOpencodePluginContent(8080, 'ses');
+		const repliedIdx = content.indexOf('question.replied');
+		const rejectedIdx = content.indexOf('question.rejected');
+		// Both are in the same else-if branch followed by a single busy POST
+		const branchEnd = content.indexOf('/hook-state/busy', repliedIdx);
+		expect(branchEnd).toBeGreaterThan(repliedIdx);
+		expect(branchEnd).toBeGreaterThan(rejectedIdx);
+	});
 });
 
 describe('writeOpencodePluginFile', () => {

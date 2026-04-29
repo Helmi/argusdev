@@ -281,6 +281,9 @@ const OPENCODE_PLUGIN_FILENAME = 'argusdev-state.js';
  *   - event(session.idle)           → POST idle
  *   - event(session.status, idle)   → POST idle
  *   - event(session.status, busy)   → POST busy  (pure-chat responses with no tool calls)
+ *   - event(question.asked)         → POST waiting_input  (agent question tool)
+ *   - event(question.replied)       → POST busy
+ *   - event(question.rejected)      → POST busy
  */
 export function buildOpencodePluginContent(
 	port: number,
@@ -306,6 +309,13 @@ export const server = async () => ({
     } else if (
       event.type === "session.status" &&
       event.properties?.status?.type === "busy"
+    ) {
+      fetch("${base}/busy", { method: "POST" }).catch(() => {});
+    } else if (event.type === "question.asked") {
+      fetch("${base}/waiting_input", { method: "POST" }).catch(() => {});
+    } else if (
+      event.type === "question.replied" ||
+      event.type === "question.rejected"
     ) {
       fetch("${base}/busy", { method: "POST" }).catch(() => {});
     }
