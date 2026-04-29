@@ -372,7 +372,11 @@ ${commandTokens.join(' ')}
 			}
 		}
 
-		void this.updateSessionState(session, resolvedState);
+		void this.updateSessionState(session, resolvedState).then(() => {
+			if (resolvedState === 'pending_auto_approval') {
+				this.handleAutoApproval(session);
+			}
+		});
 	}
 
 	private getTerminalContent(session: Session): string {
@@ -1022,8 +1026,13 @@ ${commandTokens.join(' ')}
 			// session_shutdown cover all idle entrances. PTY handles only waiting_input.
 			// Drop PTY-detected busy/idle entirely — stale spinner lines in the 30-line
 			// buffer would otherwise re-apply busy after agent_end fires idle.
+			// Exception: allow PTY through when current OR detected state is
+			// waiting_input/pending_auto_approval — PTY is the only mechanism to enter
+			// or exit those states (e.g. user answers prompt → spinner → PTY detects busy).
 			if (
 				session.partialHookDetection &&
+				oldState !== 'waiting_input' &&
+				oldState !== 'pending_auto_approval' &&
 				detectedState !== 'waiting_input' &&
 				detectedState !== 'pending_auto_approval'
 			) {

@@ -9,7 +9,10 @@ import {join} from 'path';
 import {tmpdir} from 'os';
 import {mkdtemp, rm, readFile} from 'fs/promises';
 import * as startupScript from '../utils/startupScript.js';
-import {STATE_CHECK_INTERVAL_MS} from '../constants/statePersistence.js';
+import {
+	STATE_CHECK_INTERVAL_MS,
+	STATE_PERSISTENCE_DURATION_MS,
+} from '../constants/statePersistence.js';
 
 // Mock node-pty
 vi.mock('node-pty', () => ({
@@ -56,6 +59,19 @@ vi.mock('@xterm/headless', () => ({
 vi.mock('./worktreeService.js', () => ({
 	WorktreeService: vi.fn(),
 }));
+
+// Mock autoApprovalVerifier so handleAutoApproval doesn't make real subprocess calls.
+// verifyNeedsPermission returns an Effect — mock it with Effect.succeed.
+vi.mock('./autoApprovalVerifier.js', async () => {
+	const {Effect} = await import('effect');
+	return {
+		autoApprovalVerifier: {
+			verifyNeedsPermission: vi.fn(() =>
+				Effect.succeed({needsPermission: false}),
+			),
+		},
+	};
+});
 
 // Create a mock IPty class
 class MockPty extends EventEmitter {
@@ -1202,6 +1218,96 @@ describe('SessionManager', () => {
 
 				await new Promise(resolve => setTimeout(resolve, 700));
 				expect(cleanup).toHaveBeenCalledOnce();
+			});
+
+			it('hook-delivered waiting_input triggers auto-approval when enabled (gap 1)', async () => {
+				// Regression: applyHookStateEvent converts waiting_input → pending_auto_approval
+				// when auto-approval is enabled, but handleAutoApproval was never called for
+				// hook-based sessions (only reachable from polling loop). Fix: call after state update.
+				// Verifier mock returns needsPermission:false → auto-approve → state ends at busy.
+				vi.mocked(configurationManager.isAutoApprovalEnabled).mockReturnValue(
+					true,
+				);
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						'/test/worktree',
+						'codex',
+						[],
+						'codex',
+						'Codex Session',
+						'codex',
+						undefined,
+						'agent',
+						{hookBasedDetection: true},
+					),
+				);
+
+				expect(session.stateMutex.getSnapshot().state).toBe('idle');
+
+				sessionManager.applyHookStateEvent(session.id, 'waiting_input');
+				// Allow state update → pending_auto_approval → handleAutoApproval → verifier → busy
+				await new Promise(resolve => setTimeout(resolve, 100));
+
+				// Auto-approval succeeded (verifier mock: needsPermission=false) → state is busy.
+				// If handleAutoApproval were never called (the pre-fix bug), state would stay at
+				// waiting_input because nothing drives the pending_auto_approval → busy transition.
+				expect(session.stateMutex.getSnapshot().state).toBe('busy');
+				expect(mockPty.write).toHaveBeenCalledWith('\r');
+			});
+
+			it('PTY-detected busy transitions partial-hook session out of waiting_input (gap 2)', async () => {
+				// Regression: Pi session in waiting_input (user answered prompt). Tool resumes,
+				// spinner appears in PTY, but no new turn_start/tool_call hook fires for the
+				// same in-flight action. Old guard dropped PTY-busy → session stuck on
+				// waiting_input. Fix: allow PTY through when oldState is waiting_input.
+				vi.mocked(configurationManager.isAutoApprovalEnabled).mockReturnValue(
+					false,
+				);
+				vi.mocked(spawn).mockReturnValue(mockPty as unknown as IPty);
+
+				const session = await Effect.runPromise(
+					sessionManager.createSessionWithAgentEffect(
+						'/test/worktree',
+						'pi',
+						[],
+						'pi',
+						'Pi Session',
+						'pi',
+						undefined,
+						'agent',
+						{partialHookDetection: true},
+					),
+				);
+
+				// Hook delivers waiting_input (permission prompt appeared)
+				sessionManager.applyHookStateEvent(session.id, 'waiting_input');
+				await new Promise(resolve => setTimeout(resolve, 10));
+				expect(session.stateMutex.getSnapshot().state).toBe('waiting_input');
+
+				// Now mock the terminal to show a Pi-style spinner (busy) — simulates user
+				// answering and tool resuming. Pi detectState looks for braille + "working..."
+				const busyLine = {translateToString: vi.fn(() => '⠸ working...')};
+				vi.mocked(session.terminal.buffer.active.getLine).mockReturnValue(
+					busyLine as unknown as ReturnType<
+						typeof session.terminal.buffer.active.getLine
+					>,
+				);
+				Object.defineProperty(session.terminal.buffer.active, 'length', {
+					value: 1,
+					configurable: true,
+				});
+
+				// Wait for polling to pick up PTY-busy and persist it (STATE_PERSISTENCE_DURATION_MS
+				// must elapse while busy is consistently detected before state commits).
+				await new Promise(resolve =>
+					setTimeout(
+						resolve,
+						STATE_PERSISTENCE_DURATION_MS + STATE_CHECK_INTERVAL_MS * 3,
+					),
+				);
+				expect(session.stateMutex.getSnapshot().state).toBe('busy');
 			});
 		});
 	});
