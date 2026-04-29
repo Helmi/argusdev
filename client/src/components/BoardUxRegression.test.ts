@@ -42,4 +42,15 @@ describe('Board UX regression checks', () => {
     const source = readSource('client/src/components/TaskBoard.tsx')
     expect(source).toContain('Show {hiddenClosedCount} older')
   })
+
+  it('uses per-project tdIssues store to eliminate last-write-wins race', () => {
+    const storeSource = readSource('client/src/lib/store.tsx')
+    const boardSource = readSource('client/src/components/TaskBoard.tsx')
+    // store must use per-project map, not global array
+    expect(storeSource).toContain('tdIssuesByProject')
+    expect(storeSource).not.toContain('setTdIssues(')
+    // TaskBoard must derive its slice from the map, not destructure a global tdIssues
+    expect(boardSource).toContain('tdIssuesByProject')
+    expect(boardSource).not.toContain('tdIssues,')
+  })
 })

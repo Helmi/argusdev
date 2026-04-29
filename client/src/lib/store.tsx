@@ -170,7 +170,7 @@ interface AppState {
 	// TD Integration
 	tdStatus: TdStatus | null;
 	tdStatusLoading: boolean;
-	tdIssues: TdIssue[];
+	tdIssuesByProject: Record<string, TdIssue[]>;
 	tdBoardView: Record<string, TdIssue[]>;
 	taskBoardOpen: boolean;
 	taskBoardProjectPath: string | null;
@@ -516,7 +516,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 	// TD Integration state
 	const [tdStatus, setTdStatus] = useState<TdStatus | null>(null);
 	const [tdStatusLoading, setTdStatusLoading] = useState(true);
-	const [tdIssues, setTdIssues] = useState<TdIssue[]>([]);
+	const [tdIssuesByProject, setTdIssuesByProject] = useState<Record<string, TdIssue[]>>({});
 	const [tdBoardView, setTdBoardView] = useState<Record<string, TdIssue[]>>({});
 	const [taskBoardOpen, setTaskBoardOpen] = useState(false);
 	const [taskBoardProjectPath, setTaskBoardProjectPath] = useState<string | null>(null);
@@ -862,10 +862,11 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const fetchTdIssues = useCallback(
 		async (options?: TdIssueQueryOptions) => {
+			const projectPath = options?.projectPath || currentProject?.path;
+			if (!projectPath) return;
 			try {
 				const params = new URLSearchParams();
-				const projectPath = options?.projectPath || currentProject?.path;
-				if (projectPath) params.set('projectPath', projectPath);
+				params.set('projectPath', projectPath);
 				if (options?.status) params.set('status', options.status);
 				if (options?.type) params.set('type', options.type);
 				if (options?.parentId) params.set('parentId', options.parentId);
@@ -873,7 +874,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 				const res = await apiFetch(`/api/td/issues${qs ? `?${qs}` : ''}`);
 				if (res.ok) {
 					const data = await res.json();
-					setTdIssues(data.issues);
+					setTdIssuesByProject(prev => ({ ...prev, [projectPath]: data.issues }));
 				}
 			} catch (err) {
 				console.error('Failed to fetch td issues:', err);
@@ -1186,12 +1187,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 	}, [currentProject?.path, fetchProjectConfig, fetchTdStatus]);
 
 	useEffect(() => {
-		if (!currentProject) {
-			setTdIssues([]);
-			return;
-		}
-
-		setTdIssues([]);
+		if (!currentProject) return;
 		fetchTdIssues({
 			projectPath: currentProject.path,
 			status: 'open,in_progress,in_review,blocked',
@@ -1567,9 +1563,12 @@ export function AppProvider({children}: {children: ReactNode}) {
 		tdTaskId?: string,
 		context?: AddSessionContext,
 	) => {
+		const issueProjectPath = projectPath || currentProject?.path;
 		const taskCreatedBranch =
 			context?.createdBranch ||
-			tdIssues.find(issue => issue.id === tdTaskId)?.created_branch;
+			(issueProjectPath ? tdIssuesByProject[issueProjectPath] ?? [] : []).find(
+				issue => issue.id === tdTaskId,
+			)?.created_branch;
 		const inferredWorktreePath =
 			worktreePath ||
 			resolveTdIssueWorktreePath(
@@ -1901,7 +1900,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		// TD Integration
 		tdStatus,
 		tdStatusLoading,
-		tdIssues,
+		tdIssuesByProject,
 		tdBoardView,
 		taskBoardOpen,
 		taskBoardProjectPath,

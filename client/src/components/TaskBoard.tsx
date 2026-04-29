@@ -182,7 +182,7 @@ export function TaskBoard() {
     tdBoardView,
     fetchTdBoard,
     fetchTdIssues,
-    tdIssues,
+    tdIssuesByProject,
     openAddSession,
     closeTaskBoard,
     taskBoardOpen,
@@ -191,6 +191,7 @@ export function TaskBoard() {
   } = useAppStore()
 
   const taskBoardProject = projects.find(p => p.path === taskBoardProjectPath) ?? null
+  const tdIssues = tdIssuesByProject[taskBoardProjectPath ?? ''] ?? []
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
