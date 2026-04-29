@@ -5,6 +5,7 @@ import { SessionGrid } from '@/components/SessionGrid'
 import { InlineDiffViewer } from '@/components/InlineDiffViewer'
 import { FileViewer } from '@/components/FileViewer'
 import { FilePreviewDialog } from '@/components/FilePreviewDialog'
+import { NudgeDialog } from '@/components/NudgeDialog'
 import { TaskBoard } from '@/components/TaskBoard'
 import { ConversationView } from '@/components/ConversationView'
 import { ErrorBanner } from '@/components/ErrorBanner'
@@ -80,6 +81,7 @@ function AuthenticatedAppContent() {
       {addSessionOpen && <AddSessionScreen />}
       {settingsOpen && <SettingsScreen />}
       <FilePreviewDialog />
+      <NudgeDialog />
     </>
   )
 }

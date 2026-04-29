@@ -29,6 +29,7 @@ import {
 	PanelRightOpen,
 	PanelRightClose,
 	ClipboardPaste,
+	MessageSquarePlus,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {Session} from '@/lib/types';
@@ -138,6 +139,7 @@ export const TerminalSession = memo(function TerminalSession({
 		openTaskBoard,
 		tdStatus,
 		openFilePreview,
+		setNudgePending,
 	} = useAppStore();
 	const isMobile = useIsMobile();
 	const hasMultipleSessions = selectedSessions.length > 1;
@@ -888,6 +890,25 @@ export const TerminalSession = memo(function TerminalSession({
 					>
 						<RefreshCw className="h-3.5 w-3.5" />
 					</Button>
+
+					{/* Nudge — send text to PTY; only for PTY sessions (SDK has no PTY) */}
+					{session.type !== 'sdk' && (
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-5 w-5 text-muted-foreground hover:text-foreground"
+							onClick={() =>
+								setNudgePending({
+									sessionId: session.id,
+									text: '',
+									purpose: 'manual',
+								})
+							}
+							title="Nudge session"
+						>
+							<MessageSquarePlus className="h-3.5 w-3.5" />
+						</Button>
+					)}
 
 					{/* Maximize/Minimize - hidden on mobile */}
 					{!isMobile && (

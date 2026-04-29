@@ -180,6 +180,9 @@ interface AppState {
 	projectConfig: ProjectConfig | null;
 	projectConfigPath: string | null;
 
+	// Nudge
+	nudgePending: import('./nudge').NudgePending | null;
+
 	// Socket
 	socket: Socket;
 }
@@ -342,6 +345,9 @@ interface AppActions {
 		taskId?: string;
 	}) => void;
 	closeConversationView: () => void;
+
+	// Nudge
+	setNudgePending: (pending: import('./nudge').NudgePending | null) => void;
 
 	// Error handling
 	clearError: () => void;
@@ -530,6 +536,11 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const [projectConfigPath, setProjectConfigPath] = useState<string | null>(
 		null,
 	);
+
+	// Nudge state
+	const [nudgePending, setNudgePending] = useState<
+		import('./nudge').NudgePending | null
+	>(null);
 
 	// Apply theme to document
 	useEffect(() => {
@@ -1906,6 +1917,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 		closeTaskBoard,
 		openConversationView,
 		closeConversationView,
+		nudgePending,
+		setNudgePending,
 	};
 
 	return <AppContext.Provider value={store}>{children}</AppContext.Provider>;
