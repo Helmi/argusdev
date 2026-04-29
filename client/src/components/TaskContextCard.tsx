@@ -371,6 +371,7 @@ export function TaskContextCard({worktreePath}: TaskContextCardProps) {
 			{selectedIssueId && (
 				<TaskDetailModal
 					issueId={selectedIssueId}
+					projectPath={resolvedProjectPath}
 					onClose={closeModal}
 					onRefresh={() => fetchTaskDetail(selectedIssueId)}
 				/>

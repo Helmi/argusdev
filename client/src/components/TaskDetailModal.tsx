@@ -175,6 +175,7 @@ function CollapsibleSection({ title, icon: Icon, defaultOpen = false, count, chi
 
 interface TaskDetailModalProps {
   issueId: string
+  projectPath?: string
   onClose: () => void
   onNavigate?: (issueId: string) => void
   onStartWorking?: (issueId: string, intent?: 'work' | 'review' | 'fix') => void
@@ -182,8 +183,8 @@ interface TaskDetailModalProps {
   onRefresh?: () => void
 }
 
-export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, onStartReview, onRefresh }: TaskDetailModalProps) {
-  const { openConversationView, taskBoardProjectPath, tdRejectLoopByProject, setNudgePending, openAddSession } = useAppStore()
+export function TaskDetailModal({ issueId, projectPath, onClose, onNavigate, onStartWorking, onStartReview, onRefresh }: TaskDetailModalProps) {
+  const { openConversationView, tdRejectLoopByProject, setNudgePending, openAddSession } = useAppStore()
   const [issue, setIssue] = useState<TdIssueWithChildren | null>(null)
   const [loading, setLoading] = useState(true)
   const [isVisible, setIsVisible] = useState(false)
@@ -252,10 +253,10 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
     : { overview: 0, activity: 0, details: 0 }
 
   const rejectLoopItem = useMemo(() => {
-    if (!issue || !taskBoardProjectPath) return null
-    const items = tdRejectLoopByProject[taskBoardProjectPath] ?? []
+    if (!issue || !projectPath) return null
+    const items = tdRejectLoopByProject[projectPath] ?? []
     return items.find(i => i.issue.id === issue.id) ?? null
-  }, [issue, taskBoardProjectPath, tdRejectLoopByProject])
+  }, [issue, projectPath, tdRejectLoopByProject])
 
   const resolveConversationSessionId = useCallback(async (tdSessionId: string): Promise<string | null> => {
     if (!issue?.id) return null
@@ -264,8 +265,8 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
         tdSessionId,
         taskId: issue.id,
       })
-      if (taskBoardProjectPath) {
-        params.set('projectPath', taskBoardProjectPath)
+      if (projectPath) {
+        params.set('projectPath', projectPath)
       }
       const res = await apiFetch(`/api/conversations/resolve-linked-session?${params.toString()}`)
       if (!res.ok) return null
@@ -274,7 +275,7 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
     } catch {
       return null
     }
-  }, [taskBoardProjectPath, issue?.id])
+  }, [projectPath, issue?.id])
 
   return (
     <>
@@ -342,7 +343,7 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                           setNudgePending({ sessionId: rejectLoopItem.sessionId, text: rejectLoopItem.nudgeText, purpose: 'review-rejected' })
                         } else {
                           handleClose()
-                          openAddSession(undefined, taskBoardProjectPath ?? undefined, issue.id, {
+                          openAddSession(undefined, projectPath ?? undefined, issue.id, {
                             intent: rejectLoopItem.intent,
                             createdBranch: issue.created_branch || undefined,
                           })

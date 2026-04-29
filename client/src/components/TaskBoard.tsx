@@ -444,6 +444,7 @@ export function TaskBoard() {
       {selectedIssueId && (
         <TaskDetailModal
           issueId={selectedIssueId}
+          projectPath={taskBoardProjectPath ?? undefined}
           onClose={() => setSelectedIssueId(null)}
           onNavigate={setSelectedIssueId}
           onStartWorking={(taskId, intent = 'work') => {

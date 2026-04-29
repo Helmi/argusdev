@@ -980,6 +980,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		setConversationViewOpen(false);
 		setConversationInitialSessionId(null);
 		setConversationTaskFilterId(null);
+		setConversationViewProjectPath(null);
 	}, []);
 
 	// Save (create or update) an agent
@@ -1639,7 +1640,10 @@ export function AppProvider({children}: {children: ReactNode}) {
 		}
 		setSettingsOpen(true);
 	};
-	const closeSettings = () => setSettingsOpen(false);
+	const closeSettings = () => {
+		setSettingsOpen(false);
+		setSettingsProjectPath(null);
+	};
 	const navigateSettings = (
 		section:
 			| 'general'
