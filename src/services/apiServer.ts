@@ -1950,6 +1950,7 @@ export class APIServer {
 				.map(s => ({
 					...toApiSessionPayload(s),
 					type: 'pty' as const,
+					tdTaskId: sessionStore.getSessionById(s.id)?.tdTaskId ?? null,
 				}));
 			const sdkSessions = sdkSessionManager
 				.getAllSessions()
@@ -1971,6 +1972,7 @@ export class APIServer {
 					pid: 0,
 					autoApprovalFailed: false,
 					autoApprovalReason: undefined,
+					tdTaskId: sessionStore.getSessionById(s.id)?.tdTaskId ?? null,
 				}));
 			return [...ptySessions, ...sdkSessions];
 		});

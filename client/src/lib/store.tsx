@@ -33,6 +33,8 @@ import {
 	getDefaultConfig,
 } from './configMapper';
 import {resolveTdIssueWorktreePath} from './tdWorktreeResolver';
+import {detectRejectLoopItems} from './tdRejectLoop';
+import type {RejectLoopItem} from './tdRejectLoop';
 
 // Debounce utility
 function debounce<T extends (...args: Parameters<T>) => void>(
@@ -178,6 +180,7 @@ interface AppState {
 	conversationInitialSessionId: string | null;
 	conversationTaskFilterId: string | null;
 	tdReviewCountsByProject: Record<string, number>;
+	tdRejectLoopByProject: Record<string, RejectLoopItem[]>;
 	projectConfig: ProjectConfig | null;
 	projectConfigPath: string | null;
 
@@ -543,6 +546,16 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const [nudgePending, setNudgePending] = useState<
 		import('./nudge').NudgePending | null
 	>(null);
+
+	// Derived: reject-loop items per project
+	const tdRejectLoopByProject = useMemo<Record<string, RejectLoopItem[]>>(() => {
+		const result: Record<string, RejectLoopItem[]> = {};
+		for (const [projectPath, issues] of Object.entries(tdIssuesByProject)) {
+			const items = detectRejectLoopItems(issues, sessions);
+			if (items.length > 0) result[projectPath] = items;
+		}
+		return result;
+	}, [tdIssuesByProject, sessions]);
 
 	// Apply theme to document
 	useEffect(() => {
@@ -1908,6 +1921,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		conversationInitialSessionId,
 		conversationTaskFilterId,
 		tdReviewCountsByProject,
+		tdRejectLoopByProject,
 		projectConfig,
 		projectConfigPath,
 		fetchTdStatus,

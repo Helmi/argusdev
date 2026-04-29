@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
 import type { TdIssue } from '@/lib/types'
+import type { RejectLoopItem } from '@/lib/tdRejectLoop'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,7 +42,25 @@ function priorityBadgeClass(priority: string): string {
   return 'bg-muted text-muted-foreground'
 }
 
-function IssueCard({ issue, compact, indent, onSelect, childCount }: { issue: TdIssue; compact?: boolean; indent?: boolean; onSelect: (id: string) => void; childCount?: number }) {
+function RejectLoopPill({ item, onClick }: { item: RejectLoopItem; onClick: (item: RejectLoopItem) => void }) {
+  const isRejected = item.pill === 'rejected'
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick(item) }}
+      className={cn(
+        'text-xs font-medium px-1.5 py-0.5 rounded shrink-0',
+        isRejected
+          ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+          : 'bg-purple-500/15 text-purple-400 hover:bg-purple-500/25',
+      )}
+      title={item.nudgeText}
+    >
+      {isRejected ? 'Rejected' : 'Re-review'}
+    </button>
+  )
+}
+
+function IssueCard({ issue, compact, indent, onSelect, childCount, rejectLoopItem, onPillClick }: { issue: TdIssue; compact?: boolean; indent?: boolean; onSelect: (id: string) => void; childCount?: number; rejectLoopItem?: RejectLoopItem; onPillClick?: (item: RejectLoopItem) => void }) {
   return (
     <button
       onClick={() => onSelect(issue.id)}
@@ -72,6 +91,10 @@ function IssueCard({ issue, compact, indent, onSelect, childCount }: { issue: Td
                   <span className="text-xs text-muted-foreground">{childCount}</span>
                 )}
               </div>
+            )}
+            {/* Reject-loop pill */}
+            {rejectLoopItem && onPillClick && (
+              <RejectLoopPill item={rejectLoopItem} onClick={onPillClick} />
             )}
           </div>
           {/* Task ID */}
@@ -116,11 +139,13 @@ function groupIssuesWithChildren(issues: TdIssue[]): Array<{ issue: TdIssue; chi
   return result
 }
 
-function StatusColumn({ status, issues, onSelect, childCountByEpicId }: {
+function StatusColumn({ status, issues, onSelect, childCountByEpicId, rejectLoopByIssueId, onPillClick }: {
   status: typeof STATUS_COLUMNS[0]
   issues: TdIssue[]
   onSelect: (id: string) => void
   childCountByEpicId: Map<string, number>
+  rejectLoopByIssueId: Map<string, RejectLoopItem>
+  onPillClick: (item: RejectLoopItem) => void
 }) {
   const StatusIcon = status.icon
   const [showAllClosed, setShowAllClosed] = useState(false)
@@ -161,6 +186,8 @@ function StatusColumn({ status, issues, onSelect, childCountByEpicId }: {
               issue={issue}
               onSelect={onSelect}
               childCount={issue.type === 'epic' ? childCountByEpicId.get(issue.id) : undefined}
+              rejectLoopItem={rejectLoopByIssueId.get(issue.id)}
+              onPillClick={onPillClick}
             />
           ))}
           {status.key === 'closed' && hiddenClosedCount > 0 && (
@@ -183,6 +210,8 @@ export function TaskBoard() {
     fetchTdBoard,
     fetchTdIssues,
     tdIssuesByProject,
+    tdRejectLoopByProject,
+    setNudgePending,
     openAddSession,
     closeTaskBoard,
     taskBoardOpen,
@@ -205,6 +234,25 @@ export function TaskBoard() {
     })
     return counts
   }, [tdIssues])
+
+  const rejectLoopByIssueId = useMemo(() => {
+    const map = new Map<string, RejectLoopItem>()
+    const items = tdRejectLoopByProject[taskBoardProjectPath ?? ''] ?? []
+    items.forEach(item => map.set(item.issue.id, item))
+    return map
+  }, [tdRejectLoopByProject, taskBoardProjectPath])
+
+  const handlePillClick = useCallback((item: RejectLoopItem) => {
+    if (item.sessionId) {
+      setNudgePending({ sessionId: item.sessionId, text: item.nudgeText, purpose: 'review-rejected' })
+    } else {
+      closeTaskBoard()
+      openAddSession(undefined, taskBoardProjectPath ?? undefined, item.issue.id, {
+        intent: item.intent,
+        createdBranch: item.issue.created_branch || undefined,
+      })
+    }
+  }, [setNudgePending, openAddSession, closeTaskBoard, taskBoardProjectPath])
 
   // Fetch board data whenever the board opens or the project changes.
   // Fetch unconditionally when board opens — tdEnabled is checked at render time.
@@ -348,6 +396,8 @@ export function TaskBoard() {
                 issues={(filteredBoard[status.key] || []).filter(i => !i.deleted_at)}
                 onSelect={setSelectedIssueId}
                 childCountByEpicId={childCountByEpicId}
+                rejectLoopByIssueId={rejectLoopByIssueId}
+                onPillClick={handlePillClick}
               />
             ))}
           </div>
@@ -368,6 +418,8 @@ export function TaskBoard() {
                     compact
                     onSelect={setSelectedIssueId}
                     childCount={issue.type === 'epic' ? childCountByEpicId.get(issue.id) : undefined}
+                    rejectLoopItem={rejectLoopByIssueId.get(issue.id)}
+                    onPillClick={handlePillClick}
                   />
                   {children.map(child => (
                     <div key={child.id} className="mt-1">
@@ -376,6 +428,8 @@ export function TaskBoard() {
                         compact
                         indent
                         onSelect={setSelectedIssueId}
+                        rejectLoopItem={rejectLoopByIssueId.get(child.id)}
+                        onPillClick={handlePillClick}
                       />
                     </div>
                   ))}

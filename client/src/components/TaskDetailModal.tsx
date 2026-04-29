@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import { apiFetch } from '@/lib/apiFetch'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -183,7 +183,7 @@ interface TaskDetailModalProps {
 }
 
 export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, onStartReview, onRefresh }: TaskDetailModalProps) {
-  const { openConversationView, currentProject } = useAppStore()
+  const { openConversationView, currentProject, tdRejectLoopByProject, setNudgePending, openAddSession } = useAppStore()
   const [issue, setIssue] = useState<TdIssueWithChildren | null>(null)
   const [loading, setLoading] = useState(true)
   const [isVisible, setIsVisible] = useState(false)
@@ -250,6 +250,12 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
   const layoutCounts = issue
     ? getTaskDetailLayoutCounts(issue)
     : { overview: 0, activity: 0, details: 0 }
+
+  const rejectLoopItem = useMemo(() => {
+    if (!issue || !currentProject?.path) return null
+    const items = tdRejectLoopByProject[currentProject.path] ?? []
+    return items.find(i => i.issue.id === issue.id) ?? null
+  }, [issue, currentProject?.path, tdRejectLoopByProject])
 
   const resolveConversationSessionId = useCallback(async (tdSessionId: string): Promise<string | null> => {
     if (!issue?.id) return null
@@ -328,6 +334,30 @@ export function TaskDetailModal({ issueId, onClose, onNavigate, onStartWorking, 
                       <Layers className="h-3 w-3" />
                       {issue.type}
                     </span>
+                  )}
+                  {rejectLoopItem && (
+                    <button
+                      onClick={() => {
+                        if (rejectLoopItem.sessionId) {
+                          setNudgePending({ sessionId: rejectLoopItem.sessionId, text: rejectLoopItem.nudgeText, purpose: 'review-rejected' })
+                        } else {
+                          handleClose()
+                          openAddSession(undefined, currentProject?.path ?? undefined, issue.id, {
+                            intent: rejectLoopItem.intent,
+                            createdBranch: issue.created_branch || undefined,
+                          })
+                        }
+                      }}
+                      className={cn(
+                        'text-[11px] rounded-full px-2 py-0.5 font-medium',
+                        rejectLoopItem.pill === 'rejected'
+                          ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                          : 'bg-purple-500/15 text-purple-400 hover:bg-purple-500/25',
+                      )}
+                      title={rejectLoopItem.nudgeText}
+                    >
+                      {rejectLoopItem.pill === 'rejected' ? 'Rejected' : 'Re-review'}
+                    </button>
                   )}
                 </div>
               </div>

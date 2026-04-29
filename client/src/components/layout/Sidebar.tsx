@@ -11,6 +11,7 @@ import {
 	type Worktree,
 	type Session,
 } from '@/lib/types';
+import type {RejectLoopItem} from '@/lib/tdRejectLoop';
 import {cn} from '@/lib/utils';
 import {Checkbox} from '@/components/ui/checkbox';
 import {ConfirmDialog} from '@/components/ConfirmDialog';
@@ -122,6 +123,8 @@ export function Sidebar() {
 		sidebarOpen,
 		sidebarCollapsed,
 		tdReviewCountsByProject,
+		tdRejectLoopByProject,
+		setNudgePending,
 		expandSidebar,
 		toggleSidebar,
 		selectSession,
@@ -160,6 +163,17 @@ export function Sidebar() {
 		if (!agentId) return undefined;
 		return agents.find(a => a.id === agentId);
 	};
+
+	// Map sessionId -> RejectLoopItem across all projects
+	const rejectLoopBySessionId = useMemo(() => {
+		const map = new Map<string, RejectLoopItem>();
+		for (const items of Object.values(tdRejectLoopByProject)) {
+			for (const item of items) {
+				if (item.sessionId) map.set(item.sessionId, item);
+			}
+		}
+		return map;
+	}, [tdRejectLoopByProject]);
 
 	// Separate dialog states for different actions
 	const [removeProjectDialog, setRemoveProjectDialog] = useState<{
@@ -1277,7 +1291,30 @@ export function Sidebar() {
 																								formatName(session.path)}
 																						</span>
 																					)}
-{/* Visible menu button */}
+																					{/* Reject-loop pill */}
+																					{(() => {
+																						const rli = rejectLoopBySessionId.get(session.id);
+																						if (!rli) return null;
+																						const isRej = rli.pill === 'rejected';
+																						return (
+																							<button
+																								onClick={e => {
+																									e.stopPropagation();
+																									setNudgePending({sessionId: session.id, text: rli.nudgeText, purpose: 'review-rejected'});
+																								}}
+																								className={cn(
+																									'shrink-0 text-xs font-medium px-1.5 py-0.5 rounded',
+																									isRej
+																										? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+																										: 'bg-purple-500/15 text-purple-400 hover:bg-purple-500/25',
+																								)}
+																								title={rli.nudgeText}
+																							>
+																								{isRej ? 'Rej' : 'Rev'}
+																							</button>
+																						);
+																					})()}
+																					{/* Visible menu button */}
 																					<DropdownMenu>
 																						<DropdownMenuTrigger asChild>
 																							<div
