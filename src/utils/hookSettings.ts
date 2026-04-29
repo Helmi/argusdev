@@ -522,17 +522,32 @@ export function buildGeminiHookConfig(port: number, sessionId: string): string {
 	return JSON.stringify(config, null, 2);
 }
 
+const ARGUSDEV_HOOK_MARKER = '/api/internal/sessions/';
+
+function isArgusdevHookEntry(entry: unknown): boolean {
+	if (!entry || typeof entry !== 'object') return false;
+	const hooks = (entry as {hooks?: unknown}).hooks;
+	if (!Array.isArray(hooks)) return false;
+	return hooks.some(
+		h =>
+			h &&
+			typeof h === 'object' &&
+			typeof (h as {command?: unknown}).command === 'string' &&
+			(h as {command: string}).command.includes(ARGUSDEV_HOOK_MARKER),
+	);
+}
+
 /**
  * Write .gemini/settings.json in the given worktree, merging ArgusDev hooks
  * into any pre-existing user config (mcpServers, theme, custom hooks, etc.).
  *
- * Merge strategy: ArgusDev hook entries are appended to each event's array so
- * user-defined hooks for the same event continue to fire. Pre-existing keys
- * outside `hooks` (e.g. mcpServers) are preserved verbatim.
+ * Merge strategy: stale ArgusDev hook entries (identified by URL marker) are
+ * stripped first, then new ones appended. User-owned hooks for the same event
+ * continue to fire. Pre-existing keys outside `hooks` are preserved verbatim.
  *
- * If settings.json already exists, the original is snapshotted to
- * settings.json.argusdev-backup so cleanup can restore it exactly.
- * The returned cleanup function restores the pre-session state.
+ * Backup is written only when no backup already exists — crash-recovery
+ * re-runs therefore preserve the pristine pre-session original, not a
+ * session-polluted intermediate. Cleanup restores verbatim from backup.
  */
 export function writeGeminiHookFiles(
 	worktreePath: string,
@@ -549,7 +564,11 @@ export function writeGeminiHookFiles(
 	let existing: Record<string, unknown> = {};
 	if (hadExisting) {
 		const raw = readFileSync(settingsPath);
-		writeFileSync(backupPath, raw, {mode: 0o600});
+		// Only snapshot when no backup exists — crash-recovery re-runs must not
+		// overwrite the pristine original with a session-polluted intermediate.
+		if (!existsSync(backupPath)) {
+			writeFileSync(backupPath, raw, {mode: 0o600});
+		}
 		try {
 			existing = JSON.parse(raw.toString('utf-8')) as Record<string, unknown>;
 		} catch {
@@ -569,8 +588,11 @@ export function writeGeminiHookFiles(
 
 	const mergedHooks: Record<string, unknown> = {...existingHooks};
 	for (const [event, entries] of Object.entries(argusdevHooks)) {
-		const prior = Array.isArray(mergedHooks[event]) ? mergedHooks[event] : [];
-		mergedHooks[event] = [...(prior as unknown[]), ...(entries as unknown[])];
+		const priorRaw = Array.isArray(mergedHooks[event])
+			? (mergedHooks[event] as unknown[])
+			: [];
+		const priorFiltered = priorRaw.filter(e => !isArgusdevHookEntry(e));
+		mergedHooks[event] = [...priorFiltered, ...(entries as unknown[])];
 	}
 
 	const merged = {...existing, hooks: mergedHooks};

@@ -982,4 +982,64 @@ describe('writeGeminiHookFiles', () => {
 		const settingsPath = join(worktree, '.gemini', 'settings.json');
 		expect(existsSync(`${settingsPath}.tmp`)).toBe(false);
 	});
+
+	it('strips stale ArgusDev hooks from a prior crashed session', () => {
+		const geminiDir = join(worktree, '.gemini');
+		mkdirSync(geminiDir, {recursive: true});
+		const staleArgusdevHook = {
+			hooks: [
+				{
+					type: 'command',
+					command:
+						'curl -s -X POST http://127.0.0.1:9999/api/internal/sessions/old-session/hook-state/idle > /dev/null 2>&1 || true',
+				},
+			],
+		};
+		const userHook = {hooks: [{type: 'command', command: 'user-script'}]};
+		const polluted = {
+			hooks: {SessionStart: [userHook, staleArgusdevHook]},
+		};
+		writeFileSync(join(geminiDir, 'settings.json'), JSON.stringify(polluted), {
+			encoding: 'utf-8',
+		});
+
+		writeGeminiHookFiles(worktree, 8080, 'new-session');
+		const active = JSON.parse(
+			readFileSync(join(geminiDir, 'settings.json'), 'utf-8'),
+		);
+
+		expect(active.hooks.SessionStart).toHaveLength(2);
+		const commands = active.hooks.SessionStart.flatMap(
+			(e: {hooks: Array<{command: string}>}) =>
+				e.hooks.map((h: {command: string}) => h.command),
+		);
+		expect(commands).toContain('user-script');
+		expect(commands.some((c: string) => c.includes(':8080'))).toBe(true);
+		expect(commands.some((c: string) => c.includes('new-session'))).toBe(true);
+		expect(commands.some((c: string) => c.includes(':9999'))).toBe(false);
+		expect(commands.some((c: string) => c.includes('old-session'))).toBe(false);
+	});
+
+	it('does not overwrite existing backup on crash-recovery re-run', () => {
+		const geminiDir = join(worktree, '.gemini');
+		mkdirSync(geminiDir, {recursive: true});
+		const pristine = JSON.stringify({theme: 'dark'});
+		writeFileSync(join(geminiDir, 'settings.json'), pristine, {
+			encoding: 'utf-8',
+		});
+
+		// Session 1 starts — creates backup of pristine
+		writeGeminiHookFiles(worktree, 9999, 'session-1');
+
+		// Daemon crashes — settings.json now has session-1 hooks merged in
+		// Session 2 starts in same worktree (crash-recovery)
+		writeGeminiHookFiles(worktree, 8080, 'session-2');
+
+		// Cleanup should restore pristine, not session-1-polluted intermediate
+		const backupContent = readFileSync(
+			join(geminiDir, 'settings.json.argusdev-backup'),
+			'utf-8',
+		);
+		expect(backupContent).toBe(pristine);
+	});
 });
