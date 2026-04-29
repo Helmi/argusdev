@@ -290,7 +290,7 @@ export function TaskBoard() {
             variant="ghost"
             size="icon"
             className="h-6 w-6"
-            onClick={() => { fetchTdBoard(); fetchTdIssues() }}
+            onClick={() => { if (taskBoardProjectPath) { fetchTdBoard(taskBoardProjectPath); fetchTdIssues({ projectPath: taskBoardProjectPath }) } }}
             title="Refresh"
           >
             <RefreshCw className="h-3 w-3" />
@@ -410,7 +410,7 @@ export function TaskBoard() {
               createdBranch: issue?.created_branch || createdBranch,
             })
           }}
-          onRefresh={() => { fetchTdBoard(); fetchTdIssues() }}
+          onRefresh={() => { if (taskBoardProjectPath) { fetchTdBoard(taskBoardProjectPath); fetchTdIssues({ projectPath: taskBoardProjectPath }) } }}
         />
       )}
     </div>

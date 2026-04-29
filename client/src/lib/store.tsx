@@ -1073,6 +1073,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const fetchTdBoardRef = useRef(fetchTdBoard);
 	const fetchTdIssuesRef = useRef(fetchTdIssues);
 	const currentProjectRef = useRef(currentProject);
+	const taskBoardProjectPathRef = useRef(taskBoardProjectPath);
 	useEffect(() => {
 		fetchDataRef.current = fetchData;
 		fetchAgentsRef.current = fetchAgents;
@@ -1081,6 +1082,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		fetchTdBoardRef.current = fetchTdBoard;
 		fetchTdIssuesRef.current = fetchTdIssues;
 		currentProjectRef.current = currentProject;
+		taskBoardProjectPathRef.current = taskBoardProjectPath;
 	});
 
 	// Socket.IO event handlers — runs once on mount, uses refs for latest callbacks
@@ -1112,8 +1114,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 				setTdReviewCountsByProject(prev =>
 					updateProjectCountState(prev, data.projectPath, data.count),
 				);
-				if (currentProjectRef.current?.path === data.projectPath) {
-					fetchTdBoardRef.current();
+				if (taskBoardProjectPathRef.current === data.projectPath) {
+					fetchTdBoardRef.current(data.projectPath);
 					fetchTdIssuesRef.current({
 						projectPath: data.projectPath,
 						status: 'open,in_progress,in_review,blocked',
@@ -1121,10 +1123,13 @@ export function AppProvider({children}: {children: ReactNode}) {
 				}
 			},
 		);
-		// Auto-refresh TD board when issues.db changes externally (td CLI commands)
+		// Auto-refresh TD board when issues.db changes externally (td CLI commands).
+		// Only refresh if a board is currently open — no path means nothing to refresh.
 		socket.on('td_board_changed', () => {
-			fetchTdBoardRef.current();
-			fetchTdIssuesRef.current();
+			const path = taskBoardProjectPathRef.current;
+			if (!path) return;
+			fetchTdBoardRef.current(path);
+			fetchTdIssuesRef.current({ projectPath: path });
 		});
 
 		// File watcher events - refresh data when external changes detected
