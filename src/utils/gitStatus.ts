@@ -3,7 +3,11 @@ import {execFile, type ExecException} from 'child_process';
 import {Effect, Either} from 'effect';
 import {pipe} from 'effect/Function';
 import {GitError} from '../types/errors.js';
-import {getWorktreeParentBranch} from './worktreeConfig.js';
+import {
+	getWorktreeParentBranchWithSource,
+	type ParentBranchSource,
+	type ParentBranchResult,
+} from './worktreeConfig.js';
 import {createEffectConcurrencyLimited} from './concurrencyLimit.js';
 import {validatePathWithinBase} from './pathValidation.js';
 
@@ -15,7 +19,10 @@ export interface GitStatus {
 	aheadCount: number;
 	behindCount: number;
 	parentBranch: string | null;
+	parentBranchSource: ParentBranchSource | null;
 }
+
+export type {ParentBranchSource};
 
 export interface ChangedFile {
 	path: string;
@@ -95,7 +102,9 @@ export const getGitStatus = (
 			['branch', '--show-current'],
 			worktreePath,
 		);
-		const parentBranch = yield* fetchParentBranch(worktreePath);
+		const parentBranchResult = yield* fetchParentBranch(worktreePath);
+		const parentBranch = parentBranchResult?.branch ?? null;
+		const parentBranchSource = parentBranchResult?.source ?? null;
 
 		const diffStats = decodeGitStats(diffResult.stdout);
 		const stagedStats = decodeGitStats(stagedResult.stdout);
@@ -115,6 +124,7 @@ export const getGitStatus = (
 			aheadCount,
 			behindCount,
 			parentBranch,
+			parentBranchSource,
 		};
 	});
 
@@ -208,9 +218,11 @@ function runGit(
 	);
 }
 
-function fetchParentBranch(worktreePath: string): Effect.Effect<string | null> {
-	return Effect.catchAll(getWorktreeParentBranch(worktreePath), () =>
-		Effect.succeed<string | null>(null),
+function fetchParentBranch(
+	worktreePath: string,
+): Effect.Effect<ParentBranchResult | null> {
+	return Effect.catchAll(getWorktreeParentBranchWithSource(worktreePath), () =>
+		Effect.succeed<ParentBranchResult | null>(null),
 	);
 }
 

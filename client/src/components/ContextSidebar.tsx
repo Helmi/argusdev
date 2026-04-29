@@ -10,11 +10,13 @@ import {Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip';
 import {StatusIndicator} from '@/components/StatusIndicator';
 import {AgentIcon, getLegacyAgentIconProps} from '@/components/AgentIcon';
 import {FileBrowser} from '@/components/FileBrowser';
-import {mapSessionState, type ChangedFilesResponse} from '@/lib/types';
+import {mapSessionState, type ChangedFilesResponse, type Worktree} from '@/lib/types';
 import {TaskContextCard} from '@/components/TaskContextCard';
+import {IntegratePickerDialog} from '@/components/IntegratePickerDialog';
 import {
 	X,
 	GitBranch,
+	GitMerge,
 	Copy,
 	Check,
 	FileText,
@@ -33,6 +35,7 @@ export function ContextSidebar() {
 	const {
 		sessions,
 		worktrees,
+		projects,
 		agents,
 		contextSidebarSessionId,
 		closeContextSidebar,
@@ -45,6 +48,7 @@ export function ContextSidebar() {
 	const isMobile = useIsMobile();
 	const [copied, setCopied] = useState(false);
 	const [isRenamingSession, setIsRenamingSession] = useState(false);
+	const [showIntegratePicker, setShowIntegratePicker] = useState(false);
 	const [renameValue, setRenameValue] = useState('');
 	const renameInputRef = useRef<HTMLInputElement>(null);
 	const [filesResponse, setFilesResponse] = useState<ChangedFilesResponse | null>(null);
@@ -62,6 +66,62 @@ export function ContextSidebar() {
 	// Find the worktree for this session
 	const worktree = session
 		? worktrees.find(w => w.path === session.path)
+		: null;
+
+	// Determine if this session is a non-worktree session (integration target)
+	// A session is a non-worktree session if its path is not a non-main worktree path
+	const nonMainWorktreePaths = new Set(
+		worktrees.filter(w => !w.isMainWorktree).map(w => w.path),
+	);
+	const isNonWorktreeSession = session
+		? !nonMainWorktreePaths.has(session.path)
+		: false;
+
+	// Find unmerged worktrees in the same project as this session
+	const unmergedWorktrees: Worktree[] = isNonWorktreeSession
+		? (() => {
+				// Find the project this session belongs to
+				const sessionProject = projects.find(
+					p =>
+						session &&
+						(session.path === p.path ||
+							session.path.startsWith(p.path + '/')),
+				);
+				if (!sessionProject) return [];
+
+				// Find non-main worktrees in same project with unmerged commits
+				const projectName = sessionProject.path.split('/').pop() || '';
+				const parentDir = sessionProject.path
+					.split('/')
+					.slice(0, -1)
+					.join('/');
+
+				return worktrees.filter(w => {
+					if (w.isMainWorktree) return false;
+					if (!w.gitStatus) return false;
+					if (w.gitStatus.aheadCount === 0) return false;
+					if (!w.gitStatus.parentBranch) return false;
+
+					// Same project membership check (mirrors Sidebar logic)
+					if (
+						w.path === sessionProject.path ||
+						w.path.startsWith(sessionProject.path + '/')
+					)
+						return true;
+					if (w.path.includes(`/.worktrees/${projectName}/`)) return true;
+					if (w.path.startsWith(`${parentDir}/${projectName}-`)) return true;
+					if (w.path.startsWith(`${parentDir}/${projectName}/`)) return true;
+					return false;
+				});
+			})()
+		: [];
+
+	const sessionProject = isNonWorktreeSession
+		? projects.find(
+				p =>
+					session &&
+					(session.path === p.path || session.path.startsWith(p.path + '/')),
+			)
 		: null;
 
 	// Find agent config (for icon)
@@ -295,6 +355,32 @@ export function ContextSidebar() {
 			{/* Divider */}
 			<div className="border-t border-border" />
 
+			{/* Integrate action — only for non-worktree sessions with eligible worktrees */}
+			{isNonWorktreeSession && unmergedWorktrees.length > 0 && (
+				<>
+					<div className="flex flex-col gap-1.5">
+						<p className="text-xs font-medium text-muted-foreground">
+							Integration
+						</p>
+						<Button
+							variant="outline"
+							size="sm"
+							className="w-full justify-start gap-2 text-xs h-7"
+							onClick={() => setShowIntegratePicker(true)}
+						>
+							<GitMerge className="h-3.5 w-3.5 text-amber-400" />
+							<span>
+								Integrate worktree
+								{unmergedWorktrees.length > 1
+									? ` (${unmergedWorktrees.length} pending)`
+									: ''}
+							</span>
+						</Button>
+					</div>
+					<div className="border-t border-border" />
+				</>
+			)}
+
 			{/* Tabbed Section: Changes / Files */}
 			<Tabs
 				value={sessionContextTabs[session.id] || 'changes'}
@@ -469,10 +555,21 @@ export function ContextSidebar() {
 		</>
 	);
 
+	const integrateDialog =
+		showIntegratePicker && session && unmergedWorktrees.length > 0 ? (
+			<IntegratePickerDialog
+				session={session}
+				unmergedWorktrees={unmergedWorktrees}
+				projectName={sessionProject?.name ?? ''}
+				onClose={() => setShowIntegratePicker(false)}
+			/>
+		) : null;
+
 	// Mobile: full-width overlay with backdrop
 	if (isMobile) {
 		return (
 			<>
+				{integrateDialog}
 				{/* Backdrop */}
 				<div
 					className="fixed inset-0 top-9 bottom-7 z-40 bg-black/50 animate-in fade-in-0 duration-200"
@@ -523,28 +620,31 @@ export function ContextSidebar() {
 
 	// Desktop: static sidebar
 	return (
-		<aside className="flex w-64 flex-col border-l border-border bg-sidebar lg:w-72 xl:w-80 overflow-hidden">
-			{/* Header */}
-			<div className="flex h-8 items-center justify-between border-b border-border px-2 shrink-0">
-				<span className="text-xs font-medium text-muted-foreground">
-					Session Details
-				</span>
-				<div className="flex items-center gap-0.5">
-					<Button
-						variant="ghost"
-						size="icon"
-						className="h-5 w-5"
-						onClick={closeContextSidebar}
-					>
-						<X className="h-3 w-3" />
-					</Button>
+		<>
+			{integrateDialog}
+			<aside className="flex w-64 flex-col border-l border-border bg-sidebar lg:w-72 xl:w-80 overflow-hidden">
+				{/* Header */}
+				<div className="flex h-8 items-center justify-between border-b border-border px-2 shrink-0">
+					<span className="text-xs font-medium text-muted-foreground">
+						Session Details
+					</span>
+					<div className="flex items-center gap-0.5">
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-5 w-5"
+							onClick={closeContextSidebar}
+						>
+							<X className="h-3 w-3" />
+						</Button>
+					</div>
 				</div>
-			</div>
-			<ScrollArea className="flex-1 w-full">
-				<div className="space-y-4 p-3 w-full max-w-full box-border">
-					{mainContent}
-				</div>
-			</ScrollArea>
-		</aside>
+				<ScrollArea className="flex-1 w-full">
+					<div className="space-y-4 p-3 w-full max-w-full box-border">
+						{mainContent}
+					</div>
+				</ScrollArea>
+			</aside>
+		</>
 	);
 }

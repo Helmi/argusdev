@@ -57,6 +57,7 @@ export interface Session {
 	isActive: boolean;
 	agentId?: string;
 	type?: 'pty' | 'sdk';
+	tdTaskId?: string | null;
 }
 
 // --- SDK Session Types ---
@@ -163,6 +164,8 @@ export interface ConversationMessagesResponse {
 	error?: string;
 }
 
+export type ParentBranchSource = 'config' | 'upstream' | 'guessed';
+
 // Git status for a worktree
 export interface GitStatus {
 	filesAdded: number;
@@ -170,6 +173,7 @@ export interface GitStatus {
 	aheadCount: number;
 	behindCount: number;
 	parentBranch: string | null;
+	parentBranchSource: ParentBranchSource | null;
 }
 
 // Changed file in a worktree

@@ -6,6 +6,13 @@ import {worktreeConfigManager} from '../services/worktreeConfigManager.js';
 
 const execFileAsync = promisify(execFile);
 
+export type ParentBranchSource = 'config' | 'upstream' | 'guessed';
+
+export interface ParentBranchResult {
+	branch: string;
+	source: ParentBranchSource;
+}
+
 export function isWorktreeConfigEnabled(gitPath?: string): boolean {
 	try {
 		const result = execSync('git config extensions.worktreeConfig', {
@@ -19,117 +26,152 @@ export function isWorktreeConfigEnabled(gitPath?: string): boolean {
 	}
 }
 
+function tryGit(
+	args: string[],
+	cwd: string,
+	signal?: AbortSignal,
+): Promise<string | null> {
+	return execFileAsync('git', args, {cwd, encoding: 'utf8', signal})
+		.then(r => r.stdout.trim() || null)
+		.catch(() => null);
+}
+
+function fromArgusdevConfig(
+	worktreePath: string,
+	signal?: AbortSignal,
+): Promise<string | null> {
+	if (!worktreeConfigManager.isAvailable()) return Promise.resolve(null);
+	return tryGit(
+		['config', '--worktree', 'argusdev.parentBranch'],
+		worktreePath,
+		signal,
+	);
+}
+
+async function fromUpstream(
+	worktreePath: string,
+	signal?: AbortSignal,
+): Promise<string | null> {
+	const raw = await tryGit(
+		['rev-parse', '--abbrev-ref', '@{upstream}'],
+		worktreePath,
+		signal,
+	);
+	if (!raw) return null;
+	const upstream = raw.replace(/^[^/]+\//, '') || null;
+	if (!upstream) return null;
+	// If the upstream branch has the same name as the current branch (e.g. after
+	// `git push -u origin feat/foo`), it's not a parent — fall through to merge-base.
+	const currentBranch = await tryGit(
+		['branch', '--show-current'],
+		worktreePath,
+		signal,
+	);
+	if (upstream === currentBranch) return null;
+	return upstream;
+}
+
+async function fromMergeBase(
+	worktreePath: string,
+	signal?: AbortSignal,
+): Promise<string | null> {
+	const currentBranch = await tryGit(
+		['branch', '--show-current'],
+		worktreePath,
+		signal,
+	);
+	if (!currentBranch) return null;
+
+	const candidates = ['main', 'master', 'develop'];
+	let bestCandidate: string | null = null;
+	let bestDepth = Infinity;
+
+	for (const candidate of candidates) {
+		if (candidate === currentBranch) continue;
+		const exists = await tryGit(
+			['rev-parse', '--verify', candidate],
+			worktreePath,
+			signal,
+		);
+		if (!exists) continue;
+
+		const countRaw = await tryGit(
+			['rev-list', '--count', `${candidate}..HEAD`],
+			worktreePath,
+			signal,
+		);
+		const depth = countRaw ? Number.parseInt(countRaw, 10) : Infinity;
+		if (!Number.isNaN(depth) && depth < bestDepth) {
+			bestDepth = depth;
+			bestCandidate = candidate;
+		}
+	}
+
+	return bestCandidate;
+}
+
 /**
- * Get parent branch for worktree using Effect
- * Returns null if config doesn't exist or worktree config is not available
- *
- * @param {string} worktreePath - Path to the worktree directory
- * @returns {Effect.Effect<string | null, never>} Effect containing parent branch name or null
- *
- * @example
- * ```typescript
- * import {Effect} from 'effect';
- * import {getWorktreeParentBranch} from './utils/worktreeConfig.js';
- *
- * // This function never fails - returns null on error
- * const parentBranch = await Effect.runPromise(
- *   getWorktreeParentBranch('/path/to/worktree')
- * );
- *
- * if (parentBranch) {
- *   console.log(`Parent branch: ${parentBranch}`);
- * } else {
- *   console.log('No parent branch configured');
- * }
- *
- * // Use with Effect.flatMap for chaining
- * const status = await Effect.runPromise(
- *   Effect.flatMap(
- *     getWorktreeParentBranch('/path/to/worktree'),
- *     (branch) => branch
- *       ? Effect.succeed(`Tracking ${branch}`)
- *       : Effect.succeed('No tracking')
- *   )
- * );
- * ```
+ * Get parent branch for a worktree using a three-step fallback chain:
+ * 1. git config --worktree argusdev.parentBranch (set by argusdev on worktree creation)
+ * 2. @{upstream} tracking branch
+ * 3. Merge-base probe against main/master/develop (best guess)
  */
 export function getWorktreeParentBranch(
 	worktreePath: string,
 ): Effect.Effect<string | null, never> {
-	// Return null if worktree config extension is not available
-	if (!worktreeConfigManager.isAvailable()) {
-		return Effect.succeed(null);
-	}
-
 	return Effect.catchAll(
 		Effect.tryPromise({
-			try: signal =>
-				execFileAsync(
-					'git',
-					['config', '--worktree', 'argusdev.parentBranch'],
-					{
-						cwd: worktreePath,
-						encoding: 'utf8',
-						signal,
-					},
-				).then(result => result.stdout.trim() || null),
+			try: async signal => {
+				const fromConfig = await fromArgusdevConfig(worktreePath, signal);
+				if (fromConfig) return fromConfig;
+
+				const fromUp = await fromUpstream(worktreePath, signal);
+				if (fromUp) return fromUp;
+
+				return fromMergeBase(worktreePath, signal);
+			},
 			catch: error => error,
 		}),
 		error => {
-			// Abort errors should interrupt
-			if (isAbortError(error)) {
-				return Effect.interrupt;
-			}
-			// Config not existing is not an error, return null
+			if (isAbortError(error)) return Effect.interrupt;
 			return Effect.succeed<string | null>(null);
 		},
 	);
 }
 
 /**
- * Set parent branch for worktree using Effect
- * Succeeds silently if worktree config is not available
- *
- * @param {string} worktreePath - Path to the worktree directory
- * @param {string} parentBranch - Name of the parent branch to track
- * @returns {Effect.Effect<void, GitError>} Effect that succeeds or fails with GitError
- *
- * @example
- * ```typescript
- * import {Effect} from 'effect';
- * import {setWorktreeParentBranch} from './utils/worktreeConfig.js';
- *
- * // Set parent branch with error handling
- * await Effect.runPromise(
- *   Effect.catchTag(
- *     setWorktreeParentBranch('/path/to/worktree', 'main'),
- *     'GitError',
- *     (error) => {
- *       console.error(`Failed to set parent branch: ${error.stderr}`);
- *       return Effect.void; // Continue despite error
- *     }
- *   )
- * );
- *
- * // Or use Effect.orElse for fallback
- * await Effect.runPromise(
- *   Effect.orElse(
- *     setWorktreeParentBranch('/path/to/worktree', 'develop'),
- *     () => {
- *       console.log('Using fallback - no parent tracking');
- *       return Effect.void;
- *     }
- *   )
- * );
- * ```
- *
- * @throws {GitError} When git config command fails
+ * Get parent branch with source attribution for UI display.
  */
+export function getWorktreeParentBranchWithSource(
+	worktreePath: string,
+): Effect.Effect<ParentBranchResult | null, never> {
+	return Effect.catchAll(
+		Effect.tryPromise({
+			try: async signal => {
+				const fromConfig = await fromArgusdevConfig(worktreePath, signal);
+				if (fromConfig) return {branch: fromConfig, source: 'config' as const};
+
+				const fromUp = await fromUpstream(worktreePath, signal);
+				if (fromUp) return {branch: fromUp, source: 'upstream' as const};
+
+				const guessed = await fromMergeBase(worktreePath, signal);
+				if (guessed) return {branch: guessed, source: 'guessed' as const};
+
+				return null;
+			},
+			catch: error => error,
+		}),
+		error => {
+			if (isAbortError(error)) return Effect.interrupt;
+			return Effect.succeed<ParentBranchResult | null>(null);
+		},
+	);
+}
+
 export function setWorktreeParentBranch(
 	worktreePath: string,
 	parentBranch: string,
 ): Effect.Effect<void, GitError> {
-	// Skip if worktree config extension is not available
 	if (!worktreeConfigManager.isAvailable()) {
 		return Effect.void;
 	}
@@ -150,11 +192,9 @@ export function setWorktreeParentBranch(
 			catch: error => error,
 		}),
 		error => {
-			// Abort errors should interrupt
 			if (isAbortError(error)) {
 				return Effect.interrupt as Effect.Effect<void, GitError>;
 			}
-			// Other errors are git failures
 			return Effect.fail(toGitError(command, error));
 		},
 	);
