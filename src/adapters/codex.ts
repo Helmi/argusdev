@@ -214,15 +214,33 @@ export class CodexAdapter extends BaseAgentAdapter {
 		const messages: ConversationMessage[] = [];
 
 		rows.forEach((row, index) => {
+			const rowType = typeof row.type === 'string' ? row.type : undefined;
+
+			// Skip noise rows that don't carry conversation content
+			const payloadObj =
+				row.payload && typeof row.payload === 'object'
+					? (row.payload as Record<string, unknown>)
+					: null;
+			const payloadTypePeek =
+				typeof payloadObj?.['type'] === 'string' ? payloadObj['type'] : null;
+
+			if (
+				rowType === 'session_meta' ||
+				rowType === 'turn_context' ||
+				// event_msg/token_count has no conversation value
+				(rowType === 'event_msg' && payloadTypePeek === 'token_count') ||
+				// response_item/message duplicates event_msg/user_message and
+				// event_msg/agent_message — skip to avoid showing each turn twice.
+				// Also skips developer/system prompt blobs.
+				(rowType === 'response_item' && payloadTypePeek === 'message')
+			) {
+				return;
+			}
+
 			const payload = getCodexPayload(row);
 			const payloadType =
-				typeof payload?.['type'] === 'string'
-					? payload['type']
-					: typeof row.type === 'string'
-						? row.type
-						: undefined;
-			const rawRole = payload?.['role'] || row.role || payloadType || row.type;
-			const role = normalizeRole(rawRole);
+				typeof payload?.['type'] === 'string' ? payload['type'] : rowType;
+
 			const content = extractString(
 				payload?.['content'] || payload?.['message'] || row['content'],
 			);
@@ -262,14 +280,25 @@ export class CodexAdapter extends BaseAgentAdapter {
 				return;
 			}
 
+			// Derive role from event type — event_msg/* names are canonical
+			const role =
+				payloadType === 'function_call_output'
+					? 'tool'
+					: payloadType === 'function_call'
+						? 'assistant'
+						: payloadType === 'user_message'
+							? 'user'
+							: payloadType === 'agent_message'
+								? 'assistant'
+								: payloadType === 'agent_reasoning'
+									? 'system'
+									: normalizeRole(
+											payload?.['role'] || row.role || payloadType || rowType,
+										);
+
 			messages.push({
 				id: `codex-${index}`,
-				role:
-					payloadType === 'function_call_output'
-						? 'tool'
-						: payloadType === 'function_call'
-							? 'assistant'
-							: role,
+				role,
 				timestamp,
 				content: finalContent,
 				preview: buildPreview(finalContent || '[tool activity]'),

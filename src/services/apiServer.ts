@@ -2213,6 +2213,27 @@ export class APIServer {
 			}
 
 			if (!storedSession.agentSessionPath) {
+				// For agents that surface an "unsupported" sentinel even without a
+				// transcript file, let the adapter speak first.
+				const noFileAdapter = adapterRegistry.getByAgentType(
+					storedSession.agentType,
+				);
+				const noFileMessages = noFileAdapter
+					? await noFileAdapter.parseMessages('').catch(() => [])
+					: [];
+				if (noFileMessages.length > 0) {
+					return {
+						sessionId: storedSession.id,
+						session: storedSession,
+						metadata: {},
+						messages: noFileMessages.slice(offset, offset + limit),
+						total: noFileMessages.length,
+						limit,
+						offset,
+						missingSessionFile: false,
+						subAgentSessions: [],
+					};
+				}
 				return {
 					sessionId: storedSession.id,
 					session: storedSession,

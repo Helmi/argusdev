@@ -3,7 +3,9 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, describe, expect, it} from 'vitest';
 import {ClaudeAdapter} from './claude.js';
+import {ClineAdapter} from './cline.js';
 import {CodexAdapter} from './codex.js';
+import {GeminiAdapter} from './gemini.js';
 import {GenericAdapter} from './generic.js';
 
 const tempDirs: string[] = [];
@@ -75,10 +77,11 @@ describe('conversation transcript adapters', () => {
 		});
 	});
 
-	it('parses current Codex payload-wrapped transcripts into renderable messages', async () => {
+	it('parses Codex event_msg-based transcripts with correct roles and deduplication', async () => {
 		const filePath = makeTempFile(
 			'rollout-test.jsonl',
 			[
+				// session_meta — skipped
 				JSON.stringify({
 					timestamp: '2026-04-14T10:00:00.000Z',
 					type: 'session_meta',
@@ -88,6 +91,7 @@ describe('conversation transcript adapters', () => {
 						model: 'gpt-5-codex',
 					},
 				}),
+				// response_item/message — skipped (duplicated by event_msg/user_message)
 				JSON.stringify({
 					timestamp: '2026-04-14T10:00:05.000Z',
 					type: 'response_item',
@@ -99,8 +103,30 @@ describe('conversation transcript adapters', () => {
 						],
 					},
 				}),
+				// event_msg/user_message — canonical user input
+				JSON.stringify({
+					timestamp: '2026-04-14T10:00:05.000Z',
+					type: 'event_msg',
+					payload: {
+						type: 'user_message',
+						message: 'Open the conversations view',
+					},
+				}),
+				// response_item/reasoning — kept (no event_msg equivalent)
 				JSON.stringify({
 					timestamp: '2026-04-14T10:00:10.000Z',
+					type: 'response_item',
+					payload: {
+						type: 'reasoning',
+						summary: [
+							{type: 'summary_text', text: '**Checking parser assumptions**'},
+						],
+						content: null,
+					},
+				}),
+				// response_item/function_call — kept
+				JSON.stringify({
+					timestamp: '2026-04-14T10:00:12.000Z',
 					type: 'response_item',
 					payload: {
 						type: 'function_call',
@@ -110,8 +136,9 @@ describe('conversation transcript adapters', () => {
 						call_id: 'call_1',
 					},
 				}),
+				// response_item/function_call_output — kept
 				JSON.stringify({
-					timestamp: '2026-04-14T10:00:11.000Z',
+					timestamp: '2026-04-14T10:00:13.000Z',
 					type: 'response_item',
 					payload: {
 						type: 'function_call_output',
@@ -119,20 +146,7 @@ describe('conversation transcript adapters', () => {
 						output: '{"output":"component source"}',
 					},
 				}),
-				JSON.stringify({
-					timestamp: '2026-04-14T10:00:15.000Z',
-					type: 'response_item',
-					payload: {
-						type: 'reasoning',
-						summary: [
-							{
-								type: 'summary_text',
-								text: '**Checking parser assumptions**',
-							},
-						],
-						content: null,
-					},
-				}),
+				// response_item/message role=assistant — skipped (duplicated by event_msg/agent_message)
 				JSON.stringify({
 					timestamp: '2026-04-14T10:00:20.000Z',
 					type: 'response_item',
@@ -143,6 +157,15 @@ describe('conversation transcript adapters', () => {
 						content: [
 							{type: 'output_text', text: 'The parser is Claude-specific.'},
 						],
+					},
+				}),
+				// event_msg/agent_message — canonical assistant reply
+				JSON.stringify({
+					timestamp: '2026-04-14T10:00:20.000Z',
+					type: 'event_msg',
+					payload: {
+						type: 'agent_message',
+						message: 'The parser is Claude-specific.',
 					},
 				}),
 			].join('\n'),
@@ -156,9 +179,17 @@ describe('conversation transcript adapters', () => {
 		expect(messages[0]).toMatchObject({
 			role: 'user',
 			content: 'Open the conversations view',
+			rawType: 'user_message',
 		});
 		expect(messages[1]).toMatchObject({
+			role: 'system',
+			content: '**Checking parser assumptions**',
+			rawType: 'reasoning',
+			thinkingBlocks: [{content: '**Checking parser assumptions**'}],
+		});
+		expect(messages[2]).toMatchObject({
 			role: 'assistant',
+			rawType: 'function_call',
 			toolCalls: [
 				{
 					name: 'shell',
@@ -166,29 +197,100 @@ describe('conversation transcript adapters', () => {
 						'{"command":["bash","-lc","sed -n \\"1,40p\\" client/src/components/ConversationView.tsx"]}',
 				},
 			],
-			rawType: 'function_call',
 		});
-		expect(messages[2]).toMatchObject({
+		expect(messages[3]).toMatchObject({
 			role: 'tool',
 			content: '{"output":"component source"}',
 			rawType: 'function_call_output',
 		});
-		expect(messages[3]).toMatchObject({
-			role: 'system',
-			content: '**Checking parser assumptions**',
-			rawType: 'reasoning',
-			thinkingBlocks: [{content: '**Checking parser assumptions**'}],
-		});
 		expect(messages[4]).toMatchObject({
 			role: 'assistant',
 			content: 'The parser is Claude-specific.',
-			model: 'gpt-5-codex',
+			rawType: 'agent_message',
 		});
 		expect(metadata).toMatchObject({
 			agentSessionId: 'rollout-123',
 			messageCount: 5,
 			model: 'gpt-5-codex',
 		});
+	});
+
+	it('parses Gemini CLI JSONL transcripts with thoughts as thinking blocks', async () => {
+		const filePath = makeTempFile(
+			'session-2026-04-25T18-59-abcd1234.jsonl',
+			[
+				// session header — skipped
+				JSON.stringify({
+					sessionId: 'abcd1234-session',
+					projectHash: 'abc123',
+					startTime: '2026-04-25T18:59:26.441Z',
+					lastUpdated: '2026-04-25T18:59:26.441Z',
+					kind: 'main',
+				}),
+				// user message with content as array
+				JSON.stringify({
+					id: 'msg-1',
+					timestamp: '2026-04-25T18:59:27.040Z',
+					type: 'user',
+					content: [{text: 'What are the risks in this codebase?'}],
+				}),
+				// $set mutation — skipped
+				JSON.stringify({$set: {lastUpdated: '2026-04-25T18:59:27.040Z'}}),
+				// gemini response with thoughts and string content
+				JSON.stringify({
+					id: 'msg-2',
+					timestamp: '2026-04-25T18:59:45.000Z',
+					type: 'gemini',
+					content:
+						'The main risks are open redirects and missing CSRF protection.',
+					thoughts: [
+						{
+							subject: 'Analyzing security surface',
+							description: 'Reviewing auth routes for common vulnerabilities.',
+						},
+					],
+					model: 'gemini-2.5-pro',
+					tokens: 1500,
+				}),
+			].join('\n'),
+		);
+
+		const adapter = new GeminiAdapter();
+		const messages = await adapter.parseMessages(filePath);
+		const metadata = await adapter.extractMetadata(filePath);
+
+		expect(messages).toHaveLength(2);
+		expect(messages[0]).toMatchObject({
+			role: 'user',
+			content: 'What are the risks in this codebase?',
+			rawType: 'user',
+		});
+		expect(messages[1]).toMatchObject({
+			role: 'assistant',
+			content: 'The main risks are open redirects and missing CSRF protection.',
+			model: 'gemini-2.5-pro',
+			rawType: 'gemini',
+			thinkingBlocks: [
+				{content: 'Reviewing auth routes for common vulnerabilities.'},
+			],
+		});
+		expect(metadata).toMatchObject({
+			messageCount: 2,
+			model: 'gemini-2.5-pro',
+			totalTokens: 1500,
+		});
+	});
+
+	it('returns an explicit unsupported message for Cline sessions', async () => {
+		const adapter = new ClineAdapter();
+		const messages = await adapter.parseMessages('');
+
+		expect(messages).toHaveLength(1);
+		expect(messages[0]).toMatchObject({
+			role: 'system',
+			rawType: 'unsupported',
+		});
+		expect(messages[0]?.content).toContain('not yet supported');
 	});
 
 	it('falls back to readable plain-text messages for unknown agents', async () => {
