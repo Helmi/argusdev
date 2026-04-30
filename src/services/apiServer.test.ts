@@ -2788,7 +2788,8 @@ describe('APIServer TD issue-by-id projectPath routing', () => {
 		// project with TD disabled in config but a leftover .todos/ DB
 		// would serve issue details instead of returning 404.
 		const projectConfig = await import('../utils/projectConfig.js');
-		const original = vi.mocked(projectConfig.loadProjectConfig)
+		const original = vi
+			.mocked(projectConfig.loadProjectConfig)
 			.getMockImplementation();
 		vi.mocked(projectConfig.loadProjectConfig).mockReturnValue({
 			td: {enabled: false},
@@ -2815,7 +2816,8 @@ describe('APIServer TD issue-by-id projectPath routing', () => {
 
 	it('returns 404 when td is disabled in project config (explicit projectPath)', async () => {
 		const projectConfig = await import('../utils/projectConfig.js');
-		const original = vi.mocked(projectConfig.loadProjectConfig)
+		const original = vi
+			.mocked(projectConfig.loadProjectConfig)
 			.getMockImplementation();
 		vi.mocked(projectConfig.loadProjectConfig).mockReturnValue({
 			td: {enabled: false},
