@@ -68,6 +68,16 @@ async function fromUpstream(
 		signal,
 	);
 	if (upstream === currentBranch) return null;
+	// Stripped upstream name must exist as a local ref — otherwise downstream
+	// `rev-list <stripped>..HEAD` calls (e.g. computeAheadBehind in gitStatus)
+	// fail silently and the ahead-count pill is hidden. If the local ref is
+	// missing (e.g. after `git branch -D main`), fall through to merge-base.
+	const localExists = await tryGit(
+		['rev-parse', '--verify', upstream],
+		worktreePath,
+		signal,
+	);
+	if (!localExists) return null;
 	return upstream;
 }
 

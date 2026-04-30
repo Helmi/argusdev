@@ -181,5 +181,59 @@ describe('worktreeConfig', () => {
 				fsSync.rmSync(localDir, {recursive: true, force: true});
 			}
 		});
+
+		it('falls through when stripped upstream has no local ref', async () => {
+			const exec = await realExecSync;
+			// Bare remote + clone, create feature branch tracking origin/main,
+			// then delete local main. Upstream strip yields "main" but the
+			// local ref is gone — fromUpstream must return null instead of
+			// returning "main" (which would later break rev-list silently).
+			const remoteDir = fsSync.mkdtempSync(
+				nodePath.join(nodeOs.tmpdir(), 'argusdev-wc-remote-'),
+			);
+			const localDir = fsSync.mkdtempSync(
+				nodePath.join(nodeOs.tmpdir(), 'argusdev-wc-local-'),
+			);
+			try {
+				exec('git init --bare', {cwd: remoteDir, stdio: 'pipe'});
+				exec('git clone ' + remoteDir + ' ' + localDir, {stdio: 'pipe'});
+				exec('git config user.email "t@t.com"', {cwd: localDir, stdio: 'pipe'});
+				exec('git config user.name "T"', {cwd: localDir, stdio: 'pipe'});
+				exec('git config commit.gpgsign false', {
+					cwd: localDir,
+					stdio: 'pipe',
+				});
+
+				fsSync.writeFileSync(nodePath.join(localDir, 'f.txt'), 'x');
+				exec('git add f.txt', {cwd: localDir, stdio: 'pipe'});
+				exec('git commit -m "init"', {cwd: localDir, stdio: 'pipe'});
+				exec('git branch -M main', {cwd: localDir, stdio: 'pipe'});
+				exec('git push -u origin main', {cwd: localDir, stdio: 'pipe'});
+
+				exec('git checkout -b feat/thing', {cwd: localDir, stdio: 'pipe'});
+				exec('git branch --set-upstream-to=origin/main feat/thing', {
+					cwd: localDir,
+					stdio: 'pipe',
+				});
+				fsSync.writeFileSync(nodePath.join(localDir, 'g.txt'), 'y');
+				exec('git add g.txt', {cwd: localDir, stdio: 'pipe'});
+				exec('git commit -m "feat"', {cwd: localDir, stdio: 'pipe'});
+
+				// Drop local main — only origin/main remains.
+				exec('git branch -D main', {cwd: localDir, stdio: 'pipe'});
+
+				const result = await Effect.runPromise(
+					getWorktreeParentBranchWithSource(localDir),
+				);
+				// What MUST NOT happen: source='upstream' with branch='main'.
+				// (rev-list main..HEAD would fail because main has no local ref.)
+				if (result !== null) {
+					expect(result.source).not.toBe('upstream');
+				}
+			} finally {
+				fsSync.rmSync(remoteDir, {recursive: true, force: true});
+				fsSync.rmSync(localDir, {recursive: true, force: true});
+			}
+		});
 	});
 });

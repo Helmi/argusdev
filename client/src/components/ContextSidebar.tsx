@@ -68,13 +68,17 @@ export function ContextSidebar() {
 		? worktrees.find(w => w.path === session.path)
 		: null;
 
-	// Determine if this session is a non-worktree session (integration target)
-	// A session is a non-worktree session if its path is not a non-main worktree path
-	const nonMainWorktreePaths = new Set(
-		worktrees.filter(w => !w.isMainWorktree).map(w => w.path),
-	);
+	// Determine if this session is a non-worktree session (integration target).
+	// A session is *inside* a non-main worktree when its path equals the worktree
+	// path or is nested under it. Tolerate path-prefix so sessions opened from a
+	// subdirectory of a worktree (e.g. `/repo/.worktrees/foo/src`) are still
+	// classified as worktree sessions, not as integration targets.
 	const isNonWorktreeSession = session
-		? !nonMainWorktreePaths.has(session.path)
+		? !worktrees.some(w => {
+				if (w.isMainWorktree) return false;
+				const norm = w.path.replace(/\/+$/, '');
+				return session.path === norm || session.path.startsWith(norm + '/');
+			})
 		: false;
 
 	// Find unmerged worktrees in the same project as this session

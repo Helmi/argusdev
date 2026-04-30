@@ -43,22 +43,32 @@ export function IntegratePickerDialog({
 	);
 	const [parentBranch, setParentBranch] = useState('');
 	const [text, setText] = useState('');
+	// Once the user has typed in the textarea, stop auto-regenerating from the
+	// template — otherwise correcting the guessed parent branch (which is in
+	// the template render deps) would wipe the user's edits.
+	const [userEditedText, setUserEditedText] = useState(false);
 
 	const selectedWorktree = unmergedWorktrees.find(
 		w => w.path === selectedWorktreePath,
 	);
 
-	// Update parent branch and text when worktree selection changes
+	// Update parent branch when worktree selection changes. Reset the
+	// user-edited flag so a freshly selected worktree starts from the template.
 	useEffect(() => {
 		if (!selectedWorktree) return;
 		const parent =
 			selectedWorktree.gitStatus?.parentBranch ?? '';
 		setParentBranch(parent);
+		setUserEditedText(false);
 	}, [selectedWorktree]);
 
-	// Re-render template whenever inputs change
+	// Re-render template whenever inputs change, but only while the user has
+	// not manually edited the text. After the first manual edit the textarea
+	// is fully owned by the user — corrections to parentBranch must not wipe
+	// the prompt.
 	useEffect(() => {
 		if (!selectedWorktree) return;
+		if (userEditedText) return;
 		const branch = selectedWorktree.branch ?? '';
 		const worktreeName =
 			selectedWorktree.path.split('/').pop() ?? selectedWorktree.path;
@@ -70,7 +80,7 @@ export function IntegratePickerDialog({
 			'project.name': projectName,
 		};
 		setText(renderTemplate(DEFAULT_TEMPLATE, vars));
-	}, [selectedWorktree, parentBranch, projectName]);
+	}, [selectedWorktree, parentBranch, projectName, userEditedText]);
 
 	const isGuessed =
 		selectedWorktree?.gitStatus?.parentBranchSource === 'guessed';
@@ -142,7 +152,10 @@ export function IntegratePickerDialog({
 						<textarea
 							className="min-h-[120px] w-full resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ring"
 							value={text}
-							onChange={e => setText(e.target.value)}
+							onChange={e => {
+								setText(e.target.value);
+								setUserEditedText(true);
+							}}
 						/>
 					</div>
 				</div>
