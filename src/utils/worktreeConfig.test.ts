@@ -235,5 +235,58 @@ describe('worktreeConfig', () => {
 				fsSync.rmSync(localDir, {recursive: true, force: true});
 			}
 		});
+
+		it('does not accept a tag with the same name as the stripped upstream', async () => {
+			const exec = await realExecSync;
+			// Edge case: `git rev-parse --verify <name>` resolves any ref-ish,
+			// including tags. Scoping to refs/heads/ ensures a tag named `main`
+			// (with no local branch `main`) does not slip through as parent.
+			const remoteDir = fsSync.mkdtempSync(
+				nodePath.join(nodeOs.tmpdir(), 'argusdev-wc-remote-'),
+			);
+			const localDir = fsSync.mkdtempSync(
+				nodePath.join(nodeOs.tmpdir(), 'argusdev-wc-local-'),
+			);
+			try {
+				exec('git init --bare', {cwd: remoteDir, stdio: 'pipe'});
+				exec('git clone ' + remoteDir + ' ' + localDir, {stdio: 'pipe'});
+				exec('git config user.email "t@t.com"', {cwd: localDir, stdio: 'pipe'});
+				exec('git config user.name "T"', {cwd: localDir, stdio: 'pipe'});
+				exec('git config commit.gpgsign false', {
+					cwd: localDir,
+					stdio: 'pipe',
+				});
+
+				fsSync.writeFileSync(nodePath.join(localDir, 'f.txt'), 'x');
+				exec('git add f.txt', {cwd: localDir, stdio: 'pipe'});
+				exec('git commit -m "init"', {cwd: localDir, stdio: 'pipe'});
+				exec('git branch -M main', {cwd: localDir, stdio: 'pipe'});
+				exec('git push -u origin main', {cwd: localDir, stdio: 'pipe'});
+
+				exec('git checkout -b feat/thing', {cwd: localDir, stdio: 'pipe'});
+				exec('git branch --set-upstream-to=origin/main feat/thing', {
+					cwd: localDir,
+					stdio: 'pipe',
+				});
+				fsSync.writeFileSync(nodePath.join(localDir, 'g.txt'), 'y');
+				exec('git add g.txt', {cwd: localDir, stdio: 'pipe'});
+				exec('git commit -m "feat"', {cwd: localDir, stdio: 'pipe'});
+
+				// Drop local main branch, but create a tag named `main`.
+				exec('git branch -D main', {cwd: localDir, stdio: 'pipe'});
+				exec('git tag main HEAD', {cwd: localDir, stdio: 'pipe'});
+
+				const result = await Effect.runPromise(
+					getWorktreeParentBranchWithSource(localDir),
+				);
+				// Tag must not be accepted as a local branch.
+				if (result !== null) {
+					expect(result.source).not.toBe('upstream');
+				}
+			} finally {
+				fsSync.rmSync(remoteDir, {recursive: true, force: true});
+				fsSync.rmSync(localDir, {recursive: true, force: true});
+			}
+		});
 	});
 });

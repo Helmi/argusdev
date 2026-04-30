@@ -52,20 +52,30 @@ export function IntegratePickerDialog({
 		w => w.path === selectedWorktreePath,
 	);
 
-	// Update parent branch when worktree selection changes. Reset the
-	// user-edited flag so a freshly selected worktree starts from the template.
+	// Update parent branch when the user picks a different worktree. Reset
+	// the user-edited flag so a freshly selected worktree starts from the
+	// template.
+	//
+	// IMPORTANT: dep on `selectedWorktreePath` (string), NOT `selectedWorktree`
+	// (object). The parent recomputes `unmergedWorktrees` on every poll/socket
+	// refresh, so `unmergedWorktrees.find(...)` returns a fresh object identity
+	// even when the user has not switched worktrees. Depending on the object
+	// would re-fire this effect on every refresh and clobber the user's edits.
 	useEffect(() => {
 		if (!selectedWorktree) return;
 		const parent =
 			selectedWorktree.gitStatus?.parentBranch ?? '';
 		setParentBranch(parent);
 		setUserEditedText(false);
-	}, [selectedWorktree]);
+		// selectedWorktree is intentionally omitted from deps — see above.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [selectedWorktreePath]);
 
 	// Re-render template whenever inputs change, but only while the user has
 	// not manually edited the text. After the first manual edit the textarea
 	// is fully owned by the user — corrections to parentBranch must not wipe
-	// the prompt.
+	// the prompt. Dep on selectedWorktreePath (string) instead of the object
+	// for the same poll-refresh reason as the reset effect above.
 	useEffect(() => {
 		if (!selectedWorktree) return;
 		if (userEditedText) return;
@@ -80,7 +90,9 @@ export function IntegratePickerDialog({
 			'project.name': projectName,
 		};
 		setText(renderTemplate(DEFAULT_TEMPLATE, vars));
-	}, [selectedWorktree, parentBranch, projectName, userEditedText]);
+		// selectedWorktree is intentionally omitted — see the reset effect above.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [selectedWorktreePath, parentBranch, projectName, userEditedText]);
 
 	const isGuessed =
 		selectedWorktree?.gitStatus?.parentBranchSource === 'guessed';
