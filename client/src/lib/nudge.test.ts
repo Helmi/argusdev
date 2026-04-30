@@ -169,4 +169,14 @@ describe('sendNudgeSdk', () => {
 
 		expect(emit).not.toHaveBeenCalled();
 	});
+
+	it('resolves to false (does not throw) when fetch rejects with a network error', async () => {
+		fetchMock.mockRejectedValue(new Error('network'));
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		await expect(sendNudgeSdk('sdk-x', 'hi')).resolves.toBe(false);
+		expect(errSpy).toHaveBeenCalled();
+
+		errSpy.mockRestore();
+	});
 });

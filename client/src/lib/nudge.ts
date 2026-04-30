@@ -31,16 +31,24 @@ export function sendNudge(
 // globalSessionOrchestrator only knows about PTY sessions, so an emit('input')
 // to an SDK sessionId silently drops. Route through the SDK message endpoint
 // instead, which calls sdkSessionManager.sendMessage and spawns the next turn.
+//
+// Returns false on either non-ok response or network failure — never throws,
+// so the caller can rely on the boolean to drive observability.
 export async function sendNudgeSdk(
 	sessionId: string,
 	text: string,
 ): Promise<boolean> {
-	const response = await apiFetch(`/api/sdk-session/${sessionId}/message`, {
-		method: 'POST',
-		headers: {'Content-Type': 'application/json'},
-		body: JSON.stringify({content: text}),
-	});
-	return response.ok;
+	try {
+		const response = await apiFetch(`/api/sdk-session/${sessionId}/message`, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({content: text}),
+		});
+		return response.ok;
+	} catch (err) {
+		console.error('SDK nudge transport failed:', err);
+		return false;
+	}
 }
 
 // Programmatic entry point for callers (reject-loop, integration nudge).
