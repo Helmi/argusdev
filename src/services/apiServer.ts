@@ -3239,32 +3239,59 @@ export class APIServer {
 		});
 
 		// TD single issue with details
-		this.app.get<{Params: {id: string}}>(
-			'/api/td/issues/:id',
-			async (request, reply) => {
-				const {project, projectState} = resolveSelectedProjectTdContext();
-				if (!project || !projectState) {
-					return reply.code(400).send({error: 'No project selected'});
-				}
+		this.app.get<{
+			Params: {id: string};
+			Querystring: {projectPath?: string};
+		}>('/api/td/issues/:id', async (request, reply) => {
+			const requestedProjectPath = request.query.projectPath?.trim();
+			let project = coreService.getSelectedProject();
+			let projectState = project
+				? tdService.resolveProjectState(project.path)
+				: null;
 
-				if (!projectState.enabled || !projectState.dbPath) {
+			if (requestedProjectPath) {
+				const requestedProject =
+					projectManager.instance.getProject(requestedProjectPath);
+				if (!requestedProject) {
+					return reply.code(404).send({error: 'Project not found in registry'});
+				}
+				if (requestedProject.isValid === false) {
 					return reply
-						.code(404)
-						.send({error: 'TD not available for this project'});
+						.code(400)
+						.send({error: 'Project path is invalid or no longer exists'});
 				}
+				project = projectManager.instance.toGitProject(requestedProject);
+				const projectConfig = loadProjectConfig(project.path);
+				const globalTdConfig = configurationManager.getTdConfig();
+				const tdEnabled =
+					projectConfig?.td?.enabled ?? globalTdConfig.enabled ?? true;
+				const rawProjectState = tdService.resolveProjectState(project.path);
+				projectState = !tdEnabled
+					? {...rawProjectState, enabled: false}
+					: rawProjectState;
+			}
 
-				const reader = new TdReader(projectState.dbPath);
-				try {
-					const issue = reader.getIssueWithDetails(request.params.id);
-					if (!issue) {
-						return reply.code(404).send({error: 'Issue not found'});
-					}
-					return {issue};
-				} finally {
-					reader.close();
+			if (!project || !projectState) {
+				return reply.code(400).send({error: 'No project selected'});
+			}
+
+			if (!projectState.enabled || !projectState.dbPath) {
+				return reply
+					.code(404)
+					.send({error: 'TD not available for this project'});
+			}
+
+			const reader = new TdReader(projectState.dbPath);
+			try {
+				const issue = reader.getIssueWithDetails(request.params.id);
+				if (!issue) {
+					return reply.code(404).send({error: 'Issue not found'});
 				}
-			},
-		);
+				return {issue};
+			} finally {
+				reader.close();
+			}
+		});
 
 		// TD board view (grouped by status)
 		this.app.get<{

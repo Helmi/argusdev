@@ -14,6 +14,9 @@ export default defineConfig({
 			'.dev-projects/**',
 			'.agents/**',
 			'.claude/**',
+			// DOM tests live in the client workspace where the vite config
+			// (and React copy) match the runtime tree.
+			'**/*.dom.test.tsx',
 		],
 		coverage: {
 			reporter: ['text', 'json', 'html'],
@@ -28,4 +31,3 @@ export default defineConfig({
 		},
 	},
 });
-

@@ -212,7 +212,9 @@ vi.mock('./tdService.js', () => ({
 
 vi.mock('./tdReader.js', () => ({
 	TdReader: vi.fn().mockImplementation((dbPath: string) => ({
-		getIssueWithDetails: mockTdReaderGetIssueWithDetails,
+		getIssueWithDetails: vi.fn((id: string) =>
+			mockTdReaderGetIssueWithDetails(dbPath, id),
+		),
 		listIssues: vi.fn((query?: unknown) =>
 			mockTdReaderListIssues(dbPath, query),
 		),
@@ -2682,6 +2684,102 @@ describe('APIServer TD project review metadata', () => {
 				}),
 			],
 		});
+	});
+});
+
+describe('APIServer TD issue-by-id projectPath routing', () => {
+	let apiServer: {
+		setupPromise: Promise<void>;
+		app: {
+			inject: (request: {
+				method: string;
+				url: string;
+				headers?: Record<string, string>;
+			}) => Promise<{statusCode: number; json: () => unknown}>;
+			close: () => Promise<void>;
+		};
+	};
+
+	beforeEach(async () => {
+		vi.clearAllMocks();
+		vi.resetModules();
+
+		const {projectManager: mockedProjectManager} = await import(
+			'./projectManager.js'
+		);
+		const {coreService: mockedCoreService} = await import('./coreService.js');
+		const {tdService: mockedTdService} = await import('./tdService.js');
+
+		mockedProjectManager.instance.getProject = vi.fn((projectPath: string) => ({
+			path: projectPath,
+			name: projectPath.split('/').pop() || 'Repo',
+			isValid: true,
+		}));
+		mockedCoreService.getSelectedProject = vi.fn(() => ({
+			path: '/repo-selected',
+			name: 'Selected',
+			relativePath: '/repo-selected',
+			isValid: true,
+		}));
+		mockedTdService.resolveProjectState = vi.fn((projectPath: string) => ({
+			enabled: true,
+			initialized: true,
+			binaryAvailable: true,
+			todosDir: `${projectPath}/.todos`,
+			dbPath: `${projectPath}/.todos/issues.db`,
+			tdRoot: projectPath,
+		}));
+
+		// Echo the dbPath so tests can verify which project's reader was used.
+		mockTdReaderGetIssueWithDetails.mockImplementation(
+			(dbPath: string, id: string) => ({
+				id,
+				title: `Issue from ${dbPath}`,
+			}),
+		);
+
+		const mod = await import('./apiServer.js');
+		apiServer = mod.apiServer as unknown as typeof apiServer;
+		await apiServer.setupPromise;
+	});
+
+	it('routes the issue lookup to the requested projectPath, not the selected project', async () => {
+		const response = await apiServer.app.inject({
+			method: 'GET',
+			url: '/api/td/issues/td-aaa?projectPath=%2Frepo-other',
+			headers: {cookie: 'argusdev_session=test'},
+		});
+
+		expect(response.statusCode).toBe(200);
+		const body = response.json() as {issue: {title: string}};
+		expect(body.issue.title).toContain('/repo-other/.todos/issues.db');
+	});
+
+	it('falls back to the selected project when projectPath is omitted', async () => {
+		const response = await apiServer.app.inject({
+			method: 'GET',
+			url: '/api/td/issues/td-aaa',
+			headers: {cookie: 'argusdev_session=test'},
+		});
+
+		expect(response.statusCode).toBe(200);
+		const body = response.json() as {issue: {title: string}};
+		expect(body.issue.title).toContain('/repo-selected/.todos/issues.db');
+	});
+
+	it('returns 404 when the requested projectPath is not in the registry', async () => {
+		const {projectManager: mockedProjectManager} = await import(
+			'./projectManager.js'
+		);
+		mockedProjectManager.instance.getProject = vi.fn(() => undefined);
+
+		const response = await apiServer.app.inject({
+			method: 'GET',
+			url: '/api/td/issues/td-aaa?projectPath=%2Funknown',
+			headers: {cookie: 'argusdev_session=test'},
+		});
+
+		expect(response.statusCode).toBe(404);
 	});
 });
 

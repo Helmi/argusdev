@@ -3,7 +3,9 @@ import {
   ReactFlow,
   Background,
   Controls,
+  Handle,
   MarkerType,
+  Position,
   type Edge as RFEdge,
   type Node as RFNode,
 } from '@xyflow/react'
@@ -29,6 +31,16 @@ function priorityBadgeClass(priority: string): string {
   return 'bg-muted text-muted-foreground'
 }
 
+// Invisible handles — required by @xyflow/react v12 for custom nodes to attach edges.
+// Without these, edges fail with "Couldn't create edge for source handle id: null".
+const HANDLE_STYLE: React.CSSProperties = {
+  width: 1,
+  height: 1,
+  background: 'transparent',
+  border: 'none',
+  pointerEvents: 'none',
+}
+
 function IssueNodeCard({
   issue,
   dimmed,
@@ -39,25 +51,31 @@ function IssueNodeCard({
   onSelect: (id: string) => void
 }) {
   return (
-    <button
-      onClick={() => onSelect(issue.id)}
-      className={cn(
-        'rounded border-2 bg-card p-2 text-left transition-opacity hover:bg-accent/50',
-        statusBorderClass(issue.status),
-        dimmed && 'opacity-30',
-      )}
+    <div
+      className="relative"
       style={{ width: NODE_DIMENSIONS.width, height: NODE_DIMENSIONS.height }}
     >
-      <div className="flex flex-col gap-1.5 h-full">
-        <p className="text-sm leading-snug line-clamp-2 flex-1">{issue.title}</p>
-        <div className="flex items-center justify-between gap-1">
-          <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', priorityBadgeClass(issue.priority))}>
-            {issue.priority}
-          </span>
-          <span className="text-xs font-mono text-muted-foreground shrink-0">{issue.id}</span>
+      <Handle type="target" position={Position.Top} style={HANDLE_STYLE} isConnectable={false} />
+      <button
+        onClick={() => onSelect(issue.id)}
+        className={cn(
+          'w-full h-full rounded border-2 bg-card p-2 text-left transition-opacity hover:bg-accent/50',
+          statusBorderClass(issue.status),
+          dimmed && 'opacity-30',
+        )}
+      >
+        <div className="flex flex-col gap-1.5 h-full">
+          <p className="text-sm leading-snug line-clamp-2 flex-1">{issue.title}</p>
+          <div className="flex items-center justify-between gap-1">
+            <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', priorityBadgeClass(issue.priority))}>
+              {issue.priority}
+            </span>
+            <span className="text-xs font-mono text-muted-foreground shrink-0">{issue.id}</span>
+          </div>
         </div>
-      </div>
-    </button>
+      </button>
+      <Handle type="source" position={Position.Bottom} style={HANDLE_STYLE} isConnectable={false} />
+    </div>
   )
 }
 
@@ -109,6 +127,12 @@ export default function TaskGraphView({
           type: 'issue',
           position: n.position,
           data: { issue: n.data.issue, dimmed, onSelect },
+          // Pre-supply measurements so react-flow can render edges immediately
+          // on first paint instead of waiting for ResizeObserver — the dimensions
+          // come from buildGraph which already fed them to dagre for layout.
+          width: n.width,
+          height: n.height,
+          measured: { width: n.width, height: n.height },
           draggable: false,
           selectable: false,
         }
@@ -186,7 +210,6 @@ export default function TaskGraphView({
         edges={flowEdges}
         nodeTypes={nodeTypes}
         fitView
-        proOptions={{ hideAttribution: true }}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}

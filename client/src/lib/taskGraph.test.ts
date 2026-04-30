@@ -69,10 +69,12 @@ describe('buildGraph', () => {
       issue({ id: 'td-a', title: 'A' }),
       issue({ id: 'td-b', title: 'B' }),
     ]
+    // td-a depends on td-b, so td-b is the prerequisite (upstream).
+    // Edge should flow prerequisite → dependent so the prerequisite lays out above.
     const deps = [dep('d1', 'td-a', 'td-b')]
     const { edges } = buildGraph(issues, deps)
     expect(edges).toHaveLength(1)
-    expect(edges[0]).toMatchObject({ source: 'td-a', target: 'td-b', kind: 'dep' })
+    expect(edges[0]).toMatchObject({ source: 'td-b', target: 'td-a', kind: 'dep' })
   })
 
   it('drops dep edges when one endpoint is missing', () => {

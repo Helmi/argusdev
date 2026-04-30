@@ -90,7 +90,26 @@ describe('Board UX regression checks', () => {
     expect(graphSource).toContain('computeHighlighted')
     expect(graphSource).toContain('opacity-30')
     // Edge styling uses dashed strokes for depends-on (vs solid for parent)
-    expect(graphSource).toContain("strokeDasharray")
+    expect(graphSource).toContain('strokeDasharray')
+    // Custom node MUST declare source + target Handles or react-flow can't
+    // attach edges (regression for "Couldn't create edge for source handle id: null").
+    expect(graphSource).toMatch(/<Handle\s+type="target"/)
+    expect(graphSource).toMatch(/<Handle\s+type="source"/)
+    // Attribution badge required by @xyflow/react MIT license — must NOT be hidden.
+    expect(graphSource).not.toContain('hideAttribution')
+  })
+
+  it('forwards projectPath when fetching task detail so cross-project clicks resolve', () => {
+    const modalSource = readSource('client/src/components/TaskDetailModal.tsx')
+    // Modal must include projectPath in the issue fetch URL when known —
+    // otherwise the daemon falls back to its selected project and returns
+    // "Issue not found" for tasks belonging to other registered projects.
+    expect(modalSource).toContain('/api/td/issues/${issueId}?projectPath=')
+    const apiSource = readSource('src/services/apiServer.ts')
+    // Server-side route must accept projectPath as a query param.
+    expect(apiSource).toMatch(
+      /'\/api\/td\/issues\/:id'[\s\S]{0,400}requestedProjectPath/,
+    )
   })
 
   it('graph backend wiring uses bulk dependency endpoint, not per-issue fetches', () => {

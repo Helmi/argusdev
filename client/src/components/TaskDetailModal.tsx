@@ -226,12 +226,15 @@ export function TaskDetailModal({ issueId, projectPath, onClose, onNavigate, onS
     setActiveTab('overview')
     setShowCommentInput(false)
     setCommentText('')
-    apiFetch(`/api/td/issues/${issueId}`)
+    const url = projectPath
+      ? `/api/td/issues/${issueId}?projectPath=${encodeURIComponent(projectPath)}`
+      : `/api/td/issues/${issueId}`
+    apiFetch(url)
       .then(res => res.json())
       .then(data => setIssue(data.issue || null))
       .catch(() => setIssue(null))
       .finally(() => setLoading(false))
-  }, [issueId])
+  }, [issueId, projectPath])
 
   const status = issue ? statusConfig[issue.status] : null
   const StatusIcon = status?.icon || Circle

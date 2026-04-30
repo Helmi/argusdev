@@ -66,15 +66,20 @@ export function buildGraph(
     }
   }
 
-  // Dep edges: only include when both endpoints are visible
+  // Dep edges: only include when both endpoints are visible.
+  //
+  // Direction choice: source = prerequisite (depends_on_id), target = dependent (issue_id).
+  // With rankdir: 'TB' this places the prerequisite ABOVE the dependent — matching the
+  // parent-edge convention that "above = upstream / what others wait on". The arrow
+  // points downward from the prerequisite to the dependent that needs it.
   const depEdges: GraphEdge[] = []
   for (const dep of deps) {
     if (dep.relation_type !== 'depends_on') continue
     if (!visibleIds.has(dep.issue_id) || !visibleIds.has(dep.depends_on_id)) continue
     depEdges.push({
       id: `dep:${dep.id}`,
-      source: dep.issue_id,
-      target: dep.depends_on_id,
+      source: dep.depends_on_id,
+      target: dep.issue_id,
       kind: 'dep',
     })
   }
