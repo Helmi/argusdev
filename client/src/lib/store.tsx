@@ -101,8 +101,6 @@ interface AppState {
 	projects: Project[];
 	worktrees: Worktree[];
 	sessions: Session[];
-	currentProject: Project | null;
-
 	// Agents
 	agents: AgentConfig[];
 	defaultAgentId: string | null;
@@ -370,7 +368,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [worktrees, setWorktrees] = useState<Worktree[]>([]);
 	const [sessions, setSessions] = useState<Session[]>([]);
-	const [currentProject, setCurrentProject] = useState<Project | null>(null);
 
 	// Agents state
 	const [agents, setAgents] = useState<AgentConfig[]>([]);
@@ -608,7 +605,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 				sessionsRes.json(),
 			]);
 
-			setCurrentProject(state.selectedProject || null);
 			if (state.isDevMode !== undefined) setIsDevMode(state.isDevMode);
 			setUpdateInfo(
 				state.updateInfo && typeof state.updateInfo === 'object'
@@ -887,7 +883,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 
 	const fetchTdIssues = useCallback(
 		async (options?: TdIssueQueryOptions) => {
-			const projectPath = options?.projectPath || currentProject?.path;
+			const projectPath = options?.projectPath;
 			if (!projectPath) return;
 			try {
 				const params = new URLSearchParams();
@@ -905,7 +901,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 				console.error('Failed to fetch td issues:', err);
 			}
 		},
-		[currentProject?.path],
+		[],
 	);
 
 	const fetchTdBoard = useCallback(async (projectPath: string) => {
@@ -1098,7 +1094,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const debouncedFetchSessionDataRef = useRef(debouncedFetchSessionData);
 	const fetchTdBoardRef = useRef(fetchTdBoard);
 	const fetchTdIssuesRef = useRef(fetchTdIssues);
-	const currentProjectRef = useRef(currentProject);
 	const taskBoardProjectPathRef = useRef(taskBoardProjectPath);
 	useEffect(() => {
 		fetchDataRef.current = fetchData;
@@ -1107,7 +1102,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 		debouncedFetchSessionDataRef.current = debouncedFetchSessionData;
 		fetchTdBoardRef.current = fetchTdBoard;
 		fetchTdIssuesRef.current = fetchTdIssues;
-		currentProjectRef.current = currentProject;
 		taskBoardProjectPathRef.current = taskBoardProjectPath;
 	});
 
@@ -1199,27 +1193,10 @@ export function AppProvider({children}: {children: ReactNode}) {
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// Keep project-specific td/config state in sync with selected project
-	// Always fetch td status (availability is system-wide), only clear project-specific state
+	// td status availability is system-wide; fetch once on mount
 	useEffect(() => {
-		if (!currentProject) {
-			setProjectConfig(null);
-			setProjectConfigPath(null);
-		} else {
-			fetchProjectConfig();
-		}
-
-		// Always fetch — availability is system-wide, projectState/projectConfig will be null when no project
 		fetchTdStatus();
-	}, [currentProject?.path, fetchProjectConfig, fetchTdStatus]);
-
-	useEffect(() => {
-		if (!currentProject) return;
-		fetchTdIssues({
-			projectPath: currentProject.path,
-			status: 'open,in_progress,in_review,blocked',
-		});
-	}, [currentProject?.path, fetchTdIssues, currentProject]);
+	}, [fetchTdStatus]);
 
 	// Clean up stale sessions from sidebar preferences and tab state
 	useEffect(() => {
@@ -1278,7 +1255,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 			}
 			setSelectedSessions([]);
 			await fetchData();
-			// td status and project config are fetched by the useEffect watching currentProject.path
 			return true;
 		} catch (e) {
 			console.error(e);
@@ -1590,7 +1566,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		tdTaskId?: string,
 		context?: AddSessionContext,
 	) => {
-		const issueProjectPath = projectPath || currentProject?.path;
+		const issueProjectPath = projectPath;
 		const taskCreatedBranch =
 			context?.createdBranch ||
 			(issueProjectPath ? tdIssuesByProject[issueProjectPath] ?? [] : []).find(
@@ -1601,7 +1577,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 			resolveTdIssueWorktreePath(
 				worktrees,
 				taskCreatedBranch,
-				projectPath || currentProject?.path || undefined,
+				projectPath || undefined,
 			);
 
 		setAddSessionWorktreePath(inferredWorktreePath || null);
@@ -1846,7 +1822,6 @@ export function AppProvider({children}: {children: ReactNode}) {
 		projects,
 		worktrees,
 		sessions,
-		currentProject,
 		agents,
 		defaultAgentId,
 		agentsLoading,

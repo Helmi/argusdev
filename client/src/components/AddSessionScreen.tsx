@@ -86,13 +86,11 @@ export function AddSessionScreen() {
 		worktrees,
 		projects,
 		config,
-		currentProject,
 		agents,
 		defaultAgentId,
 		sessions,
 		openAddProject,
 		tdStatus,
-		projectConfig,
 		fetchTdPrompts,
 	} = useAppStore();
 
@@ -182,13 +180,6 @@ export function AddSessionScreen() {
 			: null;
 	const requiresExistingWorktree =
 		quickStartIntent === 'review' || quickStartIntent === 'fix';
-
-	useEffect(() => {
-		if (currentProject?.path === selectedProjectPath) {
-			setSelectedProjectConfig(projectConfig || {});
-			setSelectedProjectConfigReady(true);
-		}
-	}, [currentProject?.path, selectedProjectPath, projectConfig]);
 
 	useEffect(() => {
 		if (!selectedProjectPath) {

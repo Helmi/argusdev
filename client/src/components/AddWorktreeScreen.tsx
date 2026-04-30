@@ -24,7 +24,6 @@ export function AddWorktreeScreen() {
     createWorktree,
     fetchData,
     projects,
-    currentProject,
     config,
     openAddProject,
   } = useAppStore()
@@ -93,18 +92,11 @@ export function AddWorktreeScreen() {
       }
     }
 
-    if (currentProject?.path) {
-      const project = projects.find(p => p.path === currentProject.path)
-      if (project?.isValid === false) return
-      setSelectedProjectPath(currentProject.path)
-      return
-    }
-
     const validProjects = projects.filter(p => p.isValid !== false)
     if (validProjects.length === 1) {
       setSelectedProjectPath(validProjects[0].path)
     }
-  }, [addWorktreeProjectPath, currentProject, projects, selectedProjectPath])
+  }, [addWorktreeProjectPath, projects, selectedProjectPath])
 
   // Fetch branches when project changes
   useEffect(() => {

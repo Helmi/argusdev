@@ -18,7 +18,6 @@ import { PromptTemplateVariableLegend } from './PromptTemplateVariableLegend'
 export function SettingsProject() {
   const {
     projects,
-    currentProject,
     settingsProjectPath,
     tdStatus,
     config,
@@ -34,7 +33,7 @@ export function SettingsProject() {
   } = useAppStore()
 
   const [selectedPath, setSelectedPath] = useState<string>(
-    settingsProjectPath ?? currentProject?.path ?? '',
+    settingsProjectPath ?? projects.find(p => p.isValid !== false)?.path ?? '',
   )
 
   const [localConfig, setLocalConfig] = useState<ProjectConfig>({})
