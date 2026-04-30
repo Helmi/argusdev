@@ -280,10 +280,21 @@ export const TerminalSession = memo(function TerminalSession({
 		// - Claude: debounced (rapid updates cause ghost keypresses)
 		// - Others (Codex, Gemini): passed through (needed for cursor queries)
 		const isClaudeSession = session.agentId === 'claude';
+		// OpenCode (opentui) misuses focus-out as a "host may drop modes" signal:
+		// receiving \x1b[O sets shouldRestoreModesOnNextFocus=true, disabling mouse
+		// tracking until \x1b[I arrives — which can fail to fire when ArgusDev
+		// switches sessions without the textarea blur/focus cycle xterm expects.
+		// Strip outgoing focus events for opencode so opentui never enters that
+		// broken state. Other agents may legitimately use focus tracking — leave
+		// them untouched. See docs/research/opencode-scroll-bug.md (td-8ca92c).
+		const isOpenCodeSession = session.agentId === 'opencode';
 		// CPR pattern: \x1b[row;colR
 		const cprPattern = /\x1b\[\d+;\d+R/g;
 		// Other terminal responses to always filter (not needed by any CLI)
 		const otherResponsePattern = /\x1b\[\?[0-9;]*\$y|\x1b\[\??>[0-9;]*c|\x1b\[\?[0-9;]*c|\x1b\[[03]n/g;
+		// Focus in/out (\x1b[I, \x1b[O) — bare 3-byte sequences. SS3 keyboard
+		// input uses \x1bO... (no '['), so no false-positive collision.
+		const focusPattern = /\x1b\[[OI]/g;
 		let pendingCpr: string | null = null;
 		let cprTimeout: ReturnType<typeof setTimeout> | null = null;
 		const CPR_DEBOUNCE_MS = 100;
@@ -306,6 +317,11 @@ export const TerminalSession = memo(function TerminalSession({
 
 			// Always filter DA, DECRPM, DSR for all sessions
 			let filtered = data.replace(otherResponsePattern, '');
+
+			// Strip focus-in/out only for OpenCode — see opentui comment above.
+			if (isOpenCodeSession) {
+				filtered = filtered.replace(focusPattern, '');
+			}
 
 			// Handle CPR based on session type
 			const cprMatches = filtered.match(cprPattern);
