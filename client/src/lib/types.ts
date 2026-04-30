@@ -371,6 +371,13 @@ export interface TdIssueFile {
 	role: string;
 }
 
+export interface TdIssueDependency {
+	id: string;
+	issue_id: string;
+	depends_on_id: string;
+	relation_type: string;
+}
+
 export interface TdComment {
 	id: string;
 	issue_id: string;

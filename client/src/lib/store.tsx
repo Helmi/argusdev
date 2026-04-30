@@ -23,6 +23,7 @@ import type {
 	AgentsConfig,
 	TdStatus,
 	TdIssue,
+	TdIssueDependency,
 	ProjectConfig,
 	TdPromptTemplate,
 	UpdateInfo,
@@ -171,6 +172,7 @@ interface AppState {
 	tdStatus: TdStatus | null;
 	tdStatusLoading: boolean;
 	tdIssuesByProject: Record<string, TdIssue[]>;
+	tdDepsByProject: Record<string, TdIssueDependency[]>;
 	tdBoardView: Record<string, TdIssue[]>;
 	taskBoardOpen: boolean;
 	taskBoardProjectPath: string | null;
@@ -343,6 +345,7 @@ interface AppActions {
 		parentId?: string;
 	}) => Promise<void>;
 	fetchTdBoard: (projectPath: string) => Promise<void>;
+	fetchTdDeps: (projectPath: string) => Promise<void>;
 	openTaskBoard: (projectPath: string) => void;
 	closeTaskBoard: () => void;
 	openConversationView: (context?: {
@@ -521,6 +524,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const [tdStatus, setTdStatus] = useState<TdStatus | null>(null);
 	const [tdStatusLoading, setTdStatusLoading] = useState(true);
 	const [tdIssuesByProject, setTdIssuesByProject] = useState<Record<string, TdIssue[]>>({});
+	const [tdDepsByProject, setTdDepsByProject] = useState<Record<string, TdIssueDependency[]>>({});
 	const [tdBoardView, setTdBoardView] = useState<Record<string, TdIssue[]>>({});
 	const [taskBoardOpen, setTaskBoardOpen] = useState(false);
 	const [taskBoardProjectPath, setTaskBoardProjectPath] = useState<string | null>(null);
@@ -916,6 +920,21 @@ export function AppProvider({children}: {children: ReactNode}) {
 			}
 		} catch (err) {
 			console.error('Failed to fetch td board:', err);
+		}
+	}, []);
+
+	const fetchTdDeps = useCallback(async (projectPath: string) => {
+		if (!projectPath) return;
+		try {
+			const res = await apiFetch(
+				`/api/td/dependencies?projectPath=${encodeURIComponent(projectPath)}`,
+			);
+			if (res.ok) {
+				const data = await res.json();
+				setTdDepsByProject(prev => ({...prev, [projectPath]: data.deps ?? []}));
+			}
+		} catch (err) {
+			console.error('Failed to fetch td deps:', err);
 		}
 	}, []);
 
@@ -1910,6 +1929,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		tdStatus,
 		tdStatusLoading,
 		tdIssuesByProject,
+		tdDepsByProject,
 		tdBoardView,
 		taskBoardOpen,
 		taskBoardProjectPath,
@@ -1931,6 +1951,7 @@ export function AppProvider({children}: {children: ReactNode}) {
 		deleteTdPrompt,
 		fetchTdIssues,
 		fetchTdBoard,
+		fetchTdDeps,
 		openTaskBoard,
 		closeTaskBoard,
 		openConversationView,

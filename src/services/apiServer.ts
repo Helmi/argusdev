@@ -3312,6 +3312,54 @@ export class APIServer {
 			}
 		});
 
+		// TD dependencies — full edge map for graph view
+		this.app.get<{
+			Querystring: {projectPath?: string};
+		}>('/api/td/dependencies', async (request, reply) => {
+			const requestedProjectPath = request.query.projectPath?.trim();
+			if (!requestedProjectPath) {
+				return reply
+					.code(400)
+					.send({error: 'projectPath query param required'});
+			}
+			const requestedProject =
+				projectManager.instance.getProject(requestedProjectPath);
+			if (!requestedProject) {
+				return reply.code(404).send({error: 'Project not found in registry'});
+			}
+			if (requestedProject.isValid === false) {
+				return reply
+					.code(400)
+					.send({error: 'Project path is invalid or no longer exists'});
+			}
+			const project = projectManager.instance.toGitProject(requestedProject);
+
+			const projectConfig = loadProjectConfig(project.path);
+			const globalTdConfig = configurationManager.getTdConfig();
+			const tdEnabled =
+				projectConfig?.td?.enabled ?? globalTdConfig.enabled ?? true;
+			const rawProjectState = tdService.resolveProjectState(project.path);
+			const projectState = !tdEnabled
+				? {...rawProjectState, enabled: false}
+				: rawProjectState;
+
+			if (!projectState.enabled || !projectState.dbPath) {
+				return reply
+					.code(404)
+					.send({error: 'TD not available for this project'});
+			}
+
+			const reader = new TdReader(projectState.dbPath);
+			try {
+				return {
+					projectPath: project.path,
+					deps: reader.getAllDependencies(),
+				};
+			} finally {
+				reader.close();
+			}
+		});
+
 		// TD search issues
 		this.app.get<{
 			Querystring: {q: string};

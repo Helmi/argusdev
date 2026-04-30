@@ -500,6 +500,54 @@ describe('TdReader', () => {
 		});
 	});
 
+	describe('getAllDependencies', () => {
+		it('returns the full set of dependency edges, not paged or filtered', () => {
+			const db = new Database(TEST_DB_PATH);
+			db.prepare(
+				`INSERT INTO issue_dependencies (id, issue_id, depends_on_id, relation_type) VALUES (?, ?, ?, ?)`,
+			).run('dep-001', 'td-002', 'td-001', 'depends_on');
+			db.prepare(
+				`INSERT INTO issue_dependencies (id, issue_id, depends_on_id, relation_type) VALUES (?, ?, ?, ?)`,
+			).run('dep-002', 'td-003', 'td-001', 'depends_on');
+			db.prepare(
+				`INSERT INTO issue_dependencies (id, issue_id, depends_on_id, relation_type) VALUES (?, ?, ?, ?)`,
+			).run('dep-003', 'td-005', 'td-002', 'depends_on');
+			db.close();
+
+			const reader = new TdReader(TEST_DB_PATH);
+			const deps = reader.getAllDependencies();
+			reader.close();
+
+			expect(deps).toHaveLength(3);
+			expect(deps.map(d => d.id).sort()).toEqual([
+				'dep-001',
+				'dep-002',
+				'dep-003',
+			]);
+			expect(deps.find(d => d.id === 'dep-001')).toMatchObject({
+				issue_id: 'td-002',
+				depends_on_id: 'td-001',
+				relation_type: 'depends_on',
+			});
+
+			// Cleanup so other tests in this file don't see these rows.
+			const cleanup = new Database(TEST_DB_PATH);
+			cleanup
+				.prepare(
+					`DELETE FROM issue_dependencies WHERE id IN ('dep-001','dep-002','dep-003')`,
+				)
+				.run();
+			cleanup.close();
+		});
+
+		it('returns empty array for a project with no dependencies', () => {
+			const reader = new TdReader(TEST_DB_PATH);
+			const deps = reader.getAllDependencies();
+			reader.close();
+			expect(deps).toEqual([]);
+		});
+	});
+
 	describe('isAccessible', () => {
 		it('should return true for valid database', () => {
 			const reader = new TdReader(TEST_DB_PATH);

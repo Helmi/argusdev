@@ -23,6 +23,7 @@ const mockExecFileSync = vi.fn();
 const mockLoadPromptTemplatesByScope = vi.fn();
 const mockTdReaderGetIssueWithDetails = vi.fn();
 const mockTdReaderListIssues = vi.fn(() => []);
+const mockTdReaderGetAllDependencies = vi.fn(() => [] as unknown[]);
 const mockTdReaderClose = vi.fn();
 const mockCreateWorktreeEffect = vi.fn();
 const mockSessionStoreQuerySessions = vi.fn<() => unknown[]>(() => []);
@@ -216,6 +217,7 @@ vi.mock('./tdReader.js', () => ({
 			mockTdReaderListIssues(dbPath, query),
 		),
 		getRejectedIssueIds: vi.fn(() => new Set<string>()),
+		getAllDependencies: vi.fn(() => mockTdReaderGetAllDependencies(dbPath)),
 		close: vi.fn(() => mockTdReaderClose(dbPath)),
 	})),
 }));
@@ -2680,6 +2682,118 @@ describe('APIServer TD project review metadata', () => {
 				}),
 			],
 		});
+	});
+});
+
+describe('APIServer TD dependencies endpoint', () => {
+	let apiServer: {
+		setupPromise: Promise<void>;
+		app: {
+			inject: (request: {
+				method: string;
+				url: string;
+				headers?: Record<string, string>;
+			}) => Promise<{statusCode: number; json: () => unknown}>;
+			close: () => Promise<void>;
+		};
+	};
+
+	beforeEach(async () => {
+		vi.clearAllMocks();
+		vi.resetModules();
+
+		const {projectManager: mockedProjectManager} = await import(
+			'./projectManager.js'
+		);
+		const {tdService: mockedTdService} = await import('./tdService.js');
+
+		mockedProjectManager.instance.getProject = vi.fn((projectPath: string) => ({
+			path: projectPath,
+			name: projectPath.split('/').pop() || 'Repo',
+			isValid: true,
+		}));
+		mockedTdService.resolveProjectState = vi.fn((projectPath: string) => ({
+			enabled: true,
+			initialized: true,
+			binaryAvailable: true,
+			todosDir: `${projectPath}/.todos`,
+			dbPath: `${projectPath}/.todos/issues.db`,
+			tdRoot: projectPath,
+		}));
+
+		mockTdReaderGetAllDependencies.mockReturnValue([
+			{
+				id: 'dep-1',
+				issue_id: 'td-aaa',
+				depends_on_id: 'td-bbb',
+				relation_type: 'depends_on',
+			},
+			{
+				id: 'dep-2',
+				issue_id: 'td-ccc',
+				depends_on_id: 'td-bbb',
+				relation_type: 'depends_on',
+			},
+		]);
+
+		const mod = await import('./apiServer.js');
+		apiServer = mod.apiServer as unknown as typeof apiServer;
+		await apiServer.setupPromise;
+	});
+
+	it('returns deps for an explicit projectPath', async () => {
+		const response = await apiServer.app.inject({
+			method: 'GET',
+			url: '/api/td/dependencies?projectPath=%2Frepo-a',
+			headers: {cookie: 'argusdev_session=test'},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({
+			projectPath: '/repo-a',
+			deps: [
+				{
+					id: 'dep-1',
+					issue_id: 'td-aaa',
+					depends_on_id: 'td-bbb',
+					relation_type: 'depends_on',
+				},
+				{
+					id: 'dep-2',
+					issue_id: 'td-ccc',
+					depends_on_id: 'td-bbb',
+					relation_type: 'depends_on',
+				},
+			],
+		});
+	});
+
+	it('returns 400 when projectPath query param is missing', async () => {
+		const response = await apiServer.app.inject({
+			method: 'GET',
+			url: '/api/td/dependencies',
+			headers: {cookie: 'argusdev_session=test'},
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toMatchObject({
+			error: expect.stringContaining('projectPath'),
+		});
+	});
+
+	it('returns 404 when project is not in the registry', async () => {
+		const {projectManager: mockedProjectManager} = await import(
+			'./projectManager.js'
+		);
+		mockedProjectManager.instance.getProject = vi.fn(() => undefined);
+
+		const response = await apiServer.app.inject({
+			method: 'GET',
+			url: '/api/td/dependencies?projectPath=%2Funknown',
+			headers: {cookie: 'argusdev_session=test'},
+		});
+
+		expect(response.statusCode).toBe(404);
 	});
 });
 

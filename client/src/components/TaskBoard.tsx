@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
 import { useAppStore } from '@/lib/store'
 import type { TdIssue } from '@/lib/types'
 import type { RejectLoopItem } from '@/lib/tdRejectLoop'
@@ -11,6 +11,7 @@ import {
   ListTodo,
   LayoutGrid,
   List,
+  Network,
   Search,
   X,
   Circle,
@@ -22,7 +23,11 @@ import {
   FolderGit2,
   RefreshCw,
   XCircle,
+  Loader2,
 } from 'lucide-react'
+
+// Lazy-load the graph view so users who never open it don't pay the bundle cost.
+const TaskGraphView = lazy(() => import('@/components/TaskGraphView'))
 
 // Status column configuration
 const STATUS_COLUMNS = [
@@ -33,7 +38,7 @@ const STATUS_COLUMNS = [
   { key: 'closed', label: 'Closed', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
 ]
 
-type ViewMode = 'board' | 'list'
+type ViewMode = 'board' | 'list' | 'graph'
 
 function priorityBadgeClass(priority: string): string {
   if (priority === 'P0') return 'bg-red-500/15 text-red-400'
@@ -209,6 +214,7 @@ export function TaskBoard() {
     tdBoardView,
     fetchTdBoard,
     fetchTdIssues,
+    fetchTdDeps,
     tdIssuesByProject,
     tdRejectLoopByProject,
     setNudgePending,
@@ -336,8 +342,17 @@ export function TaskBoard() {
           <Button
             variant="ghost"
             size="icon"
+            className={cn('h-6 w-6', viewMode === 'graph' && 'bg-background shadow-sm')}
+            onClick={() => setViewMode('graph')}
+            title="Graph view"
+          >
+            <Network className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-6 w-6"
-            onClick={() => { if (taskBoardProjectPath) { fetchTdBoard(taskBoardProjectPath); fetchTdIssues({ projectPath: taskBoardProjectPath }) } }}
+            onClick={() => { if (taskBoardProjectPath) { fetchTdBoard(taskBoardProjectPath); fetchTdIssues({ projectPath: taskBoardProjectPath }); if (viewMode === 'graph') fetchTdDeps(taskBoardProjectPath) } }}
             title="Refresh"
           >
             <RefreshCw className="h-3 w-3" />
@@ -386,7 +401,7 @@ export function TaskBoard() {
       </div>
 
       {/* Board View */}
-      {viewMode === 'board' ? (
+      {viewMode === 'board' && (
         <div className="flex-1 overflow-x-auto">
           <div className="flex gap-2 p-2 h-full">
             {STATUS_COLUMNS.map(status => (
@@ -402,8 +417,10 @@ export function TaskBoard() {
             ))}
           </div>
         </div>
-      ) : (
-        /* List View */
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
         <ScrollArea className="flex-1">
           <div className="space-y-1 p-2">
             {displayIssues.length === 0 ? (
@@ -438,6 +455,27 @@ export function TaskBoard() {
             )}
           </div>
         </ScrollArea>
+      )}
+
+      {/* Graph View — lazy-loaded */}
+      {viewMode === 'graph' && taskBoardProjectPath && (
+        <div className="flex flex-1 min-h-0">
+          <Suspense
+            fallback={
+              <div className="flex flex-1 items-center justify-center text-muted-foreground gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Loading graph…</span>
+              </div>
+            }
+          >
+            <TaskGraphView
+              projectPath={taskBoardProjectPath}
+              issues={tdIssues}
+              searchQuery={searchQuery}
+              onSelect={setSelectedIssueId}
+            />
+          </Suspense>
+        </div>
       )}
 
       {/* Task Detail Modal */}

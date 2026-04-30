@@ -400,6 +400,23 @@ export class TdReader {
 		}
 	}
 
+	/**
+	 * Get every dependency edge in the project. Returns the full set —
+	 * no paging, no filtering. Intended for the graph view which needs
+	 * the entire edge map in one query.
+	 */
+	getAllDependencies(): TdIssueDependency[] {
+		try {
+			const db = this.open();
+			return db
+				.prepare('SELECT * FROM issue_dependencies')
+				.all() as TdIssueDependency[];
+		} catch (error) {
+			logger.error('[TdReader] Failed to get all dependencies', error);
+			return [];
+		}
+	}
+
 	// --- Rejection queries ---
 
 	/**

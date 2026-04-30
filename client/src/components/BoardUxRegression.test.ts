@@ -70,4 +70,36 @@ describe('Board UX regression checks', () => {
     expect(boardSource).toContain('tdIssuesByProject')
     expect(boardSource).not.toContain('tdIssues,')
   })
+
+  it('exposes a graph view mode in TaskBoard with lazy-loaded graph component', () => {
+    const boardSource = readSource('client/src/components/TaskBoard.tsx')
+    // ViewMode must include 'graph' alongside 'board' and 'list'
+    expect(boardSource).toMatch(/ViewMode\s*=\s*'board'\s*\|\s*'list'\s*\|\s*'graph'/)
+    // Graph component must be lazy-loaded (don't pay bundle cost unless opened)
+    expect(boardSource).toContain('lazy(() => import(')
+    expect(boardSource).toContain('TaskGraphView')
+    // Toggle button for graph view present in toolbar
+    expect(boardSource).toContain("title=\"Graph view\"")
+    expect(boardSource).toContain("setViewMode('graph')")
+  })
+
+  it('graph view dims non-matching nodes via opacity, never removes them', () => {
+    const graphSource = readSource('client/src/components/TaskGraphView.tsx')
+    // Highlighting is computed and applied to nodes; non-matching nodes get
+    // an opacity-30 dim class rather than being filtered out.
+    expect(graphSource).toContain('computeHighlighted')
+    expect(graphSource).toContain('opacity-30')
+    // Edge styling uses dashed strokes for depends-on (vs solid for parent)
+    expect(graphSource).toContain("strokeDasharray")
+  })
+
+  it('graph backend wiring uses bulk dependency endpoint, not per-issue fetches', () => {
+    const apiSource = readSource('src/services/apiServer.ts')
+    const readerSource = readSource('src/services/tdReader.ts')
+    const storeSource = readSource('client/src/lib/store.tsx')
+    expect(apiSource).toContain("'/api/td/dependencies'")
+    expect(readerSource).toContain('getAllDependencies()')
+    expect(storeSource).toContain('fetchTdDeps')
+    expect(storeSource).toContain('tdDepsByProject')
+  })
 })
