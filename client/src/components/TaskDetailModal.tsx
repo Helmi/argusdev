@@ -662,6 +662,7 @@ export function TaskDetailModal({ issueId, projectPath, onClose, onNavigate, onS
                               openConversationView({
                                 sessionId: resolvedConversationId || linkedSession.id,
                                 taskId: issue.id,
+                                projectPath: projectPath ?? undefined,
                               })
                               handleClose()
                             }}
