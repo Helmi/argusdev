@@ -3245,9 +3245,6 @@ export class APIServer {
 		}>('/api/td/issues/:id', async (request, reply) => {
 			const requestedProjectPath = request.query.projectPath?.trim();
 			let project = coreService.getSelectedProject();
-			let projectState = project
-				? tdService.resolveProjectState(project.path)
-				: null;
 
 			if (requestedProjectPath) {
 				const requestedProject =
@@ -3261,19 +3258,24 @@ export class APIServer {
 						.send({error: 'Project path is invalid or no longer exists'});
 				}
 				project = projectManager.instance.toGitProject(requestedProject);
-				const projectConfig = loadProjectConfig(project.path);
-				const globalTdConfig = configurationManager.getTdConfig();
-				const tdEnabled =
-					projectConfig?.td?.enabled ?? globalTdConfig.enabled ?? true;
-				const rawProjectState = tdService.resolveProjectState(project.path);
-				projectState = !tdEnabled
-					? {...rawProjectState, enabled: false}
-					: rawProjectState;
 			}
 
-			if (!project || !projectState) {
+			if (!project) {
 				return reply.code(400).send({error: 'No project selected'});
 			}
+
+			// Apply tdEnabled checks regardless of which branch resolved the
+			// project — otherwise a project with TD disabled in config but a
+			// leftover .todos/ DB would still serve issue details.
+			// Mirrors the /api/td/board pattern.
+			const projectConfig = loadProjectConfig(project.path);
+			const globalTdConfig = configurationManager.getTdConfig();
+			const tdEnabled =
+				projectConfig?.td?.enabled ?? globalTdConfig.enabled ?? true;
+			const rawProjectState = tdService.resolveProjectState(project.path);
+			const projectState = !tdEnabled
+				? {...rawProjectState, enabled: false}
+				: rawProjectState;
 
 			if (!projectState.enabled || !projectState.dbPath) {
 				return reply

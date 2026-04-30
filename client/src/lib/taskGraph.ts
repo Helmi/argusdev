@@ -40,7 +40,8 @@ const NODE_HEIGHT = 80
  *
  * Edges:
  *  - parent → child  (from issue.parent_id, only if parent is in the visible set)
- *  - depends_on      (from TdIssueDependency rows; edge points dependent → dependency)
+ *  - depends_on      (from TdIssueDependency rows; edge points prerequisite → dependent
+ *                     so the prerequisite lays out above its dependent under TB rankdir)
  */
 export function buildGraph(
   issues: TdIssue[],

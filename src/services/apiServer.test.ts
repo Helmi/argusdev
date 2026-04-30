@@ -2781,6 +2781,62 @@ describe('APIServer TD issue-by-id projectPath routing', () => {
 
 		expect(response.statusCode).toBe(404);
 	});
+
+	it('returns 404 when td is disabled in project config (selected-project fallback path)', async () => {
+		// Regression: the no-projectPath fallback used to skip the
+		// projectConfig?.td?.enabled / globalTdConfig.enabled gating, so a
+		// project with TD disabled in config but a leftover .todos/ DB
+		// would serve issue details instead of returning 404.
+		const projectConfig = await import('../utils/projectConfig.js');
+		const original = vi.mocked(projectConfig.loadProjectConfig)
+			.getMockImplementation();
+		vi.mocked(projectConfig.loadProjectConfig).mockReturnValue({
+			td: {enabled: false},
+		});
+		try {
+			const response = await apiServer.app.inject({
+				method: 'GET',
+				url: '/api/td/issues/td-aaa',
+				headers: {cookie: 'argusdev_session=test'},
+			});
+			expect(response.statusCode).toBe(404);
+		} finally {
+			// Restore so the next describe block's beforeEach + vi.clearAllMocks
+			// doesn't carry over a permanent td-disabled state.
+			if (original) {
+				vi.mocked(projectConfig.loadProjectConfig).mockImplementation(original);
+			} else {
+				vi.mocked(projectConfig.loadProjectConfig).mockReturnValue({
+					td: {enabled: true, autoStart: true},
+				});
+			}
+		}
+	});
+
+	it('returns 404 when td is disabled in project config (explicit projectPath)', async () => {
+		const projectConfig = await import('../utils/projectConfig.js');
+		const original = vi.mocked(projectConfig.loadProjectConfig)
+			.getMockImplementation();
+		vi.mocked(projectConfig.loadProjectConfig).mockReturnValue({
+			td: {enabled: false},
+		});
+		try {
+			const response = await apiServer.app.inject({
+				method: 'GET',
+				url: '/api/td/issues/td-aaa?projectPath=%2Frepo-other',
+				headers: {cookie: 'argusdev_session=test'},
+			});
+			expect(response.statusCode).toBe(404);
+		} finally {
+			if (original) {
+				vi.mocked(projectConfig.loadProjectConfig).mockImplementation(original);
+			} else {
+				vi.mocked(projectConfig.loadProjectConfig).mockReturnValue({
+					td: {enabled: true, autoStart: true},
+				});
+			}
+		}
+	});
 });
 
 describe('APIServer TD dependencies endpoint', () => {
