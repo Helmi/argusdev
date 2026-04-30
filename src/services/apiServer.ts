@@ -319,13 +319,14 @@ function renderTaskPromptTemplate(
 		'task.type': taskDetail.type,
 		'task.branch': taskDetail.created_branch,
 		'task.labels': taskDetail.labels || '',
+		'task.minor': taskDetail.minor === 1 ? 'yes' : '',
 		'task.handoff.done': latestHandoff?.done.join('\n') || '',
 		'task.handoff.remaining': latestHandoff?.remaining.join('\n') || '',
 		'task.handoff.decisions': latestHandoff?.decisions.join('\n') || '',
 		'task.handoff.uncertain': latestHandoff?.uncertain.join('\n') || '',
 	};
 	return templateContent.replace(
-		/\{\{(task\.(?:id|title|description|status|priority|acceptance|rejection_reason|type|branch|labels|handoff\.(?:done|remaining|decisions|uncertain)))\}\}/g,
+		/\{\{(task\.(?:id|title|description|status|priority|acceptance|rejection_reason|type|branch|labels|minor|handoff\.(?:done|remaining|decisions|uncertain)))\}\}/g,
 		(_match, key: string) => vars[key] || '',
 	);
 }

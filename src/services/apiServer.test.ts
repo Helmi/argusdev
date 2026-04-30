@@ -1562,6 +1562,148 @@ describe('APIServer td create-with-agent validation ordering', () => {
 		expect(options?.initialPrompt).not.toContain('undefined');
 	});
 
+	it('renders task.minor as "yes" in template when task is minor', async () => {
+		const mockedSessionManager = (
+			coreService as unknown as {
+				sessionManager: {
+					createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+				};
+			}
+		).sessionManager;
+
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Minor Task',
+			description: 'Test description',
+			status: 'in_progress',
+			priority: 'P3',
+			acceptance: '',
+			labels: '',
+			parent_id: '',
+			type: 'task',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 1,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: null,
+		});
+		mockLoadPromptTemplatesByScope.mockReturnValue([
+			{
+				name: 'Begin Work on Task',
+				path: '/tmp/Begin Work on Task.md',
+				content: 'Minor: {{task.minor}}',
+				source: 'global',
+			},
+		]);
+
+		await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'argusdev_session=test'},
+			payload: {
+				path: '/repo/.worktrees/feat',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'work',
+			},
+		});
+
+		expect(
+			mockedSessionManager.createSessionWithAgentEffect,
+		).toHaveBeenCalled();
+		const call =
+			mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		const options = call?.[8] as {initialPrompt?: string} | undefined;
+		expect(options?.initialPrompt).toContain('Minor: yes');
+	});
+
+	it('renders task.minor as empty string in template when task is not minor', async () => {
+		const mockedSessionManager = (
+			coreService as unknown as {
+				sessionManager: {
+					createSessionWithAgentEffect: ReturnType<typeof vi.fn>;
+				};
+			}
+		).sessionManager;
+
+		mockTdReaderGetIssueWithDetails.mockReturnValue({
+			id: 'td-abc123',
+			title: 'Normal Task',
+			description: 'Test description',
+			status: 'in_progress',
+			priority: 'P1',
+			acceptance: '',
+			labels: '',
+			parent_id: '',
+			type: 'task',
+			points: 0,
+			implementer_session: '',
+			reviewer_session: '',
+			created_at: '2024-01-01',
+			updated_at: '2024-01-01',
+			closed_at: null,
+			deleted_at: null,
+			minor: 0,
+			created_branch: '',
+			creator_session: '',
+			sprint: '',
+			defer_until: null,
+			due_date: null,
+			defer_count: 0,
+			children: [],
+			handoffs: [],
+			files: [],
+			comments: [],
+			rejectionReason: null,
+		});
+		mockLoadPromptTemplatesByScope.mockReturnValue([
+			{
+				name: 'Begin Work on Task',
+				path: '/tmp/Begin Work on Task.md',
+				content: 'Minor: {{task.minor}}',
+				source: 'global',
+			},
+		]);
+
+		await apiServer.app.inject({
+			method: 'POST',
+			url: '/api/session/create-with-agent',
+			headers: {cookie: 'argusdev_session=test'},
+			payload: {
+				path: '/repo/.worktrees/feat',
+				agentId: 'codex',
+				options: {},
+				tdTaskId: 'td-abc123',
+				intent: 'work',
+			},
+		});
+
+		expect(
+			mockedSessionManager.createSessionWithAgentEffect,
+		).toHaveBeenCalled();
+		const call =
+			mockedSessionManager.createSessionWithAgentEffect.mock.calls[0];
+		const options = call?.[8] as {initialPrompt?: string} | undefined;
+		expect(options?.initialPrompt).toContain('Minor:');
+		expect(options?.initialPrompt).not.toContain('Minor: 0');
+		expect(options?.initialPrompt).not.toContain('{{task.minor}}');
+	});
+
 	it('uses CLI arg startup prompt delivery and skips PTY queue for Codex', async () => {
 		const mockedSessionManager = (
 			coreService as unknown as {
