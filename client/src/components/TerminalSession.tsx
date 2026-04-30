@@ -279,7 +279,10 @@ export const TerminalSession = memo(function TerminalSession({
 		// CPR (Cursor Position Report) handling varies by agent:
 		// - Claude: debounced (rapid updates cause ghost keypresses)
 		// - Others (Codex, Gemini): passed through (needed for cursor queries)
-		const isClaudeSession = session.agentId === 'claude';
+		// Gate on normalizedAgentType (backend-resolved canonical type) so custom
+		// user profiles wrapping `claude`/`opencode` (with their own agentId) still
+		// trigger the agent-specific behavior. See td-b3a548.
+		const isClaudeSession = session.normalizedAgentType === 'claude';
 		// OpenCode (opentui) misuses focus-out as a "host may drop modes" signal:
 		// receiving \x1b[O sets shouldRestoreModesOnNextFocus=true, disabling mouse
 		// tracking until \x1b[I arrives — which can fail to fire when ArgusDev
@@ -287,7 +290,7 @@ export const TerminalSession = memo(function TerminalSession({
 		// Strip outgoing focus events for opencode so opentui never enters that
 		// broken state. Other agents may legitimately use focus tracking — leave
 		// them untouched. See docs/research/opencode-scroll-bug.md (td-8ca92c).
-		const isOpenCodeSession = session.agentId === 'opencode';
+		const isOpenCodeSession = session.normalizedAgentType === 'opencode';
 		// CPR pattern: \x1b[row;colR
 		const cprPattern = /\x1b\[\d+;\d+R/g;
 		// Other terminal responses to always filter (not needed by any CLI)

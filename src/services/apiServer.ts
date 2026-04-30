@@ -31,6 +31,7 @@ import {
 	validatePathForBrowser,
 } from '../utils/pathValidation.js';
 import {getDefaultShell} from '../utils/platform.js';
+import {resolveNormalizedAgentType} from '../utils/agentType.js';
 import {tdService} from './tdService.js';
 import {TdReader, type TdIssueWithChildren} from './tdReader.js';
 import {
@@ -379,27 +380,10 @@ function resolveSessionIntent(intent?: string): SessionIntent {
 		: 'manual';
 }
 
-function inferAgentType(agent: AgentConfig): string {
-	if (agent.kind === 'terminal') {
-		return 'terminal';
-	}
-
-	const strategy = agent.detectionStrategy?.trim();
-	if (strategy) {
-		return strategy;
-	}
-
-	const command = agent.command.toLowerCase();
-	if (command.includes('claude')) return 'claude';
-	if (command.includes('codex')) return 'codex';
-	if (command.includes('gemini')) return 'gemini';
-	if (command.includes('cursor')) return 'cursor';
-	if (command.includes('pi')) return 'pi';
-	if (command.includes('droid')) return 'droid';
-	if (command.includes('kilo')) return 'kilocode';
-	if (command.includes('opencode')) return 'opencode';
-	return agent.id;
-}
+// Re-exported shim — actual implementation lives in src/utils/agentType.ts so
+// SessionManager and other callers can share it. Keeping the local name avoids
+// churn across the many call sites already in this file.
+const inferAgentType = resolveNormalizedAgentType;
 
 function resolveGitField(
 	worktreePath: string,
@@ -820,6 +804,7 @@ export class APIServer {
 					hookBasedDetection: recoveryHookBased,
 					partialHookDetection: recoveryPartialHook,
 					hookCleanup: recoveryHookCleanup,
+					normalizedAgentType: resolveNormalizedAgentType(agent),
 				},
 			);
 			const result = await Effect.runPromise(Effect.either(effect));
@@ -1977,6 +1962,7 @@ export class APIServer {
 						createdAt: Math.floor(s.createdAt.getTime() / 1000),
 						isActive: s.state !== 'closed' && s.state !== 'error',
 						agentId: s.agentId,
+						normalizedAgentType: 'claude',
 						type: 'sdk' as const,
 						pid: 0,
 						autoApprovalFailed: false,
@@ -3021,6 +3007,7 @@ export class APIServer {
 					hookBasedDetection,
 					partialHookDetection,
 					hookCleanup,
+					normalizedAgentType: resolveNormalizedAgentType(agent),
 				},
 			);
 			const result = await Effect.runPromise(Effect.either(effect));
@@ -3109,6 +3096,7 @@ export class APIServer {
 				id: session.id,
 				name: session.name,
 				agentId: session.agentId,
+				normalizedAgentType: session.normalizedAgentType,
 			};
 		});
 
@@ -3891,6 +3879,7 @@ export class APIServer {
 				createdAt: Math.floor(s.createdAt.getTime() / 1000),
 				isActive: s.state !== 'closed' && s.state !== 'error',
 				agentId: s.agentId,
+				normalizedAgentType: 'claude',
 				type: 'sdk' as const,
 				model: s.model,
 				usage: s.usage,

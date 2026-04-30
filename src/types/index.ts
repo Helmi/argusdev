@@ -36,6 +36,7 @@ export interface Session {
 	name?: string;
 	worktreePath: string;
 	agentId?: string; // ID of the agent/preset used to create this session
+	normalizedAgentType?: string; // Canonical agent type (resolveNormalizedAgentType). Stable across custom wrappers — gates should key off this, not agentId.
 	process: IPty;
 	output: string[]; // Recent output for state detection
 	outputHistory: Buffer[]; // Full output history as buffers

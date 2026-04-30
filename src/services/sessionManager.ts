@@ -27,6 +27,7 @@ import {getDefaultShell, getPtyEnv} from '../utils/platform.js';
 import {adapterRegistry} from '../adapters/index.js';
 import {ensureStartupScriptInGitExclude} from '../utils/startupScript.js';
 import {cleanupHookSettingsFile} from '../utils/hookSettings.js';
+import {resolveNormalizedAgentType} from '../utils/agentType.js';
 const {Terminal} = pkg;
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -48,6 +49,7 @@ interface AgentBootstrapOptions {
 	hookBasedDetection?: boolean;
 	partialHookDetection?: boolean;
 	hookCleanup?: () => void;
+	normalizedAgentType?: string;
 }
 
 export class SessionManager extends EventEmitter implements ISessionManager {
@@ -591,6 +593,7 @@ ${commandTokens.join(' ')}
 			devcontainerConfig?: DevcontainerConfig;
 			sessionName?: string;
 			agentId?: string;
+			normalizedAgentType?: string;
 			sessionId?: string;
 		} = {},
 	): Promise<Session> {
@@ -606,6 +609,7 @@ ${commandTokens.join(' ')}
 			name: options.sessionName,
 			worktreePath,
 			agentId: options.agentId,
+			normalizedAgentType: options.normalizedAgentType,
 			process: ptyProcess,
 			output: [],
 			outputHistory: [],
@@ -712,6 +716,7 @@ ${commandTokens.join(' ')}
 						detectionStrategy: preset.detectionStrategy,
 						sessionName,
 						agentId: preset.id,
+						normalizedAgentType: resolveNormalizedAgentType(preset),
 					},
 				);
 			},
@@ -790,6 +795,7 @@ ${commandTokens.join(' ')}
 						hookCleanup: bootstrapOptions?.hookCleanup,
 						sessionName: sessionName,
 						agentId: agentId,
+						normalizedAgentType: bootstrapOptions?.normalizedAgentType,
 						sessionId: bootstrapOptions?.sessionIdOverride,
 					},
 				);
@@ -1434,6 +1440,7 @@ ${commandTokens.join(' ')}
 						devcontainerConfig,
 						sessionName,
 						agentId: preset.id,
+						normalizedAgentType: resolveNormalizedAgentType(preset),
 					},
 				);
 			},

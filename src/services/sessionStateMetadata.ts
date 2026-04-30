@@ -12,6 +12,7 @@ type ApiSessionPayloadSource = Pick<
 	| 'worktreePath'
 	| 'isActive'
 	| 'agentId'
+	| 'normalizedAgentType'
 	| 'stateMutex'
 	| 'process'
 > &
@@ -79,6 +80,7 @@ export function toApiSessionPayload(session: ApiSessionPayloadSource): {
 	autoApprovalReason: string | undefined;
 	isActive: boolean;
 	agentId: string | undefined;
+	normalizedAgentType: string | undefined;
 	pid: number;
 } {
 	return {
@@ -89,6 +91,7 @@ export function toApiSessionPayload(session: ApiSessionPayloadSource): {
 		createdAt: resolveSessionCreatedAtFromSource(session),
 		isActive: session.isActive,
 		agentId: session.agentId,
+		normalizedAgentType: session.normalizedAgentType,
 		pid: session.process.pid,
 	};
 }

@@ -9,9 +9,10 @@ interface TerminalViewProps {
     sessionId: string;
     socket: Socket;
     agentId?: string;
+    normalizedAgentType?: string;
 }
 
-export const TerminalView = ({ sessionId, socket, agentId }: TerminalViewProps) => {
+export const TerminalView = ({ sessionId, socket, normalizedAgentType }: TerminalViewProps) => {
     const terminalRef = useRef<HTMLDivElement>(null);
     const xtermRef = useRef<Terminal | null>(null);
 
@@ -67,7 +68,7 @@ export const TerminalView = ({ sessionId, socket, agentId }: TerminalViewProps) 
         // CPR (Cursor Position Report) handling varies by agent:
         // - Claude: debounced (rapid updates cause ghost keypresses)
         // - Others (Codex, Gemini): passed through (needed for cursor queries)
-        const isClaudeSession = agentId === 'claude';
+        const isClaudeSession = normalizedAgentType === 'claude';
         // CPR pattern: \x1b[row;colR
         const cprPattern = /\x1b\[\d+;\d+R/g;
         // Other terminal responses to always filter (not needed by any CLI)

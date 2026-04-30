@@ -22,6 +22,7 @@ type SessionLike = Pick<
 	| 'worktreePath'
 	| 'isActive'
 	| 'agentId'
+	| 'normalizedAgentType'
 	| 'stateMutex'
 	| 'process'
 >;
@@ -36,6 +37,7 @@ function createSession(
 		worktreePath: '/repo/.worktrees/feat',
 		isActive: true,
 		agentId: 'codex',
+		normalizedAgentType: 'codex',
 		process: {pid: 4321} as Session['process'],
 		stateMutex: new Mutex({
 			...createInitialSessionStateData(),
@@ -69,8 +71,22 @@ describe('sessionStateMetadata', () => {
 			autoApprovalReason: 'Approval verifier denied',
 			isActive: false,
 			agentId: 'codex',
+			normalizedAgentType: 'codex',
 			pid: 4321,
 		});
+	});
+
+	it('surfaces normalizedAgentType for custom-wrapped profiles (td-b3a548)', () => {
+		const payload = toApiSessionPayload(
+			createSession({
+				id: 'session-custom',
+				agentId: 'my-claude',
+				normalizedAgentType: 'claude',
+			}),
+		);
+
+		expect(payload.agentId).toBe('my-claude');
+		expect(payload.normalizedAgentType).toBe('claude');
 	});
 
 	it('maps websocket session_update payload with auto-approval metadata', () => {

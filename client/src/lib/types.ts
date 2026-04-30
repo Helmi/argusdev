@@ -46,6 +46,26 @@ export type ThemeType =
 // Monospace font options
 export type FontType = 'jetbrains' | 'fira' | 'source' | 'ibm';
 
+/**
+ * Canonical agent type derived backend-side via resolveNormalizedAgentType.
+ * Custom user profiles wrapping a known command (e.g. agentId='my-claude' with
+ * command='claude') still resolve to the built-in literal here, so behavioral
+ * gates can key off this field instead of the raw agentId.
+ */
+export type NormalizedAgentType =
+	| 'claude'
+	| 'opencode'
+	| 'codex'
+	| 'gemini'
+	| 'pi'
+	| 'cursor'
+	| 'kilocode'
+	| 'droid'
+	| 'github-copilot'
+	| 'cline'
+	| 'terminal'
+	| (string & {});
+
 // Session from the backend API
 export interface Session {
 	id: string;
@@ -56,6 +76,7 @@ export interface Session {
 	endedAt?: number | null;
 	isActive: boolean;
 	agentId?: string;
+	normalizedAgentType?: NormalizedAgentType;
 	type?: 'pty' | 'sdk';
 	tdTaskId?: string | null;
 	intent?: string | null;

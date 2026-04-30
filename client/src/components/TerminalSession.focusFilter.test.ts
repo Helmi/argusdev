@@ -7,9 +7,11 @@ function readSource(): string {
 }
 
 describe('TerminalSession focus-event filter (td-8ca92c)', () => {
-  it('declares isOpenCodeSession gated on session.agentId === "opencode"', () => {
+  it('declares isOpenCodeSession gated on session.normalizedAgentType === "opencode"', () => {
     const source = readSource()
-    expect(source).toMatch(/const\s+isOpenCodeSession\s*=\s*session\.agentId\s*===\s*'opencode'/)
+    // td-b3a548: gate moved off raw agentId to normalizedAgentType so custom
+    // user profiles wrapping the opencode command still trigger the filter.
+    expect(source).toMatch(/const\s+isOpenCodeSession\s*=\s*session\.normalizedAgentType\s*===\s*'opencode'/)
   })
 
   it('declares the focusPattern regex for \\x1b[O and \\x1b[I', () => {
@@ -40,8 +42,8 @@ describe('TerminalSession focus-event filter (td-8ca92c)', () => {
 
   it('filter logic: strips \\x1b[O and \\x1b[I for opencode, passes through for other agents', () => {
     const focusPattern = /\x1b\[[OI]/g
-    const apply = (agentId: string, data: string) => {
-      const isOpenCode = agentId === 'opencode'
+    const apply = (normalizedAgentType: string, data: string) => {
+      const isOpenCode = normalizedAgentType === 'opencode'
       return isOpenCode ? data.replace(focusPattern, '') : data
     }
 
@@ -56,5 +58,23 @@ describe('TerminalSession focus-event filter (td-8ca92c)', () => {
     // Note: \x1bOA has no '[', so the pattern can't match it for any agent.
     const ss3 = '\x1bOA\x1bOB\x1bOC\x1bOD'
     expect(apply('opencode', ss3)).toBe(ss3)
+  })
+
+  it('regression (td-b3a548): custom profile wrapping opencode (agentId="my-opencode") triggers gate via normalizedAgentType', () => {
+    // The whole point of routing the gate through normalizedAgentType is that
+    // a session like { agentId: 'my-opencode', normalizedAgentType: 'opencode' }
+    // — produced by a user-defined profile with command='opencode' — must
+    // still strip focus events. Mirror the gate logic and assert this.
+    const focusPattern = /\x1b\[[OI]/g
+    const gate = (session: {agentId?: string; normalizedAgentType?: string}, data: string) => {
+      const isOpenCode = session.normalizedAgentType === 'opencode'
+      return isOpenCode ? data.replace(focusPattern, '') : data
+    }
+
+    const sample = `hello\x1b[Oworld\x1b[Itail`
+    expect(gate({agentId: 'my-opencode', normalizedAgentType: 'opencode'}, sample)).toBe('helloworldtail')
+    expect(gate({agentId: 'opencode', normalizedAgentType: 'opencode'}, sample)).toBe('helloworldtail')
+    // A profile that just *names* itself opencode but isn't (no normalized type) must not trigger.
+    expect(gate({agentId: 'opencode', normalizedAgentType: undefined}, sample)).toBe(sample)
   })
 })
