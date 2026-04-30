@@ -1,5 +1,5 @@
-import {describe, expect, it, vi} from 'vitest';
-import {sendNudge, nudgeSession} from './nudge';
+import {describe, expect, it, vi, beforeEach, afterEach} from 'vitest';
+import {sendNudge, sendNudgeSdk, nudgeSession} from './nudge';
 import type {NudgePending} from './nudge';
 
 describe('sendNudge', () => {
@@ -120,5 +120,53 @@ describe('NudgeDialog send-gate (state-aware)', () => {
 		expect(canSend({state: 'unknown-future-state', isActive: true})).toBe(
 			false,
 		);
+	});
+});
+
+describe('sendNudgeSdk', () => {
+	let fetchMock: ReturnType<typeof vi.fn>;
+
+	beforeEach(() => {
+		fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		// apiFetch reads pathname for token; provide a benign location
+		vi.stubGlobal('window', {
+			location: {pathname: '/'},
+			dispatchEvent: vi.fn(),
+		});
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('POSTs to /api/sdk-session/:id/message with content body', async () => {
+		fetchMock.mockResolvedValue({ok: true, status: 200});
+
+		const ok = await sendNudgeSdk('sdk-123', 'please continue');
+
+		expect(ok).toBe(true);
+		expect(fetchMock).toHaveBeenCalledOnce();
+		const [url, init] = fetchMock.mock.calls[0];
+		expect(url).toBe('/api/sdk-session/sdk-123/message');
+		expect(init.method).toBe('POST');
+		expect(JSON.parse(init.body)).toEqual({content: 'please continue'});
+	});
+
+	it('returns false when the API responds non-ok', async () => {
+		fetchMock.mockResolvedValue({ok: false, status: 404});
+
+		const ok = await sendNudgeSdk('sdk-missing', 'hi');
+
+		expect(ok).toBe(false);
+	});
+
+	it('does not emit on a socket — SDK transport is HTTP-only', async () => {
+		fetchMock.mockResolvedValue({ok: true, status: 200});
+		const emit = vi.fn();
+
+		await sendNudgeSdk('sdk-1', 'text');
+
+		expect(emit).not.toHaveBeenCalled();
 	});
 });

@@ -1,4 +1,5 @@
 import type {Socket} from 'socket.io-client';
+import {apiFetch} from './apiFetch';
 
 export type NudgePurpose = 'manual' | 'review-rejected' | 'integrate';
 
@@ -24,6 +25,22 @@ export function sendNudge(
 ): void {
 	const payload = `\x1b[200~${text}\x1b[201~\r`;
 	socket.emit('input', {sessionId, data: payload});
+}
+
+// SDK sessions are not handled by the PTY socket 'input' channel — the daemon's
+// globalSessionOrchestrator only knows about PTY sessions, so an emit('input')
+// to an SDK sessionId silently drops. Route through the SDK message endpoint
+// instead, which calls sdkSessionManager.sendMessage and spawns the next turn.
+export async function sendNudgeSdk(
+	sessionId: string,
+	text: string,
+): Promise<boolean> {
+	const response = await apiFetch(`/api/sdk-session/${sessionId}/message`, {
+		method: 'POST',
+		headers: {'Content-Type': 'application/json'},
+		body: JSON.stringify({content: text}),
+	});
+	return response.ok;
 }
 
 // Programmatic entry point for callers (reject-loop, integration nudge).

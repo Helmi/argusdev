@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import {Button} from '@/components/ui/button';
 import {useAppStore} from '@/lib/store';
-import {sendNudge} from '@/lib/nudge';
+import {sendNudge, sendNudgeSdk} from '@/lib/nudge';
 
 export function NudgeDialog() {
 	const {nudgePending, setNudgePending, sessions, socket} = useAppStore();
@@ -39,7 +39,14 @@ export function NudgeDialog() {
 
 	const handleSend = () => {
 		if (!canSend || !text) return;
-		sendNudge(nudgePending.sessionId, text, socket);
+		if (session?.type === 'sdk') {
+			const sid = nudgePending.sessionId;
+			void sendNudgeSdk(sid, text).then(ok => {
+				if (!ok) console.error(`SDK nudge to ${sid} failed`);
+			});
+		} else {
+			sendNudge(nudgePending.sessionId, text, socket);
+		}
 		setNudgePending(null);
 	};
 
