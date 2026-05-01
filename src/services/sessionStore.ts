@@ -22,6 +22,7 @@ const DB_FILENAME = 'sessions.db';
 const SCHEMA_VERSION = 2;
 const DISCOVERY_RETRY_LIMIT = 8;
 const DISCOVERY_RETRY_DELAY_MS = 1500;
+const DISCOVERY_RESCHEDULE_COOLDOWN_MS = 60_000;
 
 type SqlPrimitive = string | number | null;
 
@@ -159,6 +160,7 @@ export class SessionStore {
 	private db: Database.Database;
 	private readonly dbPath: string;
 	private readonly discoveryTimers = new Map<string, NodeJS.Timeout>();
+	private readonly lastDiscoveryAttempt = new Map<string, number>();
 
 	constructor(dbPath?: string) {
 		const resolvedDbPath = dbPath || resolveDefaultDbPath();
@@ -500,6 +502,7 @@ export class SessionStore {
 		createdAt?: number;
 	}): void {
 		this.cancelAgentSessionDiscovery(params.sessionId);
+		this.lastDiscoveryAttempt.set(params.sessionId, Date.now());
 
 		const attempt = async (remaining: number) => {
 			const discovered = await this.findSessionFileForAgent(
@@ -548,6 +551,49 @@ export class SessionStore {
 
 		clearTimeout(timer);
 		this.discoveryTimers.delete(sessionId);
+	}
+
+	/**
+	 * Lazily reschedules agent session-file discovery for a session whose
+	 * `agentSessionPath` is still null. Used by the conversations endpoint to
+	 * recover from the initial 12s discovery window timing out before the
+	 * agent (e.g. Claude, Opencode) wrote its transcript file.
+	 *
+	 * Gates (all must hold):
+	 *   - session exists in DB
+	 *   - `agentSessionPath` is null
+	 *   - session is still active (`endedAt` is null)
+	 *   - no active discovery timer for this session
+	 *   - cooldown elapsed since last attempt (avoids resetting the retry chain
+	 *     on every poll)
+	 *
+	 * Returns true if a new discovery cycle was scheduled, false otherwise.
+	 */
+	maybeRescheduleAgentSessionDiscovery(sessionId: string): boolean {
+		if (this.discoveryTimers.has(sessionId)) {
+			return false;
+		}
+
+		const session = this.getSessionById(sessionId);
+		if (!session) return false;
+		if (session.agentSessionPath) return false;
+		if (session.endedAt !== null) return false;
+
+		const lastAttempt = this.lastDiscoveryAttempt.get(sessionId);
+		if (
+			typeof lastAttempt === 'number' &&
+			Date.now() - lastAttempt < DISCOVERY_RESCHEDULE_COOLDOWN_MS
+		) {
+			return false;
+		}
+
+		this.scheduleAgentSessionDiscovery({
+			sessionId: session.id,
+			agentType: session.agentType,
+			worktreePath: session.worktreePath,
+			createdAt: session.createdAt,
+		});
+		return true;
 	}
 
 	async hydrateSessionContentPreview(sessionId: string): Promise<void> {

@@ -13,6 +13,12 @@ vi.mock('../utils/logger.js', () => ({
 	},
 }));
 
+vi.mock('../adapters/index.js', () => ({
+	adapterRegistry: {
+		getByAgentType: () => null,
+	},
+}));
+
 describe('SessionStore', () => {
 	const dbPath = path.join(
 		tmpdir(),
@@ -287,5 +293,107 @@ describe('SessionStore', () => {
 				projectPath: '/tmp/project-a',
 			}),
 		).toBeNull();
+	});
+
+	describe('maybeRescheduleAgentSessionDiscovery', () => {
+		beforeEach(() => {
+			vi.useFakeTimers();
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
+		const createNullPathSession = (id: string) => {
+			store.createSessionRecord({
+				id,
+				agentProfileId: 'claude-max',
+				agentProfileName: 'Claude Max',
+				agentType: 'claude',
+				agentOptions: {},
+				worktreePath: '/tmp/worktree-discovery',
+				projectPath: '/tmp/project-discovery',
+				intent: 'manual',
+				createdAt: Math.floor(Date.now() / 1000),
+			});
+		};
+
+		it('returns false when an active discovery timer already exists', () => {
+			createNullPathSession('ses-active-timer');
+			// Initial scheduling sets a live timer + cooldown stamp.
+			store.scheduleAgentSessionDiscovery({
+				sessionId: 'ses-active-timer',
+				agentType: 'claude',
+				worktreePath: '/tmp/worktree-discovery',
+				createdAt: Math.floor(Date.now() / 1000),
+			});
+
+			expect(
+				store.maybeRescheduleAgentSessionDiscovery('ses-active-timer'),
+			).toBe(false);
+
+			store.cancelAgentSessionDiscovery('ses-active-timer');
+		});
+
+		it('reschedules when no timer is active and the session is eligible', () => {
+			createNullPathSession('ses-eligible');
+
+			expect(store.maybeRescheduleAgentSessionDiscovery('ses-eligible')).toBe(
+				true,
+			);
+
+			store.cancelAgentSessionDiscovery('ses-eligible');
+		});
+
+		it('returns false when the session has already ended', () => {
+			createNullPathSession('ses-ended');
+			store.markSessionEnded('ses-ended', Math.floor(Date.now() / 1000));
+
+			expect(store.maybeRescheduleAgentSessionDiscovery('ses-ended')).toBe(
+				false,
+			);
+		});
+
+		it('returns false when agentSessionPath is already populated', () => {
+			createNullPathSession('ses-has-path');
+			store.updateAgentSessionLink(
+				'ses-has-path',
+				'/tmp/transcripts/ses-has-path.jsonl',
+				'agent-internal-id',
+			);
+
+			expect(store.maybeRescheduleAgentSessionDiscovery('ses-has-path')).toBe(
+				false,
+			);
+		});
+
+		it('honors the cooldown window between attempts', () => {
+			createNullPathSession('ses-cooldown');
+
+			// First schedule consumes the cooldown stamp.
+			expect(store.maybeRescheduleAgentSessionDiscovery('ses-cooldown')).toBe(
+				true,
+			);
+			store.cancelAgentSessionDiscovery('ses-cooldown');
+
+			// Within cooldown — must be rejected.
+			vi.advanceTimersByTime(30_000);
+			expect(store.maybeRescheduleAgentSessionDiscovery('ses-cooldown')).toBe(
+				false,
+			);
+
+			// After cooldown — eligible again.
+			vi.advanceTimersByTime(31_000);
+			expect(store.maybeRescheduleAgentSessionDiscovery('ses-cooldown')).toBe(
+				true,
+			);
+			store.cancelAgentSessionDiscovery('ses-cooldown');
+		});
+
+		it('returns false for an unknown session id', () => {
+			expect(
+				store.maybeRescheduleAgentSessionDiscovery('ses-does-not-exist'),
+			).toBe(false);
+		});
 	});
 });

@@ -2075,6 +2075,16 @@ export class APIServer {
 				storedSessions = sessionStore.querySessions(filters);
 			}
 
+			// Lazy re-discovery: when the initial 12s discovery window timed
+			// out before the agent wrote its transcript, agentSessionPath is
+			// permanently null. Trigger a new discovery cycle for active
+			// sessions; gating + cooldown live in sessionStore.
+			for (const session of storedSessions) {
+				if (!session.agentSessionPath && session.endedAt === null) {
+					sessionStore.maybeRescheduleAgentSessionDiscovery(session.id);
+				}
+			}
+
 			const activeSessions = new Map(
 				coreService.sessionManager
 					.getAllSessions()
