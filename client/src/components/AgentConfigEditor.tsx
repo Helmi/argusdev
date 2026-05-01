@@ -499,7 +499,7 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
                 className="h-6 text-xs font-mono"
               />
               <p className="text-xs text-muted-foreground">
-                Format: <code>value:label</code> — value is sent to the CLI, label is shown in the dropdown. Leave empty for free text input.
+                Format: <code>value:label</code> — value is sent to the CLI, label is shown in the dropdown. Leave empty for free text input. Use <code>__omit__</code> as the value to suppress the flag entirely (e.g. <code>__omit__:All tools</code>).
               </p>
             </div>
           )}

@@ -21,7 +21,11 @@ import {
 	ValidationError,
 } from '../types/errors.js';
 import {getConfigDir} from '../utils/configDir.js';
-import {getAgentProfileById, getAgentProfilesByIds} from './agentProfiles.js';
+import {
+	getAgentProfileById,
+	getAgentProfilesByIds,
+	OMIT_FLAG_VALUE,
+} from './agentProfiles.js';
 
 // Current schema version for agents config
 const AGENTS_SCHEMA_VERSION = 3;
@@ -828,6 +832,12 @@ export class ConfigurationManager {
 
 			if (value === undefined || value === false || value === '') {
 				continue; // Skip disabled or empty options
+			}
+
+			// Sentinel value meaning "omit this flag entirely" — used when "no flag"
+			// is itself a valid CLI mode (e.g. Pi's --tools omitted = all tools allowed).
+			if (value === OMIT_FLAG_VALUE) {
+				continue;
 			}
 
 			if (option.type === 'boolean' && value === true) {

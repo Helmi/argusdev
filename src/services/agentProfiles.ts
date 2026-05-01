@@ -1,5 +1,13 @@
 import {AgentConfig} from '../types/index.js';
 
+/**
+ * Sentinel choice value that suppresses the option's CLI flag entirely.
+ * Use it when "no flag" is a meaningful state distinct from any concrete value
+ * — e.g. Pi's `--tools` flag where omitting it enables all tools, not just the
+ * union of named ones. Recognized in configurationManager.buildAgentArgs.
+ */
+export const OMIT_FLAG_VALUE = '__omit__';
+
 export interface DetectableAgent {
 	id: string;
 	command: string;
@@ -197,10 +205,7 @@ const PROFILES: Record<string, AgentConfig> = {
 					{value: 'read,grep,find,ls', label: 'Read-only'},
 					{value: 'read,edit,write,grep,find,ls', label: 'Safe (no bash)'},
 					{value: 'read,bash,edit,write', label: 'Default (includes bash)'},
-					{
-						value: 'read,bash,edit,write,grep,find,ls',
-						label: 'All tools',
-					},
+					{value: OMIT_FLAG_VALUE, label: 'All tools (no restriction)'},
 				],
 			},
 			{

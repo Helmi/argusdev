@@ -561,4 +561,42 @@ describe('ConfigurationManager - Command Presets', () => {
 			expect(errors).toEqual([]);
 		});
 	});
+
+	describe('buildAgentArgs — OMIT_FLAG_VALUE sentinel', () => {
+		const agent = {
+			options: [
+				{
+					id: 'tools',
+					flag: '--tools',
+					label: 'Tools',
+					type: 'string' as const,
+					choices: [
+						{value: 'read,grep', label: 'Read-only'},
+						{value: '__omit__', label: 'All tools'},
+					],
+				},
+				{
+					id: 'thinking',
+					flag: '--thinking',
+					label: 'Thinking',
+					type: 'string' as const,
+				},
+			],
+		} as import('../types/index.js').AgentConfig;
+
+		it('emits the flag for normal string choices', () => {
+			configManager = new ConfigurationManager();
+			const args = configManager.buildAgentArgs(agent, {tools: 'read,grep'});
+			expect(args).toEqual(['--tools', 'read,grep']);
+		});
+
+		it('omits the flag entirely when value is __omit__', () => {
+			configManager = new ConfigurationManager();
+			const args = configManager.buildAgentArgs(agent, {
+				tools: '__omit__',
+				thinking: 'medium',
+			});
+			expect(args).toEqual(['--thinking', 'medium']);
+		});
+	});
 });
