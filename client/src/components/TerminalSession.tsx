@@ -275,7 +275,8 @@ export const TerminalSession = memo(function TerminalSession({
 					}`,
 				);
 			}
-			term.write(content);
+			const output = isPiSession ? content.replace(piCursorPattern, '') : content;
+			term.write(output);
 		};
 
 		currentSocket.on('terminal_data', handleDataWithDiag);
@@ -294,6 +295,15 @@ export const TerminalSession = memo(function TerminalSession({
 		// user profiles wrapping `claude`/`opencode` (with their own agentId) still
 		// trigger the agent-specific behavior. See td-b3a548.
 		const isClaudeSession = session.normalizedAgentType === 'claude';
+		const isPiSession = session.normalizedAgentType === 'pi';
+		// Pi (pi-tui) emits \x1b[?25l on every render tick even when nothing changed
+		// (heartbeat via pi-messenger plugin fires requestRender every ~15s). Receiving
+		// cursor-visibility escapes in xterm's main buffer causes viewport jumps because
+		// xterm refreshes the render area on cursor state changes. Pi doesn't use
+		// altscreen so xterm's default cursor is the user-facing cursor — stripping
+		// these from the incoming stream is safe. Both hide and show are stripped so
+		// xterm retains full control over cursor visibility. See td-52e9cf.
+		const piCursorPattern = /\x1b\[\?25[lh]/g;
 		// OpenCode (opentui) misuses focus-out as a "host may drop modes" signal:
 		// receiving \x1b[O sets shouldRestoreModesOnNextFocus=true, disabling mouse
 		// tracking until \x1b[I arrives — which can fail to fire when ArgusDev
