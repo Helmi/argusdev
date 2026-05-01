@@ -258,6 +258,37 @@ export const TerminalSession = memo(function TerminalSession({
 			{ name: 'DECRQM \\x1b[?...$p', re: /\x1b\[\?[0-9;]+\$p/g },
 		];
 
+		// On re-attach, TUI agents (claude, codex, pi, …) often display a garbled
+		// buffer because the replayed scrollback was drawn at a previous cursor
+		// position and SIGWINCH never fires (dims didn't change). Mirror what the
+		// manual redraw button does — emit a cols-1 → cols resize cycle once,
+		// shortly after the replay payload lands. Skip plain terminal sessions
+		// where there's no TUI to redraw.
+		const isTuiAgent = session.agentId !== 'terminal';
+		let autoRedrawScheduled = false;
+		const scheduleAutoRedraw = () => {
+			if (autoRedrawScheduled || !isTuiAgent) return;
+			autoRedrawScheduled = true;
+			setTimeout(() => {
+				if (!isMounted) return;
+				const t = xtermRef.current;
+				const fa = fitAddonRef.current;
+				if (!t || !fa) return;
+				const { cols, rows } = t;
+				if (cols > 1) {
+					currentSocket.emit('resize', { sessionId: sessionIdRef.current, cols: cols - 1, rows });
+				}
+				setTimeout(() => {
+					if (!isMounted || !xtermRef.current || !fitAddonRef.current) return;
+					fitAddonRef.current.fit();
+					const next = { cols: xtermRef.current.cols, rows: xtermRef.current.rows };
+					lastDimsRef.current = next;
+					currentSocket.emit('resize', { sessionId: sessionIdRef.current, ...next });
+					xtermRef.current.refresh(0, xtermRef.current.rows - 1);
+				}, 60);
+			}, 350);
+		};
+
 		const handleDataWithDiag = (msg: {sessionId: string; data: string} | string) => {
 			const content = typeof msg === 'string' ? msg : msg.data;
 			const msgSessionId = typeof msg === 'string' ? null : msg.sessionId;
@@ -276,6 +307,7 @@ export const TerminalSession = memo(function TerminalSession({
 						counts.length ? JSON.stringify(counts) : 'none'
 					}`,
 				);
+				scheduleAutoRedraw();
 			}
 			const output = isPiSession ? content.replace(piCursorPattern, '') : content;
 			term.write(output);
