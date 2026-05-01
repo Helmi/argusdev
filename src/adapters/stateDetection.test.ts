@@ -211,10 +211,113 @@ describe('detectStateForStrategy', () => {
 		).toBe('idle');
 	});
 
-	it('detects Pi confirmation prompts as waiting_input', () => {
-		expect(detect('pi', ['Do you want to continue? [y/n]'])).toBe(
-			'waiting_input',
+	// Pi's real ctx.ui.confirm prompts route through ExtensionSelectorComponent.
+	// Empirical render shape (after ANSI strip), from pi-coding-agent dist
+	// modes/interactive/components/extension-selector.js: dynamic border,
+	// blank, title, blank, options ("→ Yes" on selected, "  No"), blank,
+	// footer "↑↓ navigate  enter select  escape cancel", blank, dynamic border.
+	it('detects Pi ctx.ui.confirm dialog as waiting_input', () => {
+		expect(
+			detect('pi', [
+				'────────────────────────────────────────',
+				'',
+				'Import session',
+				'Replace current session with /tmp/x.jsonl?',
+				'',
+				'→ Yes',
+				'  No',
+				'',
+				'↑↓ navigate  enter select  escape cancel',
+				'',
+				'────────────────────────────────────────',
+			]),
+		).toBe('waiting_input');
+	});
+
+	it('detects Pi ctx.ui.select dialog (multi-option) as waiting_input', () => {
+		expect(
+			detect('pi', [
+				'────────────────────────────────────────',
+				'',
+				'Summarize branch?',
+				'',
+				'→ No summary',
+				'  Summarize',
+				'  Summarize with custom prompt',
+				'',
+				'↑↓ navigate  return select  esc cancel',
+				'',
+				'────────────────────────────────────────',
+			]),
+		).toBe('waiting_input');
+	});
+
+	it('detects Pi pre-TUI startup [y/N] fork prompt as waiting_input', () => {
+		expect(detect('pi', ['Continue? [y/N]'])).toBe('waiting_input');
+	});
+
+	it('does not detect waiting_input from conversational "do you want" in Pi response', () => {
+		// Regression: Pi response text saying "do you want" triggered false waiting_input
+		expect(
+			detect('pi', [
+				'Here is what I found. Do you want me to also check the tests?',
+				'',
+				'────────────────────────────────────────',
+				'',
+				'────────────────────────────────────────',
+				'~/project (main)',
+				'$0.003 (sub) 2.1%/200k (auto)   (anthropic) claude-haiku-4-5 • high',
+			]),
+		).toBe('idle');
+	});
+
+	it('does not detect waiting_input from conversational "would you like" in Pi response', () => {
+		// Regression: Pi response text saying "would you like" triggered false waiting_input
+		expect(
+			detect('pi', [
+				'Would you like me to refactor this function as well?',
+				'',
+				'────────────────────────────────────────',
+				'',
+				'────────────────────────────────────────',
+				'~/project (main)',
+				'$0.005 (sub) 3.0%/200k (auto)   (anthropic) claude-haiku-4-5 • high',
+			]),
+		).toBe('idle');
+	});
+
+	it('does not detect waiting_input from scrollback conversational text in Pi session', () => {
+		// Regression: text further up in the 30-line buffer should not match —
+		// detectPiState now scans only the bottom 15 lines.
+		const scrollback = Array.from({length: 20}, (_, i) =>
+			i === 0 ? 'Would you like me to do that?' : `line ${i}`,
 		);
+		expect(
+			detect('pi', [
+				...scrollback,
+				'────────────────────────────────────────',
+				'',
+				'────────────────────────────────────────',
+				'~/project (main)',
+				'$0.003 (sub) 2.1%/200k (auto)   (anthropic) claude-haiku-4-5 • high',
+			]),
+		).toBe('idle');
+	});
+
+	it('does not detect waiting_input from "select" appearing in normal idle output', () => {
+		// "select" alone (without ↑↓) must not match — only the structural
+		// ExtensionSelectorComponent footer pairs ↑↓ with navigate.
+		expect(
+			detect('pi', [
+				'I will select the appropriate file and proceed.',
+				'',
+				'────────────────────────────────────────',
+				'',
+				'────────────────────────────────────────',
+				'~/project (main)',
+				'$0.003 (sub) 2.1%/200k (auto)   (anthropic) claude-haiku-4-5 • high',
+			]),
+		).toBe('idle');
 	});
 
 	// Pi busy: loading animation shows "Working..." with optional "(escape to interrupt)"

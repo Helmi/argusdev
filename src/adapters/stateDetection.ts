@@ -250,18 +250,28 @@ function detectClineState(terminal: Terminal): SessionState {
 }
 
 function detectPiState(terminal: Terminal): SessionState {
-	const content = getTerminalContent(terminal);
-	const lowerContent = content.toLowerCase();
-	const lines = getTerminalLines(terminal);
+	// Restrict scan to bottom lines — response text in scrollback would otherwise
+	// match conversational phrases and produce false waiting_input states.
+	const lines = getTerminalLines(terminal, 15);
+	const bottomContent = lines.join('\n');
+	const bottomLower = bottomContent.toLowerCase();
 
-	// Pi confirmation prompts: "[y/n]", "press enter to confirm", session selection
-	if (
-		lowerContent.includes('[y/n]') ||
-		/press (enter|return) to (confirm|continue)/i.test(content) ||
-		/(do you want|would you like|select a session|choose a session)/i.test(
-			content,
-		)
-	) {
+	// Pi's ctx.ui.confirm and ctx.ui.select route through ExtensionSelectorComponent
+	// (pi-coding-agent dist: modes/interactive/components/extension-selector.js,
+	// constructor body around line 36). Its footer is rendered with a hardcoded
+	// literal "↑↓" + " navigate" hint via rawKeyHint(), independent of theme or
+	// keybinding configuration. After ANSI stripping, those literals survive in
+	// the buffer and uniquely identify a Pi agent-driven prompt.
+	//
+	// Pi's pre-TUI startup fork prompt (cli main.js, no TUI render) renders "[y/N]"
+	// — kept as a secondary marker for that codepath.
+	//
+	// Out of scope: other interactive modals (session/model/theme/tree selectors)
+	// — those are user-initiated UI, not agent waits, so reporting idle is correct.
+	if (bottomContent.includes('↑↓') && /\bnavigate\b/.test(bottomLower)) {
+		return 'waiting_input';
+	}
+	if (/\[y\/n\]/i.test(bottomContent)) {
 		return 'waiting_input';
 	}
 
