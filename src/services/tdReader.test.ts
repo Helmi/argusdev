@@ -282,6 +282,40 @@ describe('TdReader', () => {
 			expect(ids.indexOf('td-001')).toBeLessThan(ids.indexOf('td-003'));
 		});
 
+		it('normalizes bare parent_id values by prepending td-', () => {
+			// Real-world data shows parent_id sometimes stored without the
+			// `td-` prefix even though id values always have it. The reader
+			// must normalize so downstream graph builders can match endpoints.
+			const db = new Database(TEST_DB_PATH);
+			db.prepare(
+				`INSERT INTO issues (id, title, status, type, priority, parent_id) VALUES (?, ?, ?, ?, ?, ?)`,
+			).run('td-bare-child', 'Bare-id child', 'open', 'task', 'P2', '001');
+			db.close();
+
+			const reader = new TdReader(TEST_DB_PATH);
+			const issues = reader.listIssues();
+			reader.close();
+
+			const child = issues.find(i => i.id === 'td-bare-child');
+			expect(child?.parent_id).toBe('td-001');
+		});
+
+		it('matches parentId queries against both prefixed and bare DB values', () => {
+			const db = new Database(TEST_DB_PATH);
+			db.prepare(
+				`INSERT INTO issues (id, title, status, type, priority, parent_id) VALUES (?, ?, ?, ?, ?, ?)`,
+			).run('td-bare-1', 'Bare-id sibling', 'open', 'task', 'P2', '001');
+			db.close();
+
+			const reader = new TdReader(TEST_DB_PATH);
+			const children = reader.listIssues({parentId: 'td-001'});
+			reader.close();
+
+			const ids = children.map(i => i.id).sort();
+			// td-002, td-003 use prefixed parent_id; td-bare-1 uses '001'.
+			expect(ids).toEqual(['td-002', 'td-003', 'td-bare-1']);
+		});
+
 		it('should hide deferred issues when hideDeferred is true', () => {
 			const db = new Database(TEST_DB_PATH);
 			db.prepare(
@@ -384,25 +418,30 @@ describe('TdReader', () => {
 	});
 
 	describe('getBoard', () => {
-		it('should group issues by status', () => {
+		it('should group every non-deleted, non-deferred issue by status', () => {
 			const reader = new TdReader(TEST_DB_PATH);
 			const board = reader.getBoard();
 			reader.close();
 
-			// td-002 and td-003 are children of an open epic, so they stay off board
-			expect(board['in_progress']).toHaveLength(2);
-			expect(board['open']).toBeUndefined();
-			expect(board['done']).toBeUndefined();
+			// All issues land in their own status column. Children of open
+			// epics used to be skipped — that hid the parent→child relationship
+			// at the board level, so we surface them now.
+			expect(board['in_progress']?.map(i => i.id).sort()).toEqual([
+				'td-001',
+				'td-005',
+			]);
+			expect(board['open']?.map(i => i.id)).toEqual(['td-002']);
+			expect(board['done']?.map(i => i.id)).toEqual(['td-003']);
 		});
 
-		it('should hide child tasks with open epic parents', () => {
+		it('should surface child tasks of open epics in their own status column', () => {
 			const reader = new TdReader(TEST_DB_PATH);
 			const board = reader.getBoard();
 			reader.close();
 
-			const inProgressIds = board['in_progress']?.map(i => i.id) ?? [];
-			expect(inProgressIds).toContain('td-001');
-			expect(inProgressIds).not.toContain('td-002');
+			// td-002 (child of open epic td-001) must appear in the open column
+			// rather than being hidden underneath the epic.
+			expect(board['open']?.map(i => i.id)).toContain('td-002');
 		});
 
 		it('should hide deferred issues', () => {
@@ -545,6 +584,43 @@ describe('TdReader', () => {
 			const deps = reader.getAllDependencies();
 			reader.close();
 			expect(deps).toEqual([]);
+		});
+
+		it('normalizes bare issue_id and depends_on_id by prepending td-', () => {
+			// Mirror the parent_id quirk — issue_dependencies rows in real
+			// data store endpoints without the td- prefix, breaking edge
+			// lookups against issue.id values that always have it.
+			const db = new Database(TEST_DB_PATH);
+			db.prepare(
+				`INSERT INTO issue_dependencies (id, issue_id, depends_on_id, relation_type) VALUES (?, ?, ?, ?)`,
+			).run('dep-bare-1', '002', '001', 'depends_on');
+			db.prepare(
+				`INSERT INTO issue_dependencies (id, issue_id, depends_on_id, relation_type) VALUES (?, ?, ?, ?)`,
+			).run('dep-mixed', 'td-005', '003', 'depends_on');
+			db.close();
+
+			const reader = new TdReader(TEST_DB_PATH);
+			const deps = reader.getAllDependencies();
+			reader.close();
+
+			const bare = deps.find(d => d.id === 'dep-bare-1');
+			expect(bare).toMatchObject({
+				issue_id: 'td-002',
+				depends_on_id: 'td-001',
+			});
+			const mixed = deps.find(d => d.id === 'dep-mixed');
+			expect(mixed).toMatchObject({
+				issue_id: 'td-005',
+				depends_on_id: 'td-003',
+			});
+
+			const cleanup = new Database(TEST_DB_PATH);
+			cleanup
+				.prepare(
+					`DELETE FROM issue_dependencies WHERE id IN ('dep-bare-1','dep-mixed')`,
+				)
+				.run();
+			cleanup.close();
 		});
 	});
 

@@ -44,36 +44,33 @@ const HANDLE_STYLE: React.CSSProperties = {
 function IssueNodeCard({
   issue,
   dimmed,
-  onSelect,
 }: {
   issue: TdIssue
   dimmed: boolean
-  onSelect: (id: string) => void
 }) {
+  // Click is handled by ReactFlow's onNodeClick at the wrapper level — see
+  // notes on TaskGraphView's <ReactFlow onNodeClick> prop. An inner <button>
+  // would block events when the wrapper's pointer-events resolves to none
+  // (which happens when neither selectable nor onNodeClick are active).
   return (
     <div
-      className="relative"
+      className={cn(
+        'relative rounded border-2 bg-card p-2 text-left transition-opacity cursor-pointer hover:bg-accent/50',
+        statusBorderClass(issue.status),
+        dimmed && 'opacity-30',
+      )}
       style={{ width: NODE_DIMENSIONS.width, height: NODE_DIMENSIONS.height }}
     >
       <Handle type="target" position={Position.Top} style={HANDLE_STYLE} isConnectable={false} />
-      <button
-        onClick={() => onSelect(issue.id)}
-        className={cn(
-          'w-full h-full rounded border-2 bg-card p-2 text-left transition-opacity hover:bg-accent/50',
-          statusBorderClass(issue.status),
-          dimmed && 'opacity-30',
-        )}
-      >
-        <div className="flex flex-col gap-1.5 h-full">
-          <p className="text-sm leading-snug line-clamp-2 flex-1">{issue.title}</p>
-          <div className="flex items-center justify-between gap-1">
-            <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', priorityBadgeClass(issue.priority))}>
-              {issue.priority}
-            </span>
-            <span className="text-xs font-mono text-muted-foreground shrink-0">{issue.id}</span>
-          </div>
+      <div className="flex flex-col gap-1.5 h-full">
+        <p className="text-sm leading-snug line-clamp-2 flex-1">{issue.title}</p>
+        <div className="flex items-center justify-between gap-1">
+          <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', priorityBadgeClass(issue.priority))}>
+            {issue.priority}
+          </span>
+          <span className="text-xs font-mono text-muted-foreground shrink-0">{issue.id}</span>
         </div>
-      </button>
+      </div>
       <Handle type="source" position={Position.Bottom} style={HANDLE_STYLE} isConnectable={false} />
     </div>
   )
@@ -126,7 +123,7 @@ export default function TaskGraphView({
           id: n.id,
           type: 'issue',
           position: n.position,
-          data: { issue: n.data.issue, dimmed, onSelect },
+          data: { issue: n.data.issue, dimmed },
           // Pre-supply measurements so react-flow can render edges immediately
           // on first paint instead of waiting for ResizeObserver — the dimensions
           // come from buildGraph which already fed them to dagre for layout.
@@ -134,10 +131,15 @@ export default function TaskGraphView({
           height: n.height,
           measured: { width: n.width, height: n.height },
           draggable: false,
-          selectable: false,
+          // NOTE: do NOT set `selectable: false` here. react-flow computes
+          // hasPointerEvents = isSelectable || isDraggable || onNodeClick.
+          // With everything off, the node wrapper gets pointer-events:none
+          // and clicks never reach our handler. We pass onNodeClick at the
+          // <ReactFlow> level which both sets the handler AND keeps pointer
+          // events alive without enabling the visual selection ring.
         }
       }),
-    [rawNodes, highlighted, onSelect],
+    [rawNodes, highlighted],
   )
 
   const flowEdges: RFEdge[] = useMemo(
@@ -169,8 +171,8 @@ export default function TaskGraphView({
 
   const nodeTypes = useMemo(
     () => ({
-      issue: ({ data }: { data: { issue: TdIssue; dimmed: boolean; onSelect: (id: string) => void } }) => (
-        <IssueNodeCard issue={data.issue} dimmed={data.dimmed} onSelect={data.onSelect} />
+      issue: ({ data }: { data: { issue: TdIssue; dimmed: boolean } }) => (
+        <IssueNodeCard issue={data.issue} dimmed={data.dimmed} />
       ),
     }),
     [],
@@ -203,6 +205,8 @@ export default function TaskGraphView({
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
+        colorMode="dark"
+        onNodeClick={(_, node) => onSelect(node.id)}
       >
         <Background />
         <Controls showInteractive={false} />

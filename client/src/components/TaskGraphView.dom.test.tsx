@@ -182,14 +182,16 @@ describe('TaskGraphView (DOM render)', () => {
     cleanup()
   })
 
-  it('renders nodes without an empty-state overlay when there are no relationships', async () => {
+  it('still mounts cleanly with no edges and shows no empty-state overlay', async () => {
+    // Per c1a6224 the empty-state overlay is intentionally NOT rendered —
+    // an empty graph already conveys "no relationships". Pin that contract.
     const { default: TaskGraphView } = await import('./TaskGraphView')
     const issuesNoRels = [
       makeIssue({ id: 'td-x', title: 'Lonely 1' }),
       makeIssue({ id: 'td-y', title: 'Lonely 2' }),
     ]
 
-    const { container, queryByText } = render(
+    const { container } = render(
       <div style={{ width: 800, height: 600 }}>
         <TaskGraphView
           projectPath="/repo"
@@ -200,8 +202,6 @@ describe('TaskGraphView (DOM render)', () => {
       </div>,
     )
 
-    // Nodes still render when there are no edges — an empty graph already
-    // conveys "no relationships", no overlay needed.
     await waitFor(
       () => {
         expect(
@@ -211,7 +211,43 @@ describe('TaskGraphView (DOM render)', () => {
       { timeout: 3000 },
     )
 
-    expect(queryByText(/No structural relationships/i)).toBeNull()
+    expect(container.textContent).not.toMatch(/no structural relationships/i)
+
+    cleanup()
+  })
+
+  it('fires onSelect when a node is clicked (regression guard for pointer-events:none)', async () => {
+    const { default: TaskGraphView } = await import('./TaskGraphView')
+    const onSelect = vi.fn()
+
+    const { container } = render(
+      <div style={{ width: 800, height: 600 }}>
+        <TaskGraphView
+          projectPath="/repo"
+          issues={MOCK_ISSUES}
+          searchQuery=""
+          onSelect={onSelect}
+        />
+      </div>,
+    )
+
+    await waitFor(
+      () => {
+        expect(container.querySelectorAll('.react-flow__node').length).toBe(3)
+      },
+      { timeout: 3000 },
+    )
+
+    // Click the node wrapper. ReactFlow's onNodeClick is attached there. If
+    // the wrapper carries pointer-events:none (the bug fixed in this branch)
+    // the click never lands and onSelect stays uncalled.
+    const firstNode = container.querySelector('.react-flow__node') as HTMLElement
+    expect(firstNode).toBeTruthy()
+    firstNode.click()
+
+    await waitFor(() => {
+      expect(onSelect).toHaveBeenCalled()
+    })
 
     cleanup()
   })

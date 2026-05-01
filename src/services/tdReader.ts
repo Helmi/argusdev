@@ -1,6 +1,23 @@
 import Database from 'better-sqlite3';
 import {logger} from '../utils/logger.js';
 
+/**
+ * Normalize an issue ID to always include the `td-` prefix.
+ *
+ * The td CLI stores issue.id values prefixed (`td-c4c615`), but real-world
+ * data shows that parent_id and issue_dependencies columns sometimes lack
+ * the prefix (`c4c615`). The WebUI's buildGraph matches edge endpoints
+ * against issue.id by exact equality — without normalization, every bare
+ * reference silently drops its edge. Apply this at read time so the rest
+ * of the pipeline can treat IDs uniformly.
+ *
+ * Empty strings are preserved as-is (means "no parent").
+ */
+function normalizeIssueId(id: string | null | undefined): string {
+	if (!id) return '';
+	return id.startsWith('td-') ? id : `td-${id}`;
+}
+
 // --- Types matching td's SQLite schema ---
 
 export interface TdIssue {
@@ -190,8 +207,12 @@ export class TdReader {
 				params.push(options.type);
 			}
 			if (options?.parentId) {
-				sql += ' AND parent_id = ?';
-				params.push(options.parentId);
+				// Match both prefixed and bare forms — DB content is inconsistent.
+				const bare = options.parentId.startsWith('td-')
+					? options.parentId.slice(3)
+					: options.parentId;
+				sql += ' AND (parent_id = ? OR parent_id = ?)';
+				params.push(`td-${bare}`, bare);
 			}
 			if (options?.hideDeferred) {
 				sql += " AND (defer_until IS NULL OR defer_until <= datetime('now'))";
@@ -200,7 +221,11 @@ export class TdReader {
 			sql +=
 				" ORDER BY CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END ASC, updated_at DESC";
 
-			return db.prepare(sql).all(...params) as TdIssue[];
+			const rows = db.prepare(sql).all(...params) as TdIssue[];
+			return rows.map(row => ({
+				...row,
+				parent_id: normalizeIssueId(row.parent_id),
+			}));
 		} catch (error) {
 			logger.error('[TdReader] Failed to list issues', error);
 			return [];
@@ -260,22 +285,15 @@ export class TdReader {
 	 */
 	getBoard(): Record<string, TdIssue[]> {
 		const issues = this.listIssues({hideDeferred: true});
-		const issueById = new Map(issues.map(issue => [issue.id, issue] as const));
 		const board: Record<string, TdIssue[]> = {};
 
+		// Children of open epics used to be hidden from the board, on the
+		// assumption that the epic implicitly represented them. In practice
+		// this made the parent→child relationship invisible at the board
+		// level — clicking an epic revealed nothing. Surface every issue in
+		// its own status column; the epic still carries a child-count badge
+		// in the WebUI for visual hierarchy.
 		for (const issue of issues) {
-			const parent = issue.parent_id
-				? issueById.get(issue.parent_id)
-				: undefined;
-			if (
-				issue.parent_id &&
-				parent &&
-				parent.type === 'epic' &&
-				parent.status !== 'closed'
-			) {
-				continue;
-			}
-
 			const status = issue.status;
 			if (!board[status]) {
 				board[status] = [];
@@ -408,9 +426,16 @@ export class TdReader {
 	getAllDependencies(): TdIssueDependency[] {
 		try {
 			const db = this.open();
-			return db
+			const rows = db
 				.prepare('SELECT * FROM issue_dependencies')
 				.all() as TdIssueDependency[];
+			// Same prefix-normalization as listIssues — issue_dependencies
+			// rows in real-world data store endpoints without `td-`.
+			return rows.map(row => ({
+				...row,
+				issue_id: normalizeIssueId(row.issue_id),
+				depends_on_id: normalizeIssueId(row.depends_on_id),
+			}));
 		} catch (error) {
 			logger.error('[TdReader] Failed to get all dependencies', error);
 			return [];
