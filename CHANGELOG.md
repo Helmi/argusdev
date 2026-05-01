@@ -2,6 +2,86 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.8.0](https://github.com/Helmi/argusdev/compare/v0.7.2...v0.8.0) (2026-05-01)
+
+The first release where state detection isn't a buffer-scraping hack on most agents. Codex, Gemini, OpenCode and Pi all moved to hook-based detection (Claude was already there in 0.7.0), so busy/idle/waiting transitions now arrive directly from the agent's lifecycle instead of being inferred from terminal output. The task board grew a graph view with parent/child and dependency edges, a "nudge" primitive lets you type into a running session without stealing focus (now used by reject-loop and integration alerts), and TUI sessions self-heal on re-attach instead of leaving you to hit Refresh. Mobile and per-project routing got a stack of fixes that have been overdue.
+
+
+### Features
+
+#### State detection
+* **hooks:** hook-based state detection for **Codex** ([2434fc9](https://github.com/Helmi/argusdev/commit/2434fc9269374d93276d7ef4618d11da35514f74)) — generated via `generateHookConfig`, replaces buffer-scraping for accurate busy/idle on Codex sessions.
+* **adapters:** hook-based state detection for **Gemini CLI** ([d3d1938](https://github.com/Helmi/argusdev/commit/d3d19388d29a83c164e666269c3d1e6bb9ad3421)) — installs into `.gemini/settings.json` and merges with existing user hooks instead of overwriting.
+* **hooks:** hook-based state detection for **OpenCode** via a native plugin ([cb14009](https://github.com/Helmi/argusdev/commit/cb14009f69f8e6846d300ba6678497b3194516f9)).
+* **adapters:** **Pi** hook-based state detection with PTY fallback ([b194220](https://github.com/Helmi/argusdev/commit/b19422004bc28149d9edfd226e209228b2756b1e)) — partial-hook coverage falls back to terminal heuristics for transitions Pi doesn't yet emit.
+* **opencode:** detect question-tool `waiting_input` via the `question.asked` bus event ([2134930](https://github.com/Helmi/argusdev/commit/21349300ab9aa718d2aa5befbb8d7dfe57939150)).
+
+#### Task board
+* **webui:** graph view for the task board ([ab5c4c2](https://github.com/Helmi/argusdev/commit/ab5c4c2fdfe09c07a1763c6eb2a97c14b465e8df)) — dagre-laid-out parent/child and dependency edges, search highlight, click-to-open. Theme-aware controls and proper keyboard a11y on nodes ([137bc99](https://github.com/Helmi/argusdev/commit/137bc998f1121fae837445c54a5bdc20a570d95e)).
+* **webui:** "Active only" toggle in graph view ([82ba4c2](https://github.com/Helmi/argusdev/commit/82ba4c28bbc4a590f69b4f8d81744832295bb05f), [aaf7108](https://github.com/Helmi/argusdev/commit/aaf7108b54e9a2f70cc92e24183533c8b0063c34)) — hides every closed node and its edges by default; closed work renders subdued (no green-border accent) when shown.
+* **taskboard:** reject-loop pills and nudges ([3e82816](https://github.com/Helmi/argusdev/commit/3e82816b99e75f2e415151123f8e0727474bdede)) — when the same rejection fingerprint repeats, the task gets a pill and the implementer session gets a nudge.
+
+#### Sessions
+* **webui:** nudge primitive — type text into a running session, busy-aware ([736c7f9](https://github.com/Helmi/argusdev/commit/736c7f9954def6811d029e6bea5d9a5d8f036d09)) — sends bracketed-paste-safe text to the PTY without stealing focus or interleaving with active output.
+* **webui:** integration nudge — surface unmerged worktrees on non-worktree sessions ([ecabf07](https://github.com/Helmi/argusdev/commit/ecabf0716019699dcbacb587ac63eb4ea9a3f873)) — when a session for the main branch ignores work that's still on a worktree branch, that's flagged in the sidebar with a nudge.
+* **webui:** auto-redraw TUI sessions on re-attach ([94ed98d](https://github.com/Helmi/argusdev/commit/94ed98d3348defa06ee5e32e4723601040536a8f)) — fires the same `cols-1 → cols` SIGWINCH cycle as the manual refresh button about 350 ms after the replay payload lands. Plain shell sessions are skipped.
+
+#### Agent profiles
+* **agents:** `__omit__` sentinel choice value ([545c516](https://github.com/Helmi/argusdev/commit/545c51651ee7eec40bf01c1d8440d6658dd5abaf)) — a profile option choice with value `__omit__` suppresses the CLI flag entirely. Pi's "All tools (no restriction)" choice now uses it so Pi runs without `--tools`, allowing every tool Pi knows about. Custom profiles can use the same trick.
+
+
+### Bug Fixes
+
+#### Conversation & transcripts
+* **api:** re-discover agent transcripts when the initial window times out ([8d8b356](https://github.com/Helmi/argusdev/commit/8d8b356d328ff53f88befefc7b4fb4046fc6d8a1)).
+* **adapters:** correct Codex/Gemini transcript parsing; surface "unsupported" for cline ([b8f2c44](https://github.com/Helmi/argusdev/commit/b8f2c44f37f9a52de63f704c97417551266b51dc)).
+* **adapters:** content-aware dedup for Codex `response_item`/`message` rows ([0246e12](https://github.com/Helmi/argusdev/commit/0246e12bb41fcfa31e57fb68add2a8c950a4421e)).
+* **adapters:** filter prompt-blob noise from legacy Codex rows ([d58ac73](https://github.com/Helmi/argusdev/commit/d58ac731d57e55b2ee4475511dca0e7707c8a4bd)) and from the top-level `response_item` envelope shape ([d3b61f1](https://github.com/Helmi/argusdev/commit/d3b61f1341b295dfef08aed49c5a307e106f1e90)).
+
+#### Hook adapters
+* **adapters:** merge ArgusDev hooks into an existing `.gemini/settings.json` instead of overwriting ([4a24308](https://github.com/Helmi/argusdev/commit/4a243087b5945c95b2ce9c312017eb767b8c1fc7)).
+* **adapters:** strip stale ArgusDev hooks and guard backup on crash-recovery ([1817cc2](https://github.com/Helmi/argusdev/commit/1817cc2a4712642ad5f7fa766b2cbc9818795451)).
+* **hooks:** prevent backup-of-backup loss; skip config revert on mid-session edits ([4606385](https://github.com/Helmi/argusdev/commit/46063859e789b4fa204447e9efb6e1bbe0a89b6f)).
+* **hooks:** strip ArgusDev hooks on cleanup instead of unlinking the host file ([bba9216](https://github.com/Helmi/argusdev/commit/bba921684cb032935253361d849c759749620466)).
+* **hooks:** correct Codex hook schema and preserve user hook files ([297d768](https://github.com/Helmi/argusdev/commit/297d76864d3507fafa452804fbd0aa0b6de365d3)).
+* **hooks:** harden backup logic and scope Gemini transcript discovery ([44b70d2](https://github.com/Helmi/argusdev/commit/44b70d2af2158b2a06b46088ab41c6ddd31ba32c)).
+* **hooks:** wire `permission.ask` and `session.status` busy to the OpenCode plugin ([0dbe0a6](https://github.com/Helmi/argusdev/commit/0dbe0a6c3dec16a3f6f970d612d414ce7a92ef20)).
+
+#### State detection edge cases
+* **state:** Pi no longer over-reports `waiting_input` ([5f392ca](https://github.com/Helmi/argusdev/commit/5f392cab5348373a063c25694f03989a033b3d1f)).
+* **adapters:** prevent PTY idle from clobbering hook-delivered busy in Pi sessions ([b180a47](https://github.com/Helmi/argusdev/commit/b180a478a81a37f2eda44b560cdae29c7d7a56e6)).
+* **adapters:** cover pure-thinking turns with `turn_start` hook; narrow PTY guard ([2044a81](https://github.com/Helmi/argusdev/commit/2044a8101acbd0c57b33a9a3bcb15c1ee4bd07cc), [df8bfe8](https://github.com/Helmi/argusdev/commit/df8bfe8cddb8c5f175ebf1a10009a19aaae8d49b)).
+* **sessions:** trigger auto-approval and restore PTY transitions for hook-based sessions ([877ad57](https://github.com/Helmi/argusdev/commit/877ad57a98ce5d003bbce1b4f606e58373172f7c)).
+* **sessions:** narrow partial-hook PTY guard to block idle from pending states; clear `pendingState` on dropped poll tick ([9bb7832](https://github.com/Helmi/argusdev/commit/9bb7832a6be77a2bc12aa1b166321b94c4bd6e3a), [6af81cc](https://github.com/Helmi/argusdev/commit/6af81cc699fb9098e4279ede7bd06186078f8e20)).
+* **daemon:** surface orphaned hook events instead of silently dropping ([2006e58](https://github.com/Helmi/argusdev/commit/2006e5849be1284b5b1e805122b0ae7031c5f01a)).
+
+#### Graph view
+* **webui,td:** initial pass — graph edges (the missing xyflow `Handle` components left zero edges drawn), board children rendering, node click handler, dark controls ([951db2e](https://github.com/Helmi/argusdev/commit/951db2e7c9789107f64784df3928be097d3340e6)).
+* **webui:** modal cross-project lookup; license attribution for vendored deps ([d29532f](https://github.com/Helmi/argusdev/commit/d29532fa837a3c256129b99a31497a0dc7077a74)).
+* **webui:** correct empty-state when a project has no visible tasks ([88e87a8](https://github.com/Helmi/argusdev/commit/88e87a864ef95c6ea07fb0a764292402c0960aa6)) and remove redundant overlay message ([c1a6224](https://github.com/Helmi/argusdev/commit/c1a622441f43e18715c9bdaba8069faad88251b4)).
+
+#### Mobile / iOS
+* **webui:** mobile paste button for iOS clipboard support ([6dc33fc](https://github.com/Helmi/argusdev/commit/6dc33fc6514c97dcf6f2d7f00b8c4ac9055fb378)) — paste flows through `xterm.paste()` so bracketed-paste mode works correctly ([6836f48](https://github.com/Helmi/argusdev/commit/6836f48d3f3c6e28888a22f0e53447f05ce86664)).
+* **webui:** iOS clipboard fallback — textarea modal when `readText` is denied ([65b3953](https://github.com/Helmi/argusdev/commit/65b395358d55710a36780ad2dafd02d1b5816ad5)).
+* **webui:** strip Pi cursor-visibility escapes to prevent heartbeat scroll-jump ([980aab1](https://github.com/Helmi/argusdev/commit/980aab1b9b37083611fe60cbdf5f4080a4c4cf64)) — Pi's pi-messenger plugin emits `\x1b[?25l` every ~15 s; xterm refreshes the render area on cursor-state changes, which jumped the viewport.
+* **webui:** strip outbound focus events for OpenCode sessions ([e5afd72](https://github.com/Helmi/argusdev/commit/e5afd7221507477c3f6a6d128a459e7d5012ddb2)) — OpenCode mishandled them as a "drop modes" signal.
+
+#### Per-project routing
+The whole `currentProject` global was a leak waiting to happen — fetches from one project's task board could land in another. Replaced with explicit `projectPath` plumbed through every layer.
+* **webui:** replace global `tdIssues` with per-project `tdIssuesByProject` store ([69d92cb](https://github.com/Helmi/argusdev/commit/69d92cb8e14532d8145fc13dff120768b164565b)).
+* **webui:** thread `projectPath` through conversation view, settings, and the task detail modal ([1d249a2](https://github.com/Helmi/argusdev/commit/1d249a22dc3bfcdb522929fbda0ae8f7b6041814), [eda6e7f](https://github.com/Helmi/argusdev/commit/eda6e7f248bc2fb899093b5379d9f19c17c6e72b), [42ceb3e](https://github.com/Helmi/argusdev/commit/42ceb3e693811730311332367c3eaec9b75878c5), [fdccd75](https://github.com/Helmi/argusdev/commit/fdccd75b038e175bf4c2535a28ca84d1170280b8)).
+* **webui:** drop `currentProject` from task board routing ([656bcc9](https://github.com/Helmi/argusdev/commit/656bcc9599e11049a36bf3e4ed75c8a4e7009900)) and as live state ([87f94fd](https://github.com/Helmi/argusdev/commit/87f94fd40530ce49f3acab148cb4c5e969486e08)).
+* **webui:** gate the task-board icon on per-project `tdEnabled`, not global `tdStatus` ([146dd0d](https://github.com/Helmi/argusdev/commit/146dd0de29a0dc60402e9413e94a7cf68f1e5e12)) and fix stale-ref guard / zero-arg fallout ([316e776](https://github.com/Helmi/argusdev/commit/316e776c0227c0a2bd4513036cefbe3d839a1140), [70bc068](https://github.com/Helmi/argusdev/commit/70bc068de4d342a853088ea212630ef06120204b)).
+* **webui:** remove the global td review banner ([7603a0c](https://github.com/Helmi/argusdev/commit/7603a0c1d72516e55d5f68903d0152bd4db982f2)).
+
+#### Misc
+* **webui:** route SDK nudges through `/api/sdk-session/:id/message`; guard `sendNudgeSdk` against fetch network errors ([29e66ac](https://github.com/Helmi/argusdev/commit/29e66ac9e40b10f925a749bd34ab8b6cba385e1f), [dde859d](https://github.com/Helmi/argusdev/commit/dde859d3f8de809b97420fd42d4b91c810e99fb2)).
+* **reject-loop:** correct detection fingerprint using the log-based `is_rejected` flag ([8ae5f78](https://github.com/Helmi/argusdev/commit/8ae5f78f6d7f1b1ae09d4cad2e34db3cf99a0fab)).
+* **integration-nudge:** edge-case fixes from review fold-in ([0d3dc7f](https://github.com/Helmi/argusdev/commit/0d3dc7f3f472f43f2f019ee5578e858a8a9a3fec), [27630df](https://github.com/Helmi/argusdev/commit/27630dfaadc38b47c06f3ba988cb9a4c50b38254)).
+* **api:** expose `task.minor` in `renderTaskPromptTemplate` var map ([081b86c](https://github.com/Helmi/argusdev/commit/081b86c9bfb2a36b8123a475499c4bac38c7bcec)).
+* **webui:** normalize agent type for behavioral gates ([0529bed](https://github.com/Helmi/argusdev/commit/0529bed703ce9f2cce9865239be9083c3179c36e)) — backend-resolved canonical type drives agent-specific UI behaviors so custom profiles wrapping `claude`/`opencode` still trigger the right code paths.
+* **webui:** de-flake graph DOM test, gate td-disabled in the issue-by-id fallback ([6b4283e](https://github.com/Helmi/argusdev/commit/6b4283e48cf3fc1d8fca1c111cd7bf445a33db35)).
+
 ### [0.7.2](https://github.com/Helmi/argusdev/compare/v0.7.1...v0.7.2) (2026-04-27)
 
 A polish-and-stability release. The headline ergonomic wins are a manual terminal redraw button (no more browser-resize gymnastics when codex or claude leave gibberish on the screen), a markdown-rendering file preview dialog, clickable file paths in the terminal, and richer td context inside the session sidebar. td integration is still flaky in places — expect more iteration in 0.7.3.
