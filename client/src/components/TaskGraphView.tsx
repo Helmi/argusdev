@@ -102,7 +102,7 @@ export default function TaskGraphView({
   searchQuery,
   onSelect,
 }: TaskGraphViewProps) {
-  const { tdDepsByProject, fetchTdDeps, theme } = useAppStore()
+  const { tdDepsByProject, fetchTdDeps, theme, graphHideClosedComponents, setGraphHideClosedComponents } = useAppStore()
   const deps = tdDepsByProject[projectPath] ?? []
   const [loaded, setLoaded] = useState(false)
   // Drive react-flow's CSS variables off argusdev's theme. Hardcoding
@@ -128,8 +128,8 @@ export default function TaskGraphView({
   }, [projectPath, fetchTdDeps])
 
   const { nodes: rawNodes, edges: rawEdges } = useMemo(
-    () => buildGraph(issues, deps),
-    [issues, deps],
+    () => buildGraph(issues, deps, { hideClosedComponents: graphHideClosedComponents }),
+    [issues, deps, graphHideClosedComponents],
   )
 
   const highlighted = useMemo(
@@ -213,7 +213,7 @@ export default function TaskGraphView({
     )
   }
 
-  if (rawNodes.length === 0) {
+  if (rawNodes.length === 0 && !graphHideClosedComponents) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground p-8">
         <p className="text-sm">No tasks to display.</p>
@@ -221,8 +221,37 @@ export default function TaskGraphView({
     )
   }
 
+  if (rawNodes.length === 0 && graphHideClosedComponents) {
+    return (
+      <div className="flex flex-col flex-1 items-center justify-center text-muted-foreground p-8 gap-3">
+        <p className="text-sm">All tasks are closed.</p>
+        <button
+          type="button"
+          onClick={() => setGraphHideClosedComponents(false)}
+          className="text-xs px-2 py-1 rounded border border-border hover:bg-accent/50 transition-colors"
+        >
+          Show all tasks
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="relative flex-1 min-h-0">
+      <div className="absolute top-2 right-2 z-10">
+        <button
+          type="button"
+          onClick={() => setGraphHideClosedComponents(!graphHideClosedComponents)}
+          className={cn(
+            'text-xs px-2 py-1 rounded border transition-colors',
+            graphHideClosedComponents
+              ? 'border-border bg-background text-muted-foreground hover:bg-accent/50'
+              : 'border-border bg-accent text-foreground hover:bg-accent/70',
+          )}
+        >
+          {graphHideClosedComponents ? 'Active only' : 'Show all'}
+        </button>
+      </div>
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}

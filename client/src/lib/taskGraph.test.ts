@@ -122,6 +122,71 @@ describe('buildGraph', () => {
   })
 })
 
+describe('buildGraph — hideClosedComponents', () => {
+  it('hides a component where all nodes are closed', () => {
+    const issues = [
+      issue({ id: 'td-c1', title: 'C1', status: 'closed' }),
+      issue({ id: 'td-c2', title: 'C2', status: 'closed' }),
+      issue({ id: 'td-c3', title: 'C3', status: 'closed' }),
+    ]
+    const deps = [dep('d1', 'td-c2', 'td-c1'), dep('d2', 'td-c3', 'td-c2')]
+    const { nodes, edges } = buildGraph(issues, deps)
+    expect(nodes).toHaveLength(0)
+    expect(edges).toHaveLength(0)
+  })
+
+  it('keeps all nodes of a mixed component (closed + open)', () => {
+    const issues = [
+      issue({ id: 'td-a', title: 'A', status: 'open' }),
+      issue({ id: 'td-b', title: 'B', status: 'closed' }),
+      issue({ id: 'td-c', title: 'C', status: 'closed' }),
+    ]
+    const deps = [dep('d1', 'td-a', 'td-b'), dep('d2', 'td-b', 'td-c')]
+    const { nodes } = buildGraph(issues, deps)
+    expect(nodes.map(n => n.id).sort()).toEqual(['td-a', 'td-b', 'td-c'])
+  })
+
+  it('hides standalone closed nodes (no edges)', () => {
+    const issues = [
+      issue({ id: 'td-open', title: 'Open task', status: 'open' }),
+      issue({ id: 'td-closed', title: 'Closed task', status: 'closed' }),
+    ]
+    const { nodes } = buildGraph(issues, [])
+    expect(nodes.map(n => n.id)).toEqual(['td-open'])
+  })
+
+  it('hides a dep-only chain where all nodes are closed', () => {
+    const issues = [
+      issue({ id: 'td-x', title: 'X', status: 'closed' }),
+      issue({ id: 'td-y', title: 'Y', status: 'closed' }),
+    ]
+    const deps = [dep('d1', 'td-y', 'td-x')]
+    const { nodes, edges } = buildGraph(issues, deps)
+    expect(nodes).toHaveLength(0)
+    expect(edges).toHaveLength(0)
+  })
+
+  it('shows all nodes when hideClosedComponents is false', () => {
+    const issues = [
+      issue({ id: 'td-c1', title: 'C1', status: 'closed' }),
+      issue({ id: 'td-c2', title: 'C2', status: 'closed' }),
+    ]
+    const deps = [dep('d1', 'td-c2', 'td-c1')]
+    const { nodes, edges } = buildGraph(issues, deps, { hideClosedComponents: false })
+    expect(nodes).toHaveLength(2)
+    expect(edges).toHaveLength(1)
+  })
+
+  it('hides all-closed parent/child subtree', () => {
+    const issues = [
+      issue({ id: 'td-epic', title: 'Epic', status: 'closed', type: 'epic' }),
+      issue({ id: 'td-child', title: 'Child', status: 'closed', parent_id: 'td-epic' }),
+    ]
+    const { nodes } = buildGraph(issues, [])
+    expect(nodes).toHaveLength(0)
+  })
+})
+
 describe('computeHighlighted', () => {
   const issues = [
     issue({ id: 'td-001', title: 'Epic', type: 'epic' }),

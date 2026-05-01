@@ -28,6 +28,10 @@ export interface BuildGraphResult {
   edges: GraphEdge[]
 }
 
+export interface BuildGraphOptions {
+  hideClosedComponents?: boolean
+}
+
 const NODE_WIDTH = 220
 const NODE_HEIGHT = 80
 
@@ -46,7 +50,10 @@ const NODE_HEIGHT = 80
 export function buildGraph(
   issues: TdIssue[],
   deps: TdIssueDependency[],
+  options: BuildGraphOptions = {},
 ): BuildGraphResult {
+  const { hideClosedComponents = true } = options
+
   // Filter out soft-deleted issues
   const visible = issues.filter(i => !i.deleted_at)
   const visibleIds = new Set(visible.map(i => i.id))
@@ -91,21 +98,65 @@ export function buildGraph(
     return a.id.localeCompare(b.id)
   })
 
+  // Optionally drop connected components where every node is closed.
+  // Build undirected adjacency, DFS to find components, filter all-closed ones.
+  let layoutIssues = sortedIssues
+  let layoutEdges = allEdges
+
+  if (hideClosedComponents) {
+    const adj = new Map<string, Set<string>>()
+    for (const issue of sortedIssues) {
+      if (!adj.has(issue.id)) adj.set(issue.id, new Set())
+    }
+    for (const edge of allEdges) {
+      adj.get(edge.source)!.add(edge.target)
+      adj.get(edge.target)!.add(edge.source)
+    }
+
+    const visited = new Set<string>()
+    const hiddenIds = new Set<string>()
+
+    for (const issue of sortedIssues) {
+      if (visited.has(issue.id)) continue
+
+      // DFS to collect the connected component
+      const component: TdIssue[] = []
+      const stack = [issue.id]
+      while (stack.length > 0) {
+        const id = stack.pop()!
+        if (visited.has(id)) continue
+        visited.add(id)
+        const found = sortedIssues.find(i => i.id === id)
+        if (found) component.push(found)
+        for (const neighbor of adj.get(id) ?? []) {
+          if (!visited.has(neighbor)) stack.push(neighbor)
+        }
+      }
+
+      if (component.every(i => i.status === 'closed')) {
+        for (const i of component) hiddenIds.add(i.id)
+      }
+    }
+
+    layoutIssues = sortedIssues.filter(i => !hiddenIds.has(i.id))
+    layoutEdges = allEdges.filter(e => !hiddenIds.has(e.source) && !hiddenIds.has(e.target))
+  }
+
   // Run dagre layout
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
   g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 60, marginx: 20, marginy: 20 })
 
-  for (const issue of sortedIssues) {
+  for (const issue of layoutIssues) {
     g.setNode(issue.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
   }
-  for (const edge of allEdges) {
+  for (const edge of layoutEdges) {
     g.setEdge(edge.source, edge.target)
   }
 
   dagre.layout(g)
 
-  const nodes: GraphNode[] = sortedIssues.map(issue => {
+  const nodes: GraphNode[] = layoutIssues.map(issue => {
     const pos = g.node(issue.id)
     return {
       id: issue.id,
@@ -119,7 +170,7 @@ export function buildGraph(
     }
   })
 
-  return { nodes, edges: allEdges }
+  return { nodes, edges: layoutEdges }
 }
 
 /**

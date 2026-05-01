@@ -189,6 +189,9 @@ interface AppState {
 	// Nudge
 	nudgePending: import('./nudge').NudgePending | null;
 
+	// Graph view
+	graphHideClosedComponents: boolean;
+
 	// Socket
 	socket: Socket;
 }
@@ -357,6 +360,9 @@ interface AppActions {
 
 	// Nudge
 	setNudgePending: (pending: import('./nudge').NudgePending | null) => void;
+
+	// Graph view
+	setGraphHideClosedComponents: (hide: boolean) => void;
 
 	// Error handling
 	clearError: () => void;
@@ -556,6 +562,9 @@ export function AppProvider({children}: {children: ReactNode}) {
 	const [nudgePending, setNudgePending] = useState<
 		import('./nudge').NudgePending | null
 	>(null);
+
+	// Graph view state
+	const [graphHideClosedComponents, setGraphHideClosedComponents] = useState(true);
 
 	// Derived: reject-loop items per project
 	const tdRejectLoopByProject = useMemo<Record<string, RejectLoopItem[]>>(() => {
@@ -1958,6 +1967,8 @@ export function AppProvider({children}: {children: ReactNode}) {
 		closeConversationView,
 		nudgePending,
 		setNudgePending,
+		graphHideClosedComponents,
+		setGraphHideClosedComponents,
 	};
 
 	return <AppContext.Provider value={store}>{children}</AppContext.Provider>;
