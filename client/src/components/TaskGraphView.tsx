@@ -14,7 +14,7 @@ import { useAppStore } from '@/lib/store'
 import type { TdIssue } from '@/lib/types'
 import { buildGraph, computeHighlighted, NODE_DIMENSIONS } from '@/lib/taskGraph'
 import { cn } from '@/lib/utils'
-import { Loader2, Network } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 // Status → border color, kept in sync with STATUS_COLUMNS in TaskBoard.tsx
 function statusBorderClass(status: string): string {
@@ -195,16 +195,6 @@ export default function TaskGraphView({
 
   return (
     <div className="relative flex-1 min-h-0">
-      {rawEdges.length === 0 && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded border border-border/50 bg-card/90 text-xs text-muted-foreground shadow-sm">
-            <Network className="h-3.5 w-3.5 opacity-60" />
-            <span>
-              No structural relationships in this project — use board or list view.
-            </span>
-          </div>
-        </div>
-      )}
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
