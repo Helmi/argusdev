@@ -57,12 +57,14 @@ export const SdkSession = memo(
 			agents,
 			projects,
 			openTaskBoard,
-			tdStatus,
 		} = useAppStore();
 		const isMobile = useIsMobile();
 		const hasMultipleSessions = selectedSessions.length > 1;
 
 		const agent = agents.find(a => a.id === session.agentId);
+
+		const sessionProjectPath = resolveProjectPathForWorktree(session.path, projects.map(p => p.path));
+		const sessionProject = projects.find(p => p.path === sessionProjectPath);
 
 		const [messages, setMessages] = useState<SdkMessage[]>([]);
 		const [state, setState] = useState(session.state);
@@ -321,18 +323,17 @@ export const SdkSession = memo(
 
 					<div className="flex items-center gap-0.5">
 						{/* Task board button */}
-						{tdStatus?.projectState?.enabled && (
+						{sessionProject?.tdEnabled && (
 							<Button
 								variant="ghost"
 								size="icon"
 								className="h-5 w-5 text-muted-foreground hover:text-foreground"
 								onClick={() => {
-									const projectPath = resolveProjectPathForWorktree(session.path, projects.map(p => p.path));
-									if (!projectPath) {
+									if (!sessionProjectPath) {
 										console.warn('[TaskBoard] cannot resolve project for session', session.id);
 										return;
 									}
-									openTaskBoard(projectPath);
+									openTaskBoard(sessionProjectPath);
 								}}
 								title="Task board"
 							>

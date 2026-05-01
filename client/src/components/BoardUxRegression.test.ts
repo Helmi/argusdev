@@ -8,10 +8,18 @@ function readSource(path: string): string {
 }
 
 describe('Board UX regression checks', () => {
-  it('conditionally shows the task board button based on td status', () => {
-    const source = readSource('client/src/components/TerminalSession.tsx')
-    expect(source).toContain('title="Task board"')
-    expect(source).toContain('tdStatus?.projectState?.enabled')
+  it('conditionally shows the task board button based on per-project td status', () => {
+    const terminalSource = readSource('client/src/components/TerminalSession.tsx')
+    const sdkSource = readSource('client/src/components/SdkSession.tsx')
+    // Button must be present in both session surfaces
+    expect(terminalSource).toContain('title="Task board"')
+    expect(sdkSource).toContain('title="Task board"')
+    // Gate must use per-project tdEnabled from the projects array, not global tdStatus
+    expect(terminalSource).toContain('sessionProject?.tdEnabled')
+    expect(sdkSource).toContain('sessionProject?.tdEnabled')
+    // Must not gate on global tdStatus.projectState (wrong source — reflects backend selectedProject)
+    expect(terminalSource).not.toContain('tdStatus?.projectState?.enabled')
+    expect(sdkSource).not.toContain('tdStatus?.projectState?.enabled')
   })
 
   it('routes task board via resolveProjectPathForWorktree, not currentProject', () => {
@@ -21,8 +29,8 @@ describe('Board UX regression checks', () => {
     expect(terminalSource).toContain('resolveProjectPathForWorktree')
     expect(sdkSource).toContain('resolveProjectPathForWorktree')
     // openTaskBoard must receive a derived path argument
-    expect(terminalSource).toContain('openTaskBoard(projectPath)')
-    expect(sdkSource).toContain('openTaskBoard(projectPath)')
+    expect(terminalSource).toContain('openTaskBoard(sessionProjectPath)')
+    expect(sdkSource).toContain('openTaskBoard(sessionProjectPath)')
     // Must not fall back to currentProject for task board routing
     expect(terminalSource).not.toContain('currentProject')
     expect(sdkSource).not.toContain('currentProject')

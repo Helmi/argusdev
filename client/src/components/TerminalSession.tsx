@@ -147,7 +147,6 @@ export const TerminalSession = memo(function TerminalSession({
 		agents,
 		projects,
 		openTaskBoard,
-		tdStatus,
 		openFilePreview,
 		setNudgePending,
 	} = useAppStore();
@@ -159,6 +158,9 @@ export const TerminalSession = memo(function TerminalSession({
 
 	// Find agent config for this session
 	const agent = agents.find(a => a.id === session.agentId);
+
+	const sessionProjectPath = resolveProjectPathForWorktree(session.path, projects.map(p => p.path));
+	const sessionProject = projects.find(p => p.path === sessionProjectPath);
 
 	// Map font type to font family string
 	const fontFamilyMap: Record<string, string> = {
@@ -918,18 +920,17 @@ export const TerminalSession = memo(function TerminalSession({
 
 				<div className="flex items-center gap-0.5">
 					{/* Task board button */}
-					{tdStatus?.projectState?.enabled && (
+					{sessionProject?.tdEnabled && (
 						<Button
 							variant="ghost"
 							size="icon"
 							className="h-5 w-5 text-muted-foreground hover:text-foreground"
 							onClick={() => {
-								const projectPath = resolveProjectPathForWorktree(session.path, projects.map(p => p.path));
-								if (!projectPath) {
+								if (!sessionProjectPath) {
 									console.warn('[TaskBoard] cannot resolve project for session', session.id);
 									return;
 								}
-								openTaskBoard(projectPath);
+								openTaskBoard(sessionProjectPath);
 							}}
 							title="Task board"
 						>
