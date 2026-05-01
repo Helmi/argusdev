@@ -14,6 +14,7 @@ import { useAppStore } from '@/lib/store'
 import type { TdIssue } from '@/lib/types'
 import { buildGraph, computeHighlighted, NODE_DIMENSIONS } from '@/lib/taskGraph'
 import { cn } from '@/lib/utils'
+import { LIGHT_THEMES } from '@/lib/iconConfig'
 import { Loader2 } from 'lucide-react'
 
 // Status → border color, kept in sync with STATUS_COLUMNS in TaskBoard.tsx
@@ -44,33 +45,45 @@ const HANDLE_STYLE: React.CSSProperties = {
 function IssueNodeCard({
   issue,
   dimmed,
+  onSelect,
 }: {
   issue: TdIssue
   dimmed: boolean
+  onSelect: (id: string) => void
 }) {
-  // Click is handled by ReactFlow's onNodeClick at the wrapper level — see
-  // notes on TaskGraphView's <ReactFlow onNodeClick> prop. An inner <button>
-  // would block events when the wrapper's pointer-events resolves to none
-  // (which happens when neither selectable nor onNodeClick are active).
+  // Native <button> restores keyboard a11y (Tab/Enter/Space) and screen-reader
+  // semantics. Pointer events stay alive because each node carries
+  // selectable:true at the data level, which makes react-flow's NodeWrapper
+  // set pointer-events:all on the node container. We stop propagation so
+  // react-flow's own click handler doesn't double-fire alongside ours.
   return (
     <div
-      className={cn(
-        'relative rounded border-2 bg-card p-2 text-left transition-opacity cursor-pointer hover:bg-accent/50',
-        statusBorderClass(issue.status),
-        dimmed && 'opacity-30',
-      )}
+      className="relative"
       style={{ width: NODE_DIMENSIONS.width, height: NODE_DIMENSIONS.height }}
     >
       <Handle type="target" position={Position.Top} style={HANDLE_STYLE} isConnectable={false} />
-      <div className="flex flex-col gap-1.5 h-full">
-        <p className="text-sm leading-snug line-clamp-2 flex-1">{issue.title}</p>
-        <div className="flex items-center justify-between gap-1">
-          <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', priorityBadgeClass(issue.priority))}>
-            {issue.priority}
-          </span>
-          <span className="text-xs font-mono text-muted-foreground shrink-0">{issue.id}</span>
+      <button
+        type="button"
+        onClick={e => {
+          e.stopPropagation()
+          onSelect(issue.id)
+        }}
+        className={cn(
+          'w-full h-full rounded border-2 bg-card p-2 text-left transition-opacity hover:bg-accent/50',
+          statusBorderClass(issue.status),
+          dimmed && 'opacity-30',
+        )}
+      >
+        <div className="flex flex-col gap-1.5 h-full">
+          <p className="text-sm leading-snug line-clamp-2 flex-1">{issue.title}</p>
+          <div className="flex items-center justify-between gap-1">
+            <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', priorityBadgeClass(issue.priority))}>
+              {issue.priority}
+            </span>
+            <span className="text-xs font-mono text-muted-foreground shrink-0">{issue.id}</span>
+          </div>
         </div>
-      </div>
+      </button>
       <Handle type="source" position={Position.Bottom} style={HANDLE_STYLE} isConnectable={false} />
     </div>
   )
@@ -89,9 +102,18 @@ export default function TaskGraphView({
   searchQuery,
   onSelect,
 }: TaskGraphViewProps) {
-  const { tdDepsByProject, fetchTdDeps } = useAppStore()
+  const { tdDepsByProject, fetchTdDeps, theme } = useAppStore()
   const deps = tdDepsByProject[projectPath] ?? []
   const [loaded, setLoaded] = useState(false)
+  // Drive react-flow's CSS variables off argusdev's theme. Hardcoding
+  // 'dark' would leave the controls white-on-light on themes like
+  // 'github' or 'solarized-light'; hardcoding 'light' would lose the
+  // original fix for argusdev's default dark theme.
+  const colorMode: 'light' | 'dark' = LIGHT_THEMES.includes(
+    theme as (typeof LIGHT_THEMES)[number],
+  )
+    ? 'light'
+    : 'dark'
 
   // Lazy fetch of deps on first mount per project
   useEffect(() => {
@@ -123,7 +145,7 @@ export default function TaskGraphView({
           id: n.id,
           type: 'issue',
           position: n.position,
-          data: { issue: n.data.issue, dimmed },
+          data: { issue: n.data.issue, dimmed, onSelect },
           // Pre-supply measurements so react-flow can render edges immediately
           // on first paint instead of waiting for ResizeObserver — the dimensions
           // come from buildGraph which already fed them to dagre for layout.
@@ -131,15 +153,15 @@ export default function TaskGraphView({
           height: n.height,
           measured: { width: n.width, height: n.height },
           draggable: false,
-          // NOTE: do NOT set `selectable: false` here. react-flow computes
-          // hasPointerEvents = isSelectable || isDraggable || onNodeClick.
-          // With everything off, the node wrapper gets pointer-events:none
-          // and clicks never reach our handler. We pass onNodeClick at the
-          // <ReactFlow> level which both sets the handler AND keeps pointer
-          // events alive without enabling the visual selection ring.
+          // selectable:true keeps the node wrapper's pointer-events:all so
+          // the inner <button> receives clicks and keyboard input. We pair
+          // this with elementsSelectable={false} on the ReactFlow root,
+          // which suppresses the visual selection ring while preserving
+          // event flow.
+          selectable: true,
         }
       }),
-    [rawNodes, highlighted],
+    [rawNodes, highlighted, onSelect],
   )
 
   const flowEdges: RFEdge[] = useMemo(
@@ -171,8 +193,12 @@ export default function TaskGraphView({
 
   const nodeTypes = useMemo(
     () => ({
-      issue: ({ data }: { data: { issue: TdIssue; dimmed: boolean } }) => (
-        <IssueNodeCard issue={data.issue} dimmed={data.dimmed} />
+      issue: ({
+        data,
+      }: {
+        data: { issue: TdIssue; dimmed: boolean; onSelect: (id: string) => void }
+      }) => (
+        <IssueNodeCard issue={data.issue} dimmed={data.dimmed} onSelect={data.onSelect} />
       ),
     }),
     [],
@@ -205,8 +231,7 @@ export default function TaskGraphView({
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
-        colorMode="dark"
-        onNodeClick={(_, node) => onSelect(node.id)}
+        colorMode={colorMode}
       >
         <Background />
         <Controls showInteractive={false} />

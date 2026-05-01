@@ -216,7 +216,14 @@ describe('TaskGraphView (DOM render)', () => {
     cleanup()
   })
 
-  it('fires onSelect when a node is clicked (regression guard for pointer-events:none)', async () => {
+  it('renders an interactive <button> per node and fires onSelect when clicked (a11y + click wiring guard)', async () => {
+    // Wiring guard, not a pointer-events guard — jsdom doesn't enforce CSS
+    // pointer-events:none so a regression that re-introduces wrapper
+    // pointer-events:none would still pass this test in jsdom. What this
+    // assertion DOES catch in code review:
+    //   - the inner <button> being replaced by a <div> (a11y regression)
+    //   - the onSelect closure not being threaded into node.data
+    //   - the button's onClick handler being detached
     const { default: TaskGraphView } = await import('./TaskGraphView')
     const onSelect = vi.fn()
 
@@ -238,16 +245,21 @@ describe('TaskGraphView (DOM render)', () => {
       { timeout: 3000 },
     )
 
-    // Click the node wrapper. ReactFlow's onNodeClick is attached there. If
-    // the wrapper carries pointer-events:none (the bug fixed in this branch)
-    // the click never lands and onSelect stays uncalled.
-    const firstNode = container.querySelector('.react-flow__node') as HTMLElement
-    expect(firstNode).toBeTruthy()
-    firstNode.click()
+    // Each node renders a real <button> — keyboard-focusable, screen-reader
+    // friendly. A regression that swaps to <div> would drop this assertion.
+    const nodeButtons = container.querySelectorAll('.react-flow__node button')
+    expect(nodeButtons.length).toBe(3)
+
+    // Click the actual button (the click target users interact with) and
+    // assert onSelect fires with one of the mocked node ids.
+    const firstButton = nodeButtons[0] as HTMLButtonElement
+    firstButton.click()
 
     await waitFor(() => {
       expect(onSelect).toHaveBeenCalled()
     })
+    const calledWith = onSelect.mock.calls[0]?.[0]
+    expect(MOCK_ISSUES.map(i => i.id)).toContain(calledWith)
 
     cleanup()
   })

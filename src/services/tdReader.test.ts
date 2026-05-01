@@ -374,6 +374,27 @@ describe('TdReader', () => {
 
 			expect(issue).toBeNull();
 		});
+
+		it('normalizes bare parent_id to the prefixed form', () => {
+			const db = new Database(TEST_DB_PATH);
+			db.prepare(
+				`INSERT INTO issues (id, title, status, type, priority, parent_id) VALUES (?, ?, ?, ?, ?, ?)`,
+			).run(
+				'td-bare-parent',
+				'Child with bare parent',
+				'open',
+				'task',
+				'P2',
+				'001',
+			);
+			db.close();
+
+			const reader = new TdReader(TEST_DB_PATH);
+			const issue = reader.getIssue('td-bare-parent');
+			reader.close();
+
+			expect(issue?.parent_id).toBe('td-001');
+		});
 	});
 
 	describe('getIssueWithDetails', () => {

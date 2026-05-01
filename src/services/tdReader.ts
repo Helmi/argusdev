@@ -238,11 +238,13 @@ export class TdReader {
 	getIssue(issueId: string): TdIssue | null {
 		try {
 			const db = this.open();
-			return (
-				(db
-					.prepare('SELECT * FROM issues WHERE id = ? AND deleted_at IS NULL')
-					.get(issueId) as TdIssue) ?? null
-			);
+			const row = db
+				.prepare('SELECT * FROM issues WHERE id = ? AND deleted_at IS NULL')
+				.get(issueId) as TdIssue | undefined;
+			if (!row) return null;
+			// Normalize parent_id so TaskDetailModal renders the same form
+			// as graph/list views (both already pass through normalization).
+			return {...row, parent_id: normalizeIssueId(row.parent_id)};
 		} catch (error) {
 			logger.error(`[TdReader] Failed to get issue ${issueId}`, error);
 			return null;
@@ -406,9 +408,19 @@ export class TdReader {
 	getDependencies(issueId: string): TdIssueDependency[] {
 		try {
 			const db = this.open();
-			return db
-				.prepare('SELECT * FROM issue_dependencies WHERE issue_id = ?')
-				.all(issueId) as TdIssueDependency[];
+			// Match against both prefixed and bare DB values, since
+			// issue_dependencies rows in real-world data are inconsistent.
+			const bare = issueId.startsWith('td-') ? issueId.slice(3) : issueId;
+			const rows = db
+				.prepare(
+					'SELECT * FROM issue_dependencies WHERE issue_id = ? OR issue_id = ?',
+				)
+				.all(`td-${bare}`, bare) as TdIssueDependency[];
+			return rows.map(row => ({
+				...row,
+				issue_id: normalizeIssueId(row.issue_id),
+				depends_on_id: normalizeIssueId(row.depends_on_id),
+			}));
 		} catch (error) {
 			logger.error(
 				`[TdReader] Failed to get dependencies for ${issueId}`,
