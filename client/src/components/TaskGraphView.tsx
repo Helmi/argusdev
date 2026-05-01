@@ -17,13 +17,19 @@ import { cn } from '@/lib/utils'
 import { LIGHT_THEMES } from '@/lib/iconConfig'
 import { Loader2 } from 'lucide-react'
 
-// Status → border color, kept in sync with STATUS_COLUMNS in TaskBoard.tsx
+// Status → border color, kept in sync with STATUS_COLUMNS in TaskBoard.tsx.
+// Closed tasks are rendered subdued — accenting "done" work draws attention
+// where it isn't useful in an active-graph view.
 function statusBorderClass(status: string): string {
   if (status === 'in_progress') return 'border-blue-500'
   if (status === 'in_review') return 'border-purple-500'
   if (status === 'blocked') return 'border-red-500'
-  if (status === 'closed') return 'border-green-500'
+  if (status === 'closed') return 'border-border'
   return 'border-border'
+}
+
+function isClosed(status: string): boolean {
+  return status === 'closed'
 }
 
 function priorityBadgeClass(priority: string): string {
@@ -71,6 +77,7 @@ function IssueNodeCard({
         className={cn(
           'w-full h-full rounded border-2 bg-card p-2 text-left transition-opacity hover:bg-accent/50',
           statusBorderClass(issue.status),
+          isClosed(issue.status) && 'opacity-60',
           dimmed && 'opacity-30',
         )}
       >

@@ -98,46 +98,18 @@ export function buildGraph(
     return a.id.localeCompare(b.id)
   })
 
-  // Optionally drop connected components where every node is closed.
-  // Build undirected adjacency, DFS to find components, filter all-closed ones.
+  // Drop all closed nodes when hideClosedComponents is on. Connected-component
+  // filtering proved too generous: a closed child of an open epic stayed visible
+  // because the component was "mixed". Users want closed work to disappear from
+  // the active view entirely; if context is needed they can toggle "Show all".
   let layoutIssues = sortedIssues
   let layoutEdges = allEdges
 
   if (hideClosedComponents) {
-    const adj = new Map<string, Set<string>>()
-    for (const issue of sortedIssues) {
-      if (!adj.has(issue.id)) adj.set(issue.id, new Set())
-    }
-    for (const edge of allEdges) {
-      adj.get(edge.source)!.add(edge.target)
-      adj.get(edge.target)!.add(edge.source)
-    }
-
-    const visited = new Set<string>()
     const hiddenIds = new Set<string>()
-
     for (const issue of sortedIssues) {
-      if (visited.has(issue.id)) continue
-
-      // DFS to collect the connected component
-      const component: TdIssue[] = []
-      const stack = [issue.id]
-      while (stack.length > 0) {
-        const id = stack.pop()!
-        if (visited.has(id)) continue
-        visited.add(id)
-        const found = sortedIssues.find(i => i.id === id)
-        if (found) component.push(found)
-        for (const neighbor of adj.get(id) ?? []) {
-          if (!visited.has(neighbor)) stack.push(neighbor)
-        }
-      }
-
-      if (component.every(i => i.status === 'closed')) {
-        for (const i of component) hiddenIds.add(i.id)
-      }
+      if (issue.status === 'closed') hiddenIds.add(issue.id)
     }
-
     layoutIssues = sortedIssues.filter(i => !hiddenIds.has(i.id))
     layoutEdges = allEdges.filter(e => !hiddenIds.has(e.source) && !hiddenIds.has(e.target))
   }
