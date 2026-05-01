@@ -127,6 +127,8 @@ export default function TaskGraphView({
     }
   }, [projectPath, fetchTdDeps])
 
+  const visibleIssueCount = useMemo(() => issues.filter(i => !i.deleted_at).length, [issues])
+
   const { nodes: rawNodes, edges: rawEdges } = useMemo(
     () => buildGraph(issues, deps, { hideClosedComponents: graphHideClosedComponents }),
     [issues, deps, graphHideClosedComponents],
@@ -213,25 +215,20 @@ export default function TaskGraphView({
     )
   }
 
-  if (rawNodes.length === 0 && !graphHideClosedComponents) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground p-8">
-        <p className="text-sm">No tasks to display.</p>
-      </div>
-    )
-  }
-
-  if (rawNodes.length === 0 && graphHideClosedComponents) {
+  if (rawNodes.length === 0) {
+    const filteredByClosed = graphHideClosedComponents && visibleIssueCount > 0
     return (
       <div className="flex flex-col flex-1 items-center justify-center text-muted-foreground p-8 gap-3">
-        <p className="text-sm">All tasks are closed.</p>
-        <button
-          type="button"
-          onClick={() => setGraphHideClosedComponents(false)}
-          className="text-xs px-2 py-1 rounded border border-border hover:bg-accent/50 transition-colors"
-        >
-          Show all tasks
-        </button>
+        <p className="text-sm">{filteredByClosed ? 'All tasks are closed.' : 'No tasks to display.'}</p>
+        {filteredByClosed && (
+          <button
+            type="button"
+            onClick={() => setGraphHideClosedComponents(false)}
+            className="text-xs px-2 py-1 rounded border border-border hover:bg-accent/50 transition-colors"
+          >
+            Show all tasks
+          </button>
+        )}
       </div>
     )
   }
