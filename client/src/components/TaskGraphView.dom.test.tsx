@@ -182,14 +182,14 @@ describe('TaskGraphView (DOM render)', () => {
     cleanup()
   })
 
-  it('renders the empty-edge overlay note when there are no relationships', async () => {
+  it('renders nodes without an empty-state overlay when there are no relationships', async () => {
     const { default: TaskGraphView } = await import('./TaskGraphView')
     const issuesNoRels = [
       makeIssue({ id: 'td-x', title: 'Lonely 1' }),
       makeIssue({ id: 'td-y', title: 'Lonely 2' }),
     ]
 
-    const { container, findByText } = render(
+    const { container, queryByText } = render(
       <div style={{ width: 800, height: 600 }}>
         <TaskGraphView
           projectPath="/repo"
@@ -200,17 +200,18 @@ describe('TaskGraphView (DOM render)', () => {
       </div>,
     )
 
-    // The overlay note is rendered above the graph, not replacing it.
-    expect(await findByText(/No structural relationships/i)).toBeTruthy()
+    // Nodes still render when there are no edges — an empty graph already
+    // conveys "no relationships", no overlay needed.
     await waitFor(
       () => {
-        // Nodes still render alongside the note (overlay, not replacement).
         expect(
           container.querySelectorAll('.react-flow__node').length,
         ).toBeGreaterThanOrEqual(2)
       },
       { timeout: 3000 },
     )
+
+    expect(queryByText(/No structural relationships/i)).toBeNull()
 
     cleanup()
   })
