@@ -14,6 +14,14 @@ import {
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import {
 	X,
 	Maximize2,
 	Minimize2,
@@ -162,6 +170,9 @@ export const TerminalSession = memo(function TerminalSession({
 	const fontFamily = fontFamilyMap[font] || fontFamilyMap.jetbrains;
 	const [isMaximized, setIsMaximized] = useState(false);
 	const [isScrolledUp, setIsScrolledUpState] = useState(false);
+	const [pasteModalOpen, setPasteModalOpen] = useState(false);
+	const [pasteModalValue, setPasteModalValue] = useState('');
+	const pasteModalTextareaRef = useRef<HTMLTextAreaElement>(null);
 	const isScrolledUpRef = useRef(false);
 	const setIsScrolledUp = useCallback((value: boolean) => {
 		isScrolledUpRef.current = value;
@@ -728,18 +739,41 @@ export const TerminalSession = memo(function TerminalSession({
 	};
 
 	const handleMobilePaste = async () => {
+		// Try the Clipboard API first — works on desktop and Android Chrome.
+		// iOS WebKit (Safari + all iOS browsers) routinely rejects readText()
+		// even inside a user-gesture handler, so we fall back to a textarea
+		// modal where the user can long-press → Paste manually.
 		try {
 			const text = await navigator.clipboard.readText();
 			if (text) {
-				// Use xterm's paste() so bracketed-paste wrapping applies when the
-				// running program has enabled DECSET 2004 (bash/zsh/fish/editors do).
-				// paste() fires onData, which is already wired to socket.emit('input').
+				// xterm.paste() applies bracketed-paste wrapping when DECSET 2004
+				// is active and fires onData (wired to socket.emit('input')).
 				xtermRef.current?.paste(text);
+				return;
 			}
-		} catch {
-			xtermRef.current?.write('\r\n[Paste failed: clipboard access denied]\r\n');
+		} catch (err) {
+			console.error('[TerminalSession] navigator.clipboard.readText failed', err);
 		}
+		setPasteModalValue('');
+		setPasteModalOpen(true);
 	};
+
+	const handlePasteModalSend = () => {
+		const text = pasteModalValue;
+		if (text) xtermRef.current?.paste(text);
+		setPasteModalOpen(false);
+		setPasteModalValue('');
+	};
+
+	useEffect(() => {
+		if (!pasteModalOpen) return;
+		// Autofocus + select-all so re-opening after a failed try lets the user
+		// overwrite the previous value with a single long-press → Paste.
+		const t = pasteModalTextareaRef.current;
+		if (!t) return;
+		t.focus();
+		if (t.value) t.select();
+	}, [pasteModalOpen]);
 
 	const handleDeleteSession = async () => {
 		await stopSession(session.id);
@@ -1028,6 +1062,36 @@ export const TerminalSession = memo(function TerminalSession({
 					</Button>
 				)}
 			</div>
+
+			{/* iOS clipboard fallback — opens when navigator.clipboard.readText fails */}
+			<Dialog open={pasteModalOpen} onOpenChange={setPasteModalOpen}>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>Paste from clipboard</DialogTitle>
+						<DialogDescription>
+							iOS blocked direct clipboard access. Long-press the field below, choose Paste, then tap Send.
+						</DialogDescription>
+					</DialogHeader>
+					<textarea
+						ref={pasteModalTextareaRef}
+						value={pasteModalValue}
+						onChange={e => setPasteModalValue(e.target.value)}
+						className="min-h-[120px] w-full rounded-md border border-input bg-background p-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+						placeholder="Long-press here → Paste"
+						autoCapitalize="off"
+						autoCorrect="off"
+						spellCheck={false}
+					/>
+					<DialogFooter>
+						<Button variant="ghost" onClick={() => setPasteModalOpen(false)}>
+							Cancel
+						</Button>
+						<Button onClick={handlePasteModalSend} disabled={!pasteModalValue}>
+							Send
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }, (prevProps, nextProps) => {
