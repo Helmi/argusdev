@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -338,27 +338,25 @@ function SortableOptionEditor(props: OptionEditorProps) {
 }
 
 function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHandleProps }: OptionEditorProps & { dragHandleProps?: Record<string, unknown> }) {
-  const formatChoices = (choices?: { value: string; label?: string }[]) =>
-    choices?.map(c => c.label ? `${c.value}:${c.label}` : c.value).join(', ') || ''
+  // Choices are stored on option.choices as { value, label? }[]. Earlier the
+  // editor serialized them through a single comma-separated string field —
+  // which silently shredded any choice whose *value* contained a comma
+  // (e.g. Pi's --tools "read,edit,write,grep,find,ls"). Each choice now has
+  // its own value + label inputs so we never round-trip through a delimiter.
+  const choices = option.choices ?? []
 
-  const [choicesText, setChoicesText] = useState(formatChoices(option.choices))
-  const localEdit = useRef(false)
+  const updateChoice = (index: number, patch: { value?: string; label?: string }) => {
+    const next = choices.map((c, i) => (i === index ? { ...c, ...patch } : c))
+    onChange({ choices: next })
+  }
 
-  // Sync choicesText when option.choices changes externally (not from our own input)
-  useEffect(() => {
-    if (localEdit.current) {
-      localEdit.current = false
-      return
-    }
-    setChoicesText(formatChoices(option.choices))
-  }, [option.choices])
+  const removeChoice = (index: number) => {
+    const next = choices.filter((_, i) => i !== index)
+    onChange({ choices: next.length > 0 ? next : undefined })
+  }
 
-  const parseChoices = (text: string) => {
-    if (!text.trim()) return undefined
-    return text.split(',').map(s => {
-      const [value, label] = s.trim().split(':')
-      return { value: value.trim(), label: label?.trim() }
-    }).filter(c => c.value)
+  const addChoice = () => {
+    onChange({ choices: [...choices, { value: '', label: '' }] })
   }
 
   return (
@@ -487,19 +485,57 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
 
           {option.type === 'string' && (
             <div className="space-y-1">
-              <Label className="text-xs">Choices (comma-separated, value:label format)</Label>
-              <Input
-                value={choicesText}
-                onChange={(e) => {
-                  localEdit.current = true
-                  setChoicesText(e.target.value)
-                  onChange({ choices: parseChoices(e.target.value) })
-                }}
-                placeholder="sonnet:Sonnet, opus:Opus, haiku:Haiku"
-                className="h-6 text-xs font-mono"
-              />
+              <Label className="text-xs">Choices</Label>
+              {choices.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No choices — option renders as a free-text input. Add a choice to make it a dropdown.
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  <div className="grid grid-cols-[1fr_1fr_auto] gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <span>Value (sent to CLI)</span>
+                    <span>Label (shown in dropdown)</span>
+                    <span className="w-5" />
+                  </div>
+                  {choices.map((choice, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-1">
+                      <Input
+                        value={choice.value}
+                        onChange={(e) => updateChoice(i, { value: e.target.value })}
+                        placeholder="sonnet"
+                        className="h-6 text-xs font-mono"
+                      />
+                      <Input
+                        value={choice.label || ''}
+                        onChange={(e) => updateChoice(i, { label: e.target.value })}
+                        placeholder="Sonnet"
+                        className="h-6 text-xs"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeChoice(i)}
+                        aria-label="Remove choice"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs gap-1"
+                onClick={addChoice}
+              >
+                <Plus className="h-3 w-3" /> Add choice
+              </Button>
               <p className="text-xs text-muted-foreground">
-                Format: <code>value:label</code> — value is sent to the CLI, label is shown in the dropdown. Leave empty for free text input. Use <code>__omit__</code> as the value to suppress the flag entirely (e.g. <code>__omit__:All tools</code>).
+                Use <code>__omit__</code> as the value to suppress the flag entirely (e.g. value <code>__omit__</code>, label <code>All tools</code>).
               </p>
             </div>
           )}
