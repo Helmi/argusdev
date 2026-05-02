@@ -465,11 +465,17 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
                     <SelectItem value="__none__" className="text-muted-foreground">
                       No default
                     </SelectItem>
-                    {option.choices.map((choice) => (
-                      <SelectItem key={choice.value} value={choice.value}>
-                        {choice.label || choice.value}
-                      </SelectItem>
-                    ))}
+                    {/* Radix Select forbids empty-string values and duplicate keys.
+                        Skip choices whose value isn't filled in yet (just-added rows)
+                        and dedupe by value so the dropdown stays valid while the
+                        user is editing. */}
+                    {option.choices
+                      .filter((c, i, arr) => c.value && arr.findIndex(o => o.value === c.value) === i)
+                      .map((choice) => (
+                        <SelectItem key={choice.value} value={choice.value}>
+                          {choice.label || choice.value}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               ) : (
