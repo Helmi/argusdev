@@ -158,6 +158,23 @@ export interface CommandPresetsConfig {
  * A single configurable option for an agent.
  * Options are rendered as form fields in the UI and assembled into argv at spawn.
  */
+/**
+ * One selectable choice for a string option. `args` carries the CLI tokens
+ * shipped when this choice is picked. `buildAgentArgs` tokenizes `args` on
+ * whitespace; if the first token starts with `-` the bundle is shipped
+ * verbatim, otherwise `option.flag` is auto-prepended. So a simple choice
+ * can use `args: "sonnet-4"` (becomes `--model sonnet-4`) and a multi-flag
+ * bundle can use `args: "deepseek/v4-pro --provider openrouter"` (shipped
+ * as-is). The literal string `__omit__` suppresses the option entirely.
+ *
+ * Legacy shape `{value, label?}` is migrated to `{label, args}` on read by
+ * normalizeAgentOptionChoices. Persisted configs use the new shape only.
+ */
+export interface AgentOptionChoice {
+	label: string;
+	args: string;
+}
+
 export interface AgentOption {
 	id: string; // Stable identity for storage and constraints
 	flag: string; // CLI flag (e.g., '--model') or empty for positional args
@@ -165,7 +182,7 @@ export interface AgentOption {
 	description?: string; // Tooltip/help text
 	type: 'boolean' | 'string';
 	default?: boolean | string;
-	choices?: {value: string; label?: string}[]; // If present, render as dropdown
+	choices?: AgentOptionChoice[]; // If present, render as dropdown
 	group?: string; // Mutual exclusivity group (options in same group are radio buttons)
 }
 

@@ -1,12 +1,56 @@
-import {AgentConfig} from '../types/index.js';
+import {AgentConfig, AgentOption, AgentOptionChoice} from '../types/index.js';
 
 /**
- * Sentinel choice value that suppresses the option's CLI flag entirely.
+ * Sentinel `args` value that suppresses the option's CLI flag entirely.
  * Use it when "no flag" is a meaningful state distinct from any concrete value
  * — e.g. Pi's `--tools` flag where omitting it enables all tools, not just the
  * union of named ones. Recognized in configurationManager.buildAgentArgs.
  */
 export const OMIT_FLAG_VALUE = '__omit__';
+
+/**
+ * Tokenize a choice's `args` string. Whitespace-separated tokens; quoting and
+ * shell escapes are not supported (CLI flags rarely need them, and adding a
+ * shell parser would surprise users). Empty string returns [].
+ */
+export function tokenizeChoiceArgs(raw: string): string[] {
+	return raw.trim().split(/\s+/).filter(Boolean);
+}
+
+/**
+ * Migrate any choice shape to the new `{label, args}` form. Accepts the
+ * legacy `{value, label?}` shape so existing user configs and any cached
+ * defaults survive a daemon upgrade. Drops malformed entries silently
+ * rather than throwing — corrupted profile data shouldn't lock a user out.
+ */
+export function normalizeAgentOptionChoices(
+	raw: unknown,
+): AgentOptionChoice[] | undefined {
+	if (!Array.isArray(raw)) return undefined;
+	const out: AgentOptionChoice[] = [];
+	for (const entry of raw) {
+		if (!entry || typeof entry !== 'object') continue;
+		const e = entry as Record<string, unknown>;
+		const argsField = typeof e['args'] === 'string' ? (e['args'] as string) : undefined;
+		const valueField = typeof e['value'] === 'string' ? (e['value'] as string) : undefined;
+		const labelField = typeof e['label'] === 'string' ? (e['label'] as string) : undefined;
+		const args = argsField ?? valueField;
+		if (args === undefined || args === '') continue;
+		const label = labelField && labelField.length > 0 ? labelField : args;
+		out.push({label, args});
+	}
+	return out;
+}
+
+export function normalizeAgentOption(option: AgentOption): AgentOption {
+	if (!option.choices) return option;
+	const normalized = normalizeAgentOptionChoices(option.choices);
+	if (!normalized) {
+		const {choices: _omitted, ...rest} = option;
+		return rest as AgentOption;
+	}
+	return {...option, choices: normalized};
+}
 
 export interface DetectableAgent {
 	id: string;
@@ -67,9 +111,9 @@ const PROFILES: Record<string, AgentConfig> = {
 				description: 'Model to use',
 				type: 'string',
 				choices: [
-					{value: 'sonnet', label: 'Sonnet'},
-					{value: 'opus', label: 'Opus'},
-					{value: 'haiku', label: 'Haiku'},
+					{label: 'Sonnet', args: 'sonnet'},
+					{label: 'Opus', args: 'opus'},
+					{label: 'Haiku', args: 'haiku'},
 				],
 			},
 		],
@@ -108,9 +152,9 @@ const PROFILES: Record<string, AgentConfig> = {
 				description: 'Model to use',
 				type: 'string',
 				choices: [
-					{value: 'sonnet', label: 'Sonnet'},
-					{value: 'opus', label: 'Opus'},
-					{value: 'haiku', label: 'Haiku'},
+					{label: 'Sonnet', args: 'sonnet'},
+					{label: 'Opus', args: 'opus'},
+					{label: 'Haiku', args: 'haiku'},
 				],
 			},
 		],
@@ -202,10 +246,10 @@ const PROFILES: Record<string, AgentConfig> = {
 				type: 'string',
 				default: 'read,edit,write,grep,find,ls',
 				choices: [
-					{value: 'read,grep,find,ls', label: 'Read-only'},
-					{value: 'read,edit,write,grep,find,ls', label: 'Safe (no bash)'},
-					{value: 'read,bash,edit,write', label: 'Default (includes bash)'},
-					{value: OMIT_FLAG_VALUE, label: 'All tools (no restriction)'},
+					{label: 'Read-only', args: 'read,grep,find,ls'},
+					{label: 'Safe (no bash)', args: 'read,edit,write,grep,find,ls'},
+					{label: 'Default (includes bash)', args: 'read,bash,edit,write'},
+					{label: 'All tools (no restriction)', args: OMIT_FLAG_VALUE},
 				],
 			},
 			{
@@ -247,12 +291,12 @@ const PROFILES: Record<string, AgentConfig> = {
 				description: 'Thinking level',
 				type: 'string',
 				choices: [
-					{value: 'off', label: 'Off'},
-					{value: 'minimal', label: 'Minimal'},
-					{value: 'low', label: 'Low'},
-					{value: 'medium', label: 'Medium'},
-					{value: 'high', label: 'High'},
-					{value: 'xhigh', label: 'Extra High'},
+					{label: 'Off', args: 'off'},
+					{label: 'Minimal', args: 'minimal'},
+					{label: 'Low', args: 'low'},
+					{label: 'Medium', args: 'medium'},
+					{label: 'High', args: 'high'},
+					{label: 'Extra High', args: 'xhigh'},
 				],
 			},
 		],
@@ -281,8 +325,8 @@ const PROFILES: Record<string, AgentConfig> = {
 				description: 'Sandbox mode',
 				type: 'string',
 				choices: [
-					{value: 'enabled', label: 'Enabled'},
-					{value: 'disabled', label: 'Disabled'},
+					{label: 'Enabled', args: 'enabled'},
+					{label: 'Disabled', args: 'disabled'},
 				],
 			},
 			{

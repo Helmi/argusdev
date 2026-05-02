@@ -562,7 +562,7 @@ describe('ConfigurationManager - Command Presets', () => {
 		});
 	});
 
-	describe('buildAgentArgs — OMIT_FLAG_VALUE sentinel', () => {
+	describe('buildAgentArgs — choice args semantics', () => {
 		const agent = {
 			options: [
 				{
@@ -571,9 +571,15 @@ describe('ConfigurationManager - Command Presets', () => {
 					label: 'Tools',
 					type: 'string' as const,
 					choices: [
-						{value: 'read,grep', label: 'Read-only'},
-						{value: '__omit__', label: 'All tools'},
+						{label: 'Read-only', args: 'read,grep'},
+						{label: 'All tools', args: '__omit__'},
 					],
+				},
+				{
+					id: 'model',
+					flag: '--model',
+					label: 'Model',
+					type: 'string' as const,
 				},
 				{
 					id: 'thinking',
@@ -584,19 +590,45 @@ describe('ConfigurationManager - Command Presets', () => {
 			],
 		} as import('../types/index.js').AgentConfig;
 
-		it('emits the flag for normal string choices', () => {
+		it('emits flag + value for a single-token args (auto-prepend)', () => {
 			configManager = new ConfigurationManager();
 			const args = configManager.buildAgentArgs(agent, {tools: 'read,grep'});
 			expect(args).toEqual(['--tools', 'read,grep']);
 		});
 
-		it('omits the flag entirely when value is __omit__', () => {
+		it('omits the flag entirely when args is __omit__', () => {
 			configManager = new ConfigurationManager();
 			const args = configManager.buildAgentArgs(agent, {
 				tools: '__omit__',
 				thinking: 'medium',
 			});
 			expect(args).toEqual(['--thinking', 'medium']);
+		});
+
+		it('ships a multi-token bundle verbatim when first token is a flag', () => {
+			configManager = new ConfigurationManager();
+			const args = configManager.buildAgentArgs(agent, {
+				model: '--model deepseek/deepseek-v4-pro --provider openrouter',
+			});
+			expect(args).toEqual([
+				'--model',
+				'deepseek/deepseek-v4-pro',
+				'--provider',
+				'openrouter',
+			]);
+		});
+
+		it('prepends option.flag when first token is a value, then ships extra flags', () => {
+			configManager = new ConfigurationManager();
+			const args = configManager.buildAgentArgs(agent, {
+				model: 'deepseek/deepseek-v4-pro --provider openrouter',
+			});
+			expect(args).toEqual([
+				'--model',
+				'deepseek/deepseek-v4-pro',
+				'--provider',
+				'openrouter',
+			]);
 		});
 	});
 });

@@ -24,11 +24,13 @@ import {getConfigDir} from '../utils/configDir.js';
 import {
 	getAgentProfileById,
 	getAgentProfilesByIds,
+	normalizeAgentOption,
 	OMIT_FLAG_VALUE,
+	tokenizeChoiceArgs,
 } from './agentProfiles.js';
 
 // Current schema version for agents config
-const AGENTS_SCHEMA_VERSION = 3;
+const AGENTS_SCHEMA_VERSION = 4;
 
 const BUILTIN_PROMPT_ARG_DEFAULTS: Record<string, string | undefined> = {
 	claude: undefined,
@@ -491,6 +493,9 @@ export class ConfigurationManager {
 			...agent,
 			enabled: agent.enabled ?? true,
 			promptArg: this.normalizePromptArgValue(agent),
+			// Migrate any legacy {value, label?} choice entries to the new
+			// {label, args} shape so older user configs survive an upgrade.
+			options: agent.options.map(opt => normalizeAgentOption(opt)),
 		};
 	}
 
@@ -850,12 +855,22 @@ export class ConfigurationManager {
 				typeof value === 'string' &&
 				value
 			) {
-				// String option - add flag and value
-				if (option.flag) {
-					args.push(option.flag, value);
+				// String option. The stored value IS the chosen choice's `args`
+				// string (or, for free-text inputs without choices, raw user
+				// input). Tokenize on whitespace: if the first token already
+				// starts with `-` the user wrote a full flag bundle and we ship
+				// it verbatim; otherwise we treat the tokens as values for
+				// option.flag and prepend it. Empty option.flag means positional.
+				const tokens = tokenizeChoiceArgs(value);
+				if (tokens.length === 0) {
+					continue;
+				}
+				if (tokens[0]!.startsWith('-')) {
+					args.push(...tokens);
+				} else if (option.flag) {
+					args.push(option.flag, ...tokens);
 				} else {
-					// No flag means positional argument
-					args.push(value);
+					args.push(...tokens);
 				}
 			}
 		}

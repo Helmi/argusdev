@@ -338,14 +338,13 @@ function SortableOptionEditor(props: OptionEditorProps) {
 }
 
 function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHandleProps }: OptionEditorProps & { dragHandleProps?: Record<string, unknown> }) {
-  // Choices are stored on option.choices as { value, label? }[]. Earlier the
-  // editor serialized them through a single comma-separated string field —
-  // which silently shredded any choice whose *value* contained a comma
-  // (e.g. Pi's --tools "read,edit,write,grep,find,ls"). Each choice now has
-  // its own value + label inputs so we never round-trip through a delimiter.
+  // Each choice = label (shown in dropdown) + args (CLI tokens emitted when
+  // selected). buildAgentArgs auto-prepends option.flag if args's first token
+  // isn't already a flag — so "sonnet-4" emits `--model sonnet-4`, while
+  // "deepseek/v4 --provider openrouter" ships verbatim.
   const choices = option.choices ?? []
 
-  const updateChoice = (index: number, patch: { value?: string; label?: string }) => {
+  const updateChoice = (index: number, patch: { label?: string; args?: string }) => {
     const next = choices.map((c, i) => (i === index ? { ...c, ...patch } : c))
     onChange({ choices: next })
   }
@@ -356,7 +355,7 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
   }
 
   const addChoice = () => {
-    onChange({ choices: [...choices, { value: '', label: '' }] })
+    onChange({ choices: [...choices, { label: '', args: '' }] })
   }
 
   return (
@@ -466,14 +465,14 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
                       No default
                     </SelectItem>
                     {/* Radix Select forbids empty-string values and duplicate keys.
-                        Skip choices whose value isn't filled in yet (just-added rows)
-                        and dedupe by value so the dropdown stays valid while the
+                        Skip choices whose args isn't filled in yet (just-added rows)
+                        and dedupe by args so the dropdown stays valid while the
                         user is editing. */}
                     {option.choices
-                      .filter((c, i, arr) => c.value && arr.findIndex(o => o.value === c.value) === i)
+                      .filter((c, i, arr) => c.args && arr.findIndex(o => o.args === c.args) === i)
                       .map((choice) => (
-                        <SelectItem key={choice.value} value={choice.value}>
-                          {choice.label || choice.value}
+                        <SelectItem key={choice.args} value={choice.args}>
+                          {choice.label || choice.args}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -498,24 +497,24 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
                 </p>
               ) : (
                 <div className="space-y-1">
-                  <div className="grid grid-cols-[1fr_1fr_auto] gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <span>Value (sent to CLI)</span>
+                  <div className="grid grid-cols-[1fr_1.4fr_auto] gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                     <span>Label (shown in dropdown)</span>
+                    <span>Args (sent to CLI)</span>
                     <span className="w-5" />
                   </div>
                   {choices.map((choice, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-1">
+                    <div key={i} className="grid grid-cols-[1fr_1.4fr_auto] gap-1">
                       <Input
-                        value={choice.value}
-                        onChange={(e) => updateChoice(i, { value: e.target.value })}
-                        placeholder="sonnet"
-                        className="h-6 text-xs font-mono"
+                        value={choice.label}
+                        onChange={(e) => updateChoice(i, { label: e.target.value })}
+                        placeholder="Sonnet 4"
+                        className="h-6 text-xs"
                       />
                       <Input
-                        value={choice.label || ''}
-                        onChange={(e) => updateChoice(i, { label: e.target.value })}
-                        placeholder="Sonnet"
-                        className="h-6 text-xs"
+                        value={choice.args}
+                        onChange={(e) => updateChoice(i, { args: e.target.value })}
+                        placeholder="anthropic/sonnet-4 — or sonnet-4 --provider openrouter"
+                        className="h-6 text-xs font-mono"
                       />
                       <Button
                         type="button"
@@ -541,7 +540,7 @@ function OptionEditor({ option, isExpanded, onToggle, onChange, onRemove, dragHa
                 <Plus className="h-3 w-3" /> Add choice
               </Button>
               <p className="text-xs text-muted-foreground">
-                Use <code>__omit__</code> as the value to suppress the flag entirely (e.g. value <code>__omit__</code>, label <code>All tools</code>).
+                Args is shipped as CLI tokens. If the first token starts with <code>-</code> (e.g. <code>--model X --provider Y</code>) it ships verbatim; otherwise <code>{option.flag || '(no flag)'}</code> is auto-prepended. Use <code>__omit__</code> to suppress the flag entirely.
               </p>
             </div>
           )}

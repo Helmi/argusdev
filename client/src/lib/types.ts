@@ -265,6 +265,14 @@ export type ConnectionStatus =
 	| 'error'
 	| 'auth-error';
 
+// One selectable choice for a string option. See backend AgentOptionChoice
+// for the full semantics; in short, args is tokenized and option.flag is
+// auto-prepended unless the bundle starts with a dash.
+export interface AgentOptionChoice {
+	label: string;
+	args: string;
+}
+
 // Agent option (single configurable parameter for an agent)
 export interface AgentOption {
 	id: string; // Stable identity for storage/constraints
@@ -273,7 +281,7 @@ export interface AgentOption {
 	description?: string; // Tooltip/help text
 	type: 'boolean' | 'string';
 	default?: boolean | string;
-	choices?: {value: string; label?: string}[]; // If present, render as dropdown
+	choices?: AgentOptionChoice[]; // If present, render as dropdown
 	group?: string; // Mutual exclusivity group
 }
 

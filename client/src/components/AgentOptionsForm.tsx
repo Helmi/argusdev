@@ -53,8 +53,14 @@ export function AgentOptionsForm({ options, values, onChange }: AgentOptionsForm
   const renderOption = (opt: AgentOption) => {
     const value = values[opt.id]
 
-    // String with choices = dropdown
+    // String with choices = dropdown. The Select stores choice.args directly
+    // (that's what buildAgentArgs needs); the dropdown displays choice.label.
     if (opt.type === 'string' && opt.choices && opt.choices.length > 0) {
+      // Filter empty/duplicate args so Radix Select doesn't get an empty value
+      // or duplicate keys. Mirrors the editor's filter for the same reasons.
+      const visibleChoices = opt.choices.filter(
+        (c, i, arr) => c.args && arr.findIndex(o => o.args === c.args) === i,
+      )
       return (
         <div key={opt.id} className="space-y-1">
           <Label className="text-xs">{opt.label}</Label>
@@ -66,9 +72,9 @@ export function AgentOptionsForm({ options, values, onChange }: AgentOptionsForm
               <SelectValue placeholder={`Select ${opt.label.toLowerCase()}`} />
             </SelectTrigger>
             <SelectContent>
-              {opt.choices.map((choice) => (
-                <SelectItem key={choice.value} value={choice.value}>
-                  {choice.label || choice.value}
+              {visibleChoices.map((choice) => (
+                <SelectItem key={choice.args} value={choice.args}>
+                  {choice.label || choice.args}
                 </SelectItem>
               ))}
             </SelectContent>
