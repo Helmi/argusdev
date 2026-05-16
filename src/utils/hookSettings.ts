@@ -200,7 +200,7 @@ function isArgusdevOwnedContent(raw: string): boolean {
 }
 
 /**
- * Write .codex/hooks.json and patch .codex/config.toml (codex_hooks = true)
+ * Write .codex/hooks.json and patch .codex/config.toml (hooks = true)
  * in the given worktree.
  *
  * If a hooks.json already exists that ArgusDev did not create, it is
@@ -708,16 +708,21 @@ function patchCodexConfigToml(codexDir: string): void {
 		content = readFileSync(configPath, 'utf-8');
 	}
 
-	if (/^\s*codex_hooks\s*=/m.test(content)) {
+	// Codex renamed the feature flag from `codex_hooks` to `hooks`.
+	// Remove the deprecated key entirely to avoid startup warnings when a
+	// worktree still has an older ArgusDev-generated config.
+	content = content.replace(/^\s*codex_hooks\s*=.*(?:\r?\n|$)/gm, '');
+
+	if (/^\s*hooks\s*=/m.test(content)) {
 		// Already present — ensure it's true
-		content = content.replace(/^(\s*codex_hooks\s*=\s*).+$/m, '$1true');
+		content = content.replace(/^(\s*hooks\s*=\s*).+$/m, '$1true');
 	} else if (/^\s*\[features\]/m.test(content)) {
 		// [features] section exists — append under it
-		content = content.replace(/^(\s*\[features\])/m, '$1\ncodex_hooks = true');
+		content = content.replace(/^(\s*\[features\])/m, '$1\nhooks = true');
 	} else {
 		// No [features] section — append one
 		const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
-		content = `${content}${separator}\n[features]\ncodex_hooks = true\n`;
+		content = `${content}${separator}\n[features]\nhooks = true\n`;
 	}
 
 	writeFileSync(configPath, content, {encoding: 'utf-8'});

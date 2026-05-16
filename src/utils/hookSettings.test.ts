@@ -303,17 +303,18 @@ describe('writeCodexHookFiles', () => {
 		expect(mode).toBe(0o600);
 	});
 
-	it('creates .codex/config.toml with [features] codex_hooks = true when absent', () => {
+	it('creates .codex/config.toml with [features] hooks = true when absent', () => {
 		writeCodexHookFiles(worktree, 8080, 'ses-cfg');
 		const content = readFileSync(
 			join(worktree, '.codex', 'config.toml'),
 			'utf-8',
 		);
-		expect(content).toContain('codex_hooks = true');
+		expect(content).toContain('hooks = true');
+		expect(content).not.toContain('codex_hooks');
 		expect(content).toContain('[features]');
 	});
 
-	it('appends codex_hooks under existing [features] section', () => {
+	it('appends hooks under existing [features] section', () => {
 		const codexDir = join(worktree, '.codex');
 		mkdirSync(codexDir, {recursive: true});
 		writeFileSync(
@@ -322,11 +323,12 @@ describe('writeCodexHookFiles', () => {
 		);
 		writeCodexHookFiles(worktree, 8080, 'ses-patch');
 		const content = readFileSync(join(codexDir, 'config.toml'), 'utf-8');
-		expect(content).toContain('codex_hooks = true');
+		expect(content).toContain('hooks = true');
+		expect(content).not.toContain('codex_hooks');
 		expect(content).toContain('unified_exec = true');
 	});
 
-	it('sets codex_hooks = true when it already exists as false', () => {
+	it('migrates deprecated codex_hooks = false to hooks = true', () => {
 		const codexDir = join(worktree, '.codex');
 		mkdirSync(codexDir, {recursive: true});
 		writeFileSync(
@@ -335,8 +337,8 @@ describe('writeCodexHookFiles', () => {
 		);
 		writeCodexHookFiles(worktree, 8080, 'ses-update');
 		const content = readFileSync(join(codexDir, 'config.toml'), 'utf-8');
-		expect(content).toContain('codex_hooks = true');
-		expect(content).not.toContain('codex_hooks = false');
+		expect(content).toContain('hooks = true');
+		expect(content).not.toContain('codex_hooks');
 	});
 
 	it('is idempotent when called twice', () => {
@@ -454,7 +456,7 @@ describe('writeCodexHookFiles', () => {
 		const cleanup = writeCodexHookFiles(worktree, 8080, 'ses-mid-edit');
 
 		// User edits config.toml during the session
-		const userEdited = 'model = "o4-mini"\n\n[features]\ncodex_hooks = true\n';
+		const userEdited = 'model = "o4-mini"\n\n[features]\nhooks = true\n';
 		writeFileSync(configPath, userEdited, {encoding: 'utf-8'});
 
 		cleanup();
@@ -470,7 +472,7 @@ describe('writeCodexHookFiles', () => {
 		expect(existsSync(configPath)).toBe(true);
 
 		// User adds settings during the session
-		const userEdited = '[features]\ncodex_hooks = true\n\nmodel = "o4-mini"\n';
+		const userEdited = '[features]\nhooks = true\n\nmodel = "o4-mini"\n';
 		writeFileSync(configPath, userEdited, {encoding: 'utf-8'});
 
 		cleanup();
