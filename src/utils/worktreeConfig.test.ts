@@ -146,11 +146,17 @@ describe('worktreeConfig', () => {
 				nodePath.join(nodeOs.tmpdir(), 'argusdev-wc-local-'),
 			);
 			try {
-				// Set up bare remote
-				exec('git init --bare', {cwd: remoteDir, stdio: 'pipe'});
+				// Set up bare remote with main as default branch (CI runners may
+				// default to 'master' otherwise, causing `git push origin main` to fail).
+				exec('git -c init.defaultBranch=main init --bare', {
+					cwd: remoteDir,
+					stdio: 'pipe',
+				});
 
 				// Clone and configure
-				exec(`git clone ${remoteDir} ${localDir}`, {stdio: 'pipe'});
+				exec(`git -c init.defaultBranch=main clone ${remoteDir} ${localDir}`, {
+					stdio: 'pipe',
+				});
 				exec('git config user.email "t@t.com"', {cwd: localDir, stdio: 'pipe'});
 				exec('git config user.name "T"', {cwd: localDir, stdio: 'pipe'});
 				exec('git config commit.gpgsign false', {cwd: localDir, stdio: 'pipe'});
@@ -159,7 +165,7 @@ describe('worktreeConfig', () => {
 				fsSync.writeFileSync(nodePath.join(localDir, 'f.txt'), 'x');
 				exec('git add f.txt', {cwd: localDir, stdio: 'pipe'});
 				exec('git commit -m "init"', {cwd: localDir, stdio: 'pipe'});
-				exec('git push origin main', {cwd: localDir, stdio: 'pipe'});
+				exec('git push origin HEAD:main', {cwd: localDir, stdio: 'pipe'});
 
 				// Create feature branch, commit, and push -u (tracking origin/feat/thing)
 				exec('git checkout -b feat/thing', {cwd: localDir, stdio: 'pipe'});
