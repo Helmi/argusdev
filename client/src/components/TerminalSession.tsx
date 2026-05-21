@@ -232,6 +232,18 @@ export const TerminalSession = memo(function TerminalSession({
 
 		term.open(terminalRef.current);
 		fitAddon.fit();
+
+		// Shift+Enter → newline-insert (sends \n / LF), matching iTerm/Warp.
+		// Plain Enter still sends \r (CR), which agents treat as submit.
+		term.attachCustomKeyEventHandler((e: KeyboardEvent) => {
+			if (e.type !== 'keydown') return true;
+			if (e.key !== 'Enter') return true;
+			if (!e.shiftKey) return true;
+			if (e.ctrlKey || e.metaKey || e.altKey) return true;
+			socket.emit('input', {sessionId: sessionIdRef.current, data: '\n'});
+			e.preventDefault();
+			return false;
+		});
 		// Don't store dimensions yet - let the delayed handleResize() emit them to backend
 		// Don't auto-focus on mount - let isFocused prop control this
 		if (isFocused) {
@@ -310,6 +322,10 @@ export const TerminalSession = memo(function TerminalSession({
 				scheduleAutoRedraw();
 			}
 			const output = isPiSession ? content.replace(piCursorPattern, '') : content;
+			const modeMatches = output.match(bracketedPasteModePattern);
+			if (modeMatches && modeMatches.length > 0) {
+				bracketedPasteEnabled = modeMatches[modeMatches.length - 1].endsWith('h');
+			}
 			term.write(output);
 		};
 
@@ -338,6 +354,12 @@ export const TerminalSession = memo(function TerminalSession({
 		// these from the incoming stream is safe. Both hide and show are stripped so
 		// xterm retains full control over cursor visibility. See td-52e9cf.
 		const piCursorPattern = /\x1b\[\?25[lh]/g;
+		// Track bracketed-paste mode (DECSET 2004). Updated from the incoming PTY
+		// stream so we know whether the running agent supports paste markers.
+		// xterm.js tracks this internally too, but we mirror it so the capture-phase
+		// paste handler can wrap content explicitly without relying on term.paste().
+		let bracketedPasteEnabled = false;
+		const bracketedPasteModePattern = /\x1b\[\?2004([hl])/g;
 		// OpenCode (opentui) misuses focus-out as a "host may drop modes" signal:
 		// receiving \x1b[O sets shouldRestoreModesOnNextFocus=true, disabling mouse
 		// tracking until \x1b[I arrives — which can fail to fire when ArgusDev
@@ -430,7 +452,11 @@ export const TerminalSession = memo(function TerminalSession({
 		};
 		terminalRef.current.addEventListener('wheel', wheelHandler, { passive: true });
 
-		// Clipboard image paste handler
+		// Clipboard paste handler — capture-phase so we run before xterm.js's own
+		// textarea listener. Images upload via paste_image; multi-line text is
+		// wrapped in bracketed-paste markers and emitted directly to the PTY when
+		// the agent has DECSET 2004 active. Single-line / unsupported cases fall
+		// through to xterm.js's default paste behavior.
 		const pasteHandler = async (e: ClipboardEvent) => {
 			const items = e.clipboardData?.items;
 			if (!items) return;
@@ -444,8 +470,19 @@ export const TerminalSession = memo(function TerminalSession({
 				}
 			}
 
-			// Only handle images - let text paste through to xterm.js
-			if (!imageItem) return;
+			if (!imageItem) {
+				const text = e.clipboardData?.getData('text/plain');
+				if (!text || !/[\r\n]/.test(text)) return;
+				if (!bracketedPasteEnabled) return;
+				e.preventDefault();
+				e.stopPropagation();
+				const normalized = text.replace(/\r\n?/g, '\n').replace(/\n/g, '\r');
+				currentSocket.emit('input', {
+					sessionId: sessionIdRef.current,
+					data: `\x1b[200~${normalized}\x1b[201~`,
+				});
+				return;
+			}
 
 			e.preventDefault();
 
@@ -470,7 +507,7 @@ export const TerminalSession = memo(function TerminalSession({
 			};
 			reader.readAsDataURL(blob);
 		};
-		terminalRef.current.addEventListener('paste', pasteHandler);
+		terminalRef.current.addEventListener('paste', pasteHandler, {capture: true});
 
 		// Handle image path response from server
 		const handleImagePath = ({
@@ -682,7 +719,7 @@ export const TerminalSession = memo(function TerminalSession({
 			filePathLinkDisposable.dispose();
 			if (terminalRef.current) {
 				terminalRef.current.removeEventListener('wheel', wheelHandler);
-				terminalRef.current.removeEventListener('paste', pasteHandler);
+				terminalRef.current.removeEventListener('paste', pasteHandler, {capture: true} as EventListenerOptions);
 				terminalRef.current.removeEventListener('pointerdown', pointerDownHandler, { capture: true });
 				terminalRef.current.removeEventListener('pointermove', pointerMoveHandler, { capture: true });
 				terminalRef.current.removeEventListener('pointerup', pointerUpHandler, { capture: true });
