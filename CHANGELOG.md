@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.8.2](https://github.com/Helmi/argusdev/compare/v0.8.0...v0.8.2) (2026-05-21)
+
+
+### Features
+
+* **agents:** choice schema with multi-flag args ([7c79af9](https://github.com/Helmi/argusdev/commit/7c79af9a00c1174f9ffa5a585a7a640f10c504ac))
+* **webui:** bracketed-paste wrapping and Shift+Enter newline ([656c163](https://github.com/Helmi/argusdev/commit/656c1630d92099802482aac692104726b461c08d))
+
+
+### Bug Fixes
+
+* **hooks:** use current Codex hooks feature flag ([fc5b8f6](https://github.com/Helmi/argusdev/commit/fc5b8f6dfdefd01a234a8882f4fbefc247b65a8b))
+* **webui:** blank screen when adding empty choice in agent profile editor ([9518d92](https://github.com/Helmi/argusdev/commit/9518d92930a4df66fb2911837ea51adf3a053e14))
+* **webui:** per-choice editor for agent option choices ([d3d4ee9](https://github.com/Helmi/argusdev/commit/d3d4ee9c733b23953b8b6cafd4091943ebadfa6a))
+
 ## [0.8.0](https://github.com/Helmi/argusdev/compare/v0.7.2...v0.8.0) (2026-05-01)
 
 The first release where state detection isn't a buffer-scraping hack on most agents. Codex, Gemini, OpenCode and Pi all moved to hook-based detection (Claude was already there in 0.7.0), so busy/idle/waiting transitions now arrive directly from the agent's lifecycle instead of being inferred from terminal output. The task board grew a graph view with parent/child and dependency edges, a "nudge" primitive lets you type into a running session without stealing focus (now used by reject-loop and integration alerts), and TUI sessions self-heal on re-attach instead of leaving you to hit Refresh. Mobile and per-project routing got a stack of fixes that have been overdue.
