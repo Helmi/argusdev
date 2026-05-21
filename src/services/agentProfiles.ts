@@ -31,9 +31,12 @@ export function normalizeAgentOptionChoices(
 	for (const entry of raw) {
 		if (!entry || typeof entry !== 'object') continue;
 		const e = entry as Record<string, unknown>;
-		const argsField = typeof e['args'] === 'string' ? (e['args'] as string) : undefined;
-		const valueField = typeof e['value'] === 'string' ? (e['value'] as string) : undefined;
-		const labelField = typeof e['label'] === 'string' ? (e['label'] as string) : undefined;
+		const argsField =
+			typeof e['args'] === 'string' ? (e['args'] as string) : undefined;
+		const valueField =
+			typeof e['value'] === 'string' ? (e['value'] as string) : undefined;
+		const labelField =
+			typeof e['label'] === 'string' ? (e['label'] as string) : undefined;
 		const args = argsField ?? valueField;
 		if (args === undefined || args === '') continue;
 		const label = labelField && labelField.length > 0 ? labelField : args;
@@ -46,7 +49,8 @@ export function normalizeAgentOption(option: AgentOption): AgentOption {
 	if (!option.choices) return option;
 	const normalized = normalizeAgentOptionChoices(option.choices);
 	if (!normalized) {
-		const {choices: _omitted, ...rest} = option;
+		const {choices, ...rest} = option;
+		void choices;
 		return rest as AgentOption;
 	}
 	return {...option, choices: normalized};
