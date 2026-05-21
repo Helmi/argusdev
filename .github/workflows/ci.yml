@@ -99,5 +99,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Install client dependencies
+        run: cd client && npm install --no-audit --no-fund
+
       - name: Test
         run: bun run test
