@@ -81,4 +81,18 @@ describe('TerminalSession Pi cursor-filter (td-52e9cf)', () => {
     // A session that just names itself pi but has no normalized type must not trigger
     expect(gate({agentId: 'pi', normalizedAgentType: undefined}, sample)).toBe(sample)
   })
+
+  it('keeps replayed Pi sessions pinned to bottom after history writes and layout fits', () => {
+    const source = readSource()
+    expect(source).toContain('const scrollToBottomIfFollowingOutput = useCallback')
+    expect(source).toMatch(/term\.write\(output,\s*\(\)\s*=>\s*\{[^}]*content\.length > 1024[^}]*scrollToBottomIfFollowingOutput\(\)/s)
+    expect(source).toMatch(/onAfterFit\?\.\(\)/)
+    expect(source).toMatch(/debouncedFit\([\s\S]*scrollToBottomIfFollowingOutput[\s\S]*\)/)
+  })
+
+  it('restores local bracketed paste state from terminal_mode on reattach', () => {
+    const source = readSource()
+    expect(source).toContain("currentSocket.on('terminal_mode', handleTerminalMode)")
+    expect(source).toMatch(/bracketedPasteEnabled\s*=\s*msg\.bracketedPaste/)
+  })
 })

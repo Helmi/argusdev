@@ -57,7 +57,8 @@ function createDebouncedFit(delay = 100) {
 		socket: ReturnType<typeof useAppStore>['socket'],
 		sessionId: string,
 		lastDims: { cols: number; rows: number },
-		onColsChange?: (cols: number) => void
+		onColsChange?: (cols: number) => void,
+		onAfterFit?: () => void
 	) => {
 		if (timeoutId) clearTimeout(timeoutId);
 		if (rafId) cancelAnimationFrame(rafId);
@@ -81,6 +82,7 @@ function createDebouncedFit(delay = 100) {
 					socket.emit('resize', { sessionId, cols, rows });
 					onColsChange?.(cols);
 				}
+				onAfterFit?.();
 			});
 		}, delay);
 	};
@@ -188,6 +190,22 @@ export const TerminalSession = memo(function TerminalSession({
 	const isProgrammaticScrollRef = useRef(false);
 	const openFilePreviewRef = useRef(openFilePreview);
 	openFilePreviewRef.current = openFilePreview;
+
+	const scrollToBottomIfFollowingOutput = useCallback(() => {
+		if (isScrolledUpRef.current) return;
+		const term = xtermRef.current;
+		if (!term) return;
+
+		isProgrammaticScrollRef.current = true;
+		term.scrollToBottom();
+		setIsScrolledUp(false);
+
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				isProgrammaticScrollRef.current = false;
+			});
+		});
+	}, [setIsScrolledUp]);
 
 	const isContextOpen = contextSidebarSessionId === session.id;
 
@@ -297,6 +315,7 @@ export const TerminalSession = memo(function TerminalSession({
 					lastDimsRef.current = next;
 					currentSocket.emit('resize', { sessionId: sessionIdRef.current, ...next });
 					xtermRef.current.refresh(0, xtermRef.current.rows - 1);
+					scrollToBottomIfFollowingOutput();
 				}, 60);
 			}, 350);
 		};
@@ -326,10 +345,33 @@ export const TerminalSession = memo(function TerminalSession({
 			if (modeMatches && modeMatches.length > 0) {
 				bracketedPasteEnabled = modeMatches[modeMatches.length - 1].endsWith('h');
 			}
-			term.write(output);
+			term.write(output, () => {
+				if (content.length > 1024) {
+					scrollToBottomIfFollowingOutput();
+				}
+			});
 		};
 
 		currentSocket.on('terminal_data', handleDataWithDiag);
+
+		// Restore terminal modes from the server on (re-)attach. The server
+		// reads its headless xterm's live state so it's accurate even after the
+		// 1MB output-history rolling buffer trimmed the original DECSET bytes.
+		// Writing the sequence to xterm keeps xterm's internal mode tracking in
+		// sync. Also update the local mirror directly: term.write() does not flow
+		// back through handleDataWithDiag, but the paste handler relies on this flag.
+		const handleTerminalMode = (msg: {
+			sessionId: string;
+			bracketedPaste: boolean;
+		}) => {
+			if (!isMounted) return;
+			if (msg.sessionId !== sessionIdRef.current) return;
+			bracketedPasteEnabled = msg.bracketedPaste;
+			term.write(msg.bracketedPaste ? '\x1b[?2004h' : '\x1b[?2004l', () => {
+				scrollToBottomIfFollowingOutput();
+			});
+		};
+		currentSocket.on('terminal_mode', handleTerminalMode);
 
 		// Handle outgoing data - uses ref for current session.id
 		// Filter terminal-to-host response sequences that xterm.js generates.
@@ -499,7 +541,7 @@ export const TerminalSession = memo(function TerminalSession({
 				currentSocket.emit('paste_image', {
 					sessionId: sessionIdRef.current,
 					imageData: base64,
-					mimeType: imageItem!.type,
+					mimeType: blob.type || imageItem!.type,
 				});
 			};
 			reader.onerror = () => {
@@ -605,7 +647,9 @@ export const TerminalSession = memo(function TerminalSession({
 				xtermRef.current,
 				currentSocket,
 				sessionIdRef.current,
-				lastDimsRef.current
+				lastDimsRef.current,
+				undefined,
+				scrollToBottomIfFollowingOutput
 			);
 		};
 
@@ -704,6 +748,7 @@ export const TerminalSession = memo(function TerminalSession({
 			// Use captured references for cleanup to ensure correct socket/session
 			currentSocket.off('connect', handleConnect);
 			currentSocket.off('terminal_data', handleDataWithDiag);
+			currentSocket.off('terminal_mode', handleTerminalMode);
 			currentSocket.off('image_path', handleImagePath);
 			initialFitTimers.forEach(timer => clearTimeout(timer));
 			window.removeEventListener('resize', handleViewportChange);
@@ -729,7 +774,7 @@ export const TerminalSession = memo(function TerminalSession({
 			xtermRef.current = null;
 			fitAddonRef.current = null;
 		};
-	}, [session.id, socket, debouncedFit]);
+	}, [session.id, socket, debouncedFit, scrollToBottomIfFollowingOutput]);
 
 	// Re-fit when maximized state changes
 	useEffect(() => {
@@ -739,9 +784,11 @@ export const TerminalSession = memo(function TerminalSession({
 			xtermRef.current,
 			socket,
 			session.id,
-			lastDimsRef.current
+			lastDimsRef.current,
+			undefined,
+			scrollToBottomIfFollowingOutput
 		);
-	}, [isMaximized, debouncedFit, socket, session.id]);
+	}, [isMaximized, debouncedFit, socket, session.id, scrollToBottomIfFollowingOutput]);
 
 	// Update terminal theme when app theme changes
 	useEffect(() => {
@@ -765,10 +812,12 @@ export const TerminalSession = memo(function TerminalSession({
 				xtermRef.current,
 				socket,
 				session.id,
-				lastDimsRef.current
+				lastDimsRef.current,
+				undefined,
+				scrollToBottomIfFollowingOutput
 			);
 		}
-	}, [fontScale, debouncedFit, socket, session.id]);
+	}, [fontScale, debouncedFit, socket, session.id, scrollToBottomIfFollowingOutput]);
 
 	// Update terminal font family when font changes
 	useEffect(() => {
@@ -780,10 +829,12 @@ export const TerminalSession = memo(function TerminalSession({
 				xtermRef.current,
 				socket,
 				session.id,
-				lastDimsRef.current
+				lastDimsRef.current,
+				undefined,
+				scrollToBottomIfFollowingOutput
 			);
 		}
-	}, [font, fontFamily, debouncedFit, socket, session.id]);
+	}, [font, fontFamily, debouncedFit, socket, session.id, scrollToBottomIfFollowingOutput]);
 
 	// Focus terminal when isFocused becomes true, only scroll to bottom if
 	// user was already at the bottom — prevents scroll jumps when regaining focus

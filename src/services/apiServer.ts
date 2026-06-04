@@ -74,15 +74,13 @@ import type {SdkSession, SdkEvent} from '../types/index.js';
 
 const sdkSessionManager = new SdkSessionManager();
 import {checkForUpdate, getCachedUpdateCheck} from './versionCheckService.js';
+import {
+	parseClipboardImageDataUrl,
+	resolveClipboardImageType,
+} from '../utils/clipboardImages.js';
 
 // --- Clipboard Image Paste Constants ---
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_MIME_TYPES = [
-	'image/png',
-	'image/jpeg',
-	'image/webp',
-	'image/gif',
-];
 const TEMP_IMAGE_DIR = path.join(tmpdir(), 'argusdev-images');
 const STARTUP_SCRIPT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 const STARTUP_SCRIPT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -4021,6 +4019,18 @@ export class APIServer {
 							sessionId: ptySession.id,
 							data: fullHistory,
 						});
+
+						// Restore terminal modes that the agent set during the trimmed
+						// portion of history. Without this, modes the agent enabled at
+						// startup (e.g. bracketed paste via \x1b[?2004h) get lost once
+						// they age out of the 1MB rolling buffer, and re-attached
+						// clients see broken paste/cursor/mouse behavior until the
+						// agent restarts. Read live state from the server-side headless
+						// xterm, which has tracked it accurately the whole time.
+						socket.emit('terminal_mode', {
+							sessionId: ptySession.id,
+							bracketedPaste: ptySession.terminal.modes.bracketedPasteMode,
+						});
 					}
 
 					// Check for SDK session and send message history
@@ -4093,18 +4103,11 @@ export class APIServer {
 						mimeType: string;
 					}) => {
 						try {
-							// Validate MIME type
-							if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
-								socket.emit('image_path', {
-									sessionId,
-									error: 'Invalid image type',
-								});
-								return;
-							}
-
-							// Parse and validate data URL format
-							const match = imageData.match(/^data:(image\/\w+);base64,(.+)$/);
-							if (!match || !match[2]) {
+							// Parse and validate data URL format. Browser clipboard MIME
+							// metadata can be empty, aliased (image/x-png), or wrong for
+							// pasted screenshots, so do not reject before inspecting bytes.
+							const parsed = parseClipboardImageDataUrl(imageData);
+							if (!parsed) {
 								socket.emit('image_path', {
 									sessionId,
 									error: 'Invalid image data',
@@ -4112,10 +4115,8 @@ export class APIServer {
 								return;
 							}
 
-							const base64Data = match[2];
-
 							// Check size before decoding (base64 is ~33% larger than binary)
-							const estimatedSize = (base64Data.length * 3) / 4;
+							const estimatedSize = (parsed.base64Data.length * 3) / 4;
 							if (estimatedSize > MAX_IMAGE_SIZE) {
 								socket.emit('image_path', {
 									sessionId,
@@ -4124,14 +4125,23 @@ export class APIServer {
 								return;
 							}
 
-							const buffer = Buffer.from(base64Data, 'base64');
-
-							// Determine extension from mime type
-							const ext = mimeType.split('/')[1] || 'png';
+							const buffer = Buffer.from(parsed.base64Data, 'base64');
+							const imageType = resolveClipboardImageType(
+								mimeType,
+								parsed.declaredMimeType,
+								buffer,
+							);
+							if (!imageType) {
+								socket.emit('image_path', {
+									sessionId,
+									error: 'Invalid image type',
+								});
+								return;
+							}
 
 							// Generate secure random filename
 							const randomName = randomBytes(16).toString('hex');
-							const filename = `${randomName}.${ext}`;
+							const filename = `${randomName}.${imageType.extension}`;
 							const filePath = path.join(TEMP_IMAGE_DIR, filename);
 
 							// Write file with restrictive permissions

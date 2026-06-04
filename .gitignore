@@ -15,6 +15,10 @@ ui-reference/
 # Local audit/task tracking
 TODO.md
 
+# Pi local session artifacts
+.pi/
+.pi-loop.json.lock
+
 # Local dev config
 temp/
 docs.archive/
