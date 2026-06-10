@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.9.0](https://github.com/Helmi/argusdev/compare/v0.8.2...v0.9.0) (2026-06-10)
+
+
+### Runtime
+
+* require Node 26, update CI/publish/docs to match, and upgrade native dependencies for Node 26 compatibility ([f07a979](https://github.com/Helmi/argusdev/commit/f07a97941b52019cbffab1b5a5d081f15c576be7))
+
+
+### Bug Fixes
+
+* include built web UI assets in the npm package
+* **webui:** harden terminal paste handling ([64bcf88](https://github.com/Helmi/argusdev/commit/64bcf880291986753ef7148f0164a33067068ac3))
+
 ### [0.8.2](https://github.com/Helmi/argusdev/compare/v0.8.0...v0.8.2) (2026-05-21)
 
 
