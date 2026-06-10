@@ -35,7 +35,7 @@ Applies to tests that touch:
 ## CI Gate Mapping
 
 Changes affecting this contract must pass these CI checks from `.github/workflows/ci.yml`:
-- `CI / Verify (Ubuntu, Node 22)`
-- `CI / Test (ubuntu-latest, Node 22.x)`
-- `CI / Test (macos-latest, Node 22.x)`
-- `CI / Test (windows-latest, Node 22.x)`
+- `CI / Verify (Ubuntu, Node 26)`
+- `CI / Test (ubuntu-latest, Node 26.x)`
+- `CI / Test (macos-latest, Node 26.x)`
+- `CI / Test (windows-latest, Node 26.x)`

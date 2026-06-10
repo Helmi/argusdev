@@ -5,7 +5,7 @@ description: How to install ArgusDev
 
 ## Requirements
 
-- Node.js 22 or later
+- Node.js 26
 - One or more AI coding assistants installed (Claude Code, Gemini CLI, etc.)
 
 ## Install via npm

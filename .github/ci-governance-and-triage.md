@@ -4,10 +4,10 @@
 
 Set these as required status checks in branch protection. They map to `.github/workflows/ci.yml`.
 
-- `CI / Verify (Ubuntu, Node 22)`
-- `CI / Test (ubuntu-latest, Node 22.x)`
-- `CI / Test (macos-latest, Node 22.x)`
-- `CI / Test (windows-latest, Node 22.x)`
+- `CI / Verify (Ubuntu, Node 26)`
+- `CI / Test (ubuntu-latest, Node 26.x)`
+- `CI / Test (macos-latest, Node 26.x)`
+- `CI / Test (windows-latest, Node 26.x)`
 
 Policy:
 - Merge to `main` only through PRs.

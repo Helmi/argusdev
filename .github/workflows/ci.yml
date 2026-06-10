@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   verify:
-    name: Verify (Ubuntu, Node 22)
+    name: Verify (Ubuntu, Node 26)
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -24,10 +24,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node 22
+      - name: Setup Node 26
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 26.x
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -38,9 +38,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-node-22-bun-${{ hashFiles('bun.lock', 'client/bun.lock') }}
+          key: ${{ runner.os }}-node-26-bun-${{ hashFiles('bun.lock', 'client/bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-node-22-bun-
+            ${{ runner.os }}-node-26-bun-
             ${{ runner.os }}-bun-
 
       - name: Install dependencies
@@ -65,13 +65,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            node-version: 22.x
+            node-version: 26.x
           - os: macos-latest
-            node-version: 22.x
+            node-version: 26.x
           - os: windows-latest
-            node-version: 22.x
-          - os: ubuntu-latest
-            node-version: 24.x
+            node-version: 26.x
 
     steps:
       - name: Checkout
